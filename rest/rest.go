@@ -1,0 +1,95 @@
+package rest
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/susruth/wbtc-garden-server/model"
+)
+
+type Server struct {
+	router  *gin.Engine
+	store   Store
+	swapper Swapper
+}
+
+type Store interface {
+	Transactions(address string) ([]model.Transaction, error)
+}
+
+type Swapper interface {
+	GetAccount() (model.Account, error)
+	ExecuteSwap(from, to, secretHash string, fromExpiry, toExpiry int64, amount uint64) error
+}
+
+func NewServer(store Store, swapper Swapper) *Server {
+	return &Server{
+		router:  gin.Default(),
+		store:   store,
+		swapper: swapper,
+	}
+}
+
+func (s *Server) Run(addr string) error {
+	s.router.GET("/", s.GetAccount())
+	s.router.POST("/transactions", s.PostTransactions())
+	s.router.GET("/transactions/:address", s.GetTransactions())
+	return s.router.Run(addr)
+}
+
+func (s *Server) GetAccount() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		account, err := s.swapper.GetAccount()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "failed to get account details",
+				"message": err.Error(),
+			})
+		}
+		c.JSON(http.StatusOK, account)
+	}
+}
+
+type PostTransactionReq struct {
+	From       string  `json:"from"`
+	To         string  `json:"to"`
+	SecretHash string  `json:"secretHash"`
+	FromExpiry float64 `json:"fromExpiry"`
+	ToExpiry   float64 `json:"toExpiry"`
+	Amount     float64 `json:"amount"`
+}
+
+func (s *Server) PostTransactions() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		req := PostTransactionReq{}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if err := s.swapper.ExecuteSwap(req.From, req.To, req.SecretHash, int64(req.FromExpiry), int64(req.ToExpiry), uint64(req.Amount)); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "failed to execute the swap",
+				"message": err.Error(),
+			})
+		}
+
+		c.JSON(http.StatusCreated, gin.H{})
+	}
+}
+
+type GetTransactionsResp []model.Transaction
+
+func (s *Server) GetTransactions() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userAddress := c.Param("address")
+		transactions, err := s.store.Transactions(userAddress)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "failed to retrieve user transactions",
+				"message": err.Error(),
+			})
+		}
+		c.JSON(http.StatusOK, transactions)
+	}
+}
