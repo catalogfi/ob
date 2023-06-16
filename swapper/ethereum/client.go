@@ -25,7 +25,7 @@ type Client interface {
 	GetProvider() *ethclient.Client
 	TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address, auth *bind.TransactOpts) (string, error)
 	GetCurrentBlock() (uint64, error)
-	GetERC20Balance(tokenAddr common.Address, address common.Address, auth *bind.CallOpts) (*big.Int, error)
+	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
 }
 type client struct {
 	url      string
@@ -125,12 +125,11 @@ func (client *client) GetCurrentBlock() (uint64, error) {
 	return bn, err
 }
 
-func (client *client) GetERC20Balance(tokenAddr common.Address, ofAddr common.Address, auth *bind.CallOpts) (*big.Int, error) {
+func (client *client) GetERC20Balance(tokenAddr common.Address, ofAddr common.Address) (*big.Int, error) {
 	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
 	if err != nil {
 		return big.NewInt(0), err
 	}
-	balance, err := instance.BalanceOf(auth, ofAddr)
+	balance, err := instance.BalanceOf(client.GetCallOpts(), ofAddr)
 	return balance, err
-
 }

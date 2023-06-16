@@ -3,6 +3,7 @@ package rest
 import (
 	"net/http"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/susruth/wbtc-garden/model"
 )
@@ -19,7 +20,7 @@ type Store interface {
 
 type Swapper interface {
 	GetAccount() (model.Account, error)
-	ExecuteSwap(from, to, secretHash string, wbtcExpiry int64, amount uint64) error
+	ExecuteSwap(from, to, secretHash string, wbtcExpiry int64) error
 }
 
 func NewServer(store Store, swapper Swapper) *Server {
@@ -34,6 +35,7 @@ func (s *Server) Run(addr string) error {
 	s.router.GET("/", s.GetAccount())
 	s.router.POST("/transactions", s.PostTransactions())
 	s.router.GET("/transactions/:address", s.GetTransactions())
+	s.router.Use(cors.Default())
 	return s.router.Run(addr)
 }
 
@@ -55,7 +57,6 @@ type PostTransactionReq struct {
 	To         string  `json:"to"`
 	SecretHash string  `json:"secretHash"`
 	WBTCExpiry float64 `json:"wbtcExpiry"`
-	Amount     float64 `json:"amount"`
 }
 
 func (s *Server) PostTransactions() gin.HandlerFunc {
@@ -66,7 +67,7 @@ func (s *Server) PostTransactions() gin.HandlerFunc {
 			return
 		}
 
-		if err := s.swapper.ExecuteSwap(req.From, req.To, req.SecretHash, int64(req.WBTCExpiry), uint64(req.Amount*100000000)); err != nil {
+		if err := s.swapper.ExecuteSwap(req.From, req.To, req.SecretHash, int64(req.WBTCExpiry)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":   "failed to execute the swap",
 				"message": err.Error(),

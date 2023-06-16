@@ -40,6 +40,18 @@ type redeemerSwap struct {
 	client           Client
 }
 
+func GetAmount(client Client, tokenAddr, redeemerAddr, initiatorAddr common.Address, secretHash []byte, expiryBlock *big.Int) (uint64, error) {
+	contractAddr, err := GetAddress(deployerAddr, client.GetCallOpts(), client.GetProvider(), redeemerAddr, initiatorAddr, secretHash, expiryBlock)
+	if err != nil {
+		return 0, err
+	}
+	balance, err := client.GetERC20Balance(tokenAddr, contractAddr)
+	if err != nil {
+		return 0, err
+	}
+	return balance.Uint64(), nil
+}
+
 var deployerAddr = common.HexToAddress("0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2")
 
 func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, tokenAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.InitiatorSwap, error) {

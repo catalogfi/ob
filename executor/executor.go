@@ -189,7 +189,7 @@ func (s *executor) GetAccount() (model.Account, error) {
 
 	ethereumAddress := crypto.PubkeyToAddress(s.ethereumPrivateKey.PublicKey)
 	_, btcBalance, _ := s.client.GetUTXOs(bitcoinAddress, 0)
-	ethBalance, err := s.ethereumClient.GetERC20Balance(s.wbtcAddress, ethereumAddress, nil)
+	ethBalance, err := s.ethereumClient.GetERC20Balance(s.wbtcAddress, ethereumAddress)
 	if err != nil {
 		return model.Account{}, fmt.Errorf("failed to get WBTC balance: %v", err)
 	}
@@ -204,8 +204,13 @@ func (s *executor) GetAccount() (model.Account, error) {
 	}, nil
 }
 
-func (s *executor) ExecuteSwap(from, to, secretHash string, wbtcExpiry int64, amount uint64) error {
-	_, err := s.getInitiatorSwap(from, secretHash, wbtcExpiry, deductFee(amount))
+func (s *executor) ExecuteSwap(from, to, secretHash string, wbtcExpiry int64) error {
+	amount, err := s.getAmount(to, secretHash, wbtcExpiry)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.getInitiatorSwap(from, secretHash, wbtcExpiry, deductFee(amount))
 	if err != nil {
 		return err
 	}
@@ -288,5 +293,24 @@ func (s *executor) getRedeemerSwap(addr, secretHash string, wbtcExpiry int64, am
 		return ethereum.NewRedeemerSwap(s.ethereumPrivateKey, address, s.wbtcAddress, secretHashBytes, big.NewInt(wbtcExpiry), big.NewInt(int64(amount)), s.ethereumClient)
 	default:
 		return nil, fmt.Errorf("unknown address type")
+	}
+}
+
+func (s *executor) getAmount(addr, secretHash string, wbtcExpiry int64) (uint64, error) {
+	secretHashBytes, err := hex.DecodeString(secretHash)
+	if err != nil {
+		return 0, err
+	}
+	address, err := s.decodeAddress(addr)
+	if err != nil {
+		return 0, err
+	}
+	switch address := address.(type) {
+	case []byte:
+		return bitcoin.GetAmount(s.client, s.bitcoinPrivateKey.PubKey().SerializeCompressed(), address, secretHashBytes, 288)
+	case common.Address:
+		return ethereum.GetAmount(s.ethereumClient, s.wbtcAddress, crypto.PubkeyToAddress(s.ethereumPrivateKey.PublicKey), address, secretHashBytes, big.NewInt(wbtcExpiry))
+	default:
+		return 0, fmt.Errorf("unknown address type")
 	}
 }

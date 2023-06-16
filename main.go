@@ -52,6 +52,7 @@ func main() {
 	}
 	go swapper.Run()
 	server := rest.NewServer(store, swapper)
+
 	if err := server.Run(fmt.Sprintf(":%s", os.Getenv("PORT"))); err != nil {
 		panic(err)
 	}

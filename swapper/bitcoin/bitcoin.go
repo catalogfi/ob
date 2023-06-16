@@ -21,6 +21,22 @@ type initiatorSwap struct {
 	client                Client
 }
 
+func GetAmount(client Client, redeemerAddr, initiatorAddr, secretHash []byte, waitBlocks int64) (uint64, error) {
+	htlcScript, err := NewHTLCScript(initiatorAddr, redeemerAddr, secretHash, waitBlocks)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create HTLC script: %w", err)
+	}
+	scriptAddr, err := btcutil.NewAddressScriptHash(htlcScript, client.Net())
+	if err != nil {
+		return 0, fmt.Errorf("failed to create script address: %w", err)
+	}
+	_, balance, err := client.GetUTXOs(scriptAddr, 0)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get UTXOs: %w", err)
+	}
+	return balance, nil
+}
+
 func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerPublicKey, secretHash []byte, waitBlocks int64, amount uint64, client Client) (swapper.InitiatorSwap, error) {
 	htlcScript, err := NewHTLCScript(initiator.PubKey().SerializeCompressed(), redeemerPublicKey, secretHash, waitBlocks)
 	if err != nil {
