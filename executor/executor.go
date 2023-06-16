@@ -191,8 +191,7 @@ func (s *executor) GetAccount() (model.Account, error) {
 	_, btcBalance, _ := s.client.GetUTXOs(bitcoinAddress, 0)
 	ethBalance, err := s.ethereumClient.GetERC20Balance(s.wbtcAddress, ethereumAddress, nil)
 	if err != nil {
-		fmt.Println("Failed to get WBTC balance: ", err)
-		return model.Account{}, err
+		return model.Account{}, fmt.Errorf("failed to get WBTC balance: %v", err)
 	}
 	return model.Account{
 		BtcAddress:       bitcoinAddress.EncodeAddress(),
