@@ -188,14 +188,12 @@ func (s *executor) GetAccount() (model.Account, error) {
 	}
 
 	ethereumAddress := crypto.PubkeyToAddress(s.ethereumPrivateKey.PublicKey)
-
 	_, btcBalance, _ := s.client.GetUTXOs(bitcoinAddress, 0)
 	ethBalance, err := s.ethereumClient.GetERC20Balance(s.wbtcAddress, ethereumAddress, nil)
 	if err != nil {
 		fmt.Println("Failed to get WBTC balance: ", err)
 		return model.Account{}, err
 	}
-
 	return model.Account{
 		BtcAddress:       bitcoinAddress.EncodeAddress(),
 		BtcPubKey:        hex.EncodeToString(s.bitcoinPrivateKey.PubKey().SerializeCompressed()),
@@ -223,7 +221,7 @@ func (s *executor) ExecuteSwap(from, to, secretHash string, wbtcExpiry int64, am
 	}
 
 	if !initiated {
-		return fmt.Errorf("precondition Violation: swap has not been initiated")
+		return fmt.Errorf("precondition violation: swap has not been initiated")
 	}
 
 	return s.store.PutTransaction(model.Transaction{
