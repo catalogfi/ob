@@ -85,7 +85,7 @@ func getDeploymentByteCode(redeemer, refunder common.Address, salt [32]byte, exp
 		expiryBlockNumber,
 	)
 
-	bytecode, _ := hex.DecodeString(AtomicSwap.AtomicSwapBin)
+	bytecode, _ := hex.DecodeString(AtomicSwap.AtomicSwapBin[2:])
 	deploymentByteCode := append(bytecode, constructorParams...)
 	return deploymentByteCode
 
