@@ -63,7 +63,7 @@ func New(privateKey string, config Config, store Store) (Executor, error) {
 	if config.IsMainnet {
 		params = &chaincfg.MainNetParams
 	} else {
-		params = &chaincfg.TestNet3Params
+		params = &chaincfg.RegressionNetParams
 	}
 
 	return &executor{
@@ -72,6 +72,7 @@ func New(privateKey string, config Config, store Store) (Executor, error) {
 		client:             bitcoin.NewClient(config.BitcoinURL, params),
 		ethereumClient:     ethereum.NewClient(config.EthereumURL),
 		wbtcAddress:        common.HexToAddress(config.WBTCAddress),
+		store:              store,
 	}, nil
 }
 
@@ -85,6 +86,7 @@ func (s *executor) Run() {
 		}
 
 		for _, tx := range txs {
+			fmt.Println("Executing transaction: ", tx)
 			s.execute(tx)
 		}
 
@@ -92,16 +94,18 @@ func (s *executor) Run() {
 			fmt.Println("No pending transactions, sleeping for 1 minute")
 			time.Sleep(time.Minute)
 		}
+
+		time.Sleep(10 * time.Second)
 	}
 }
 
 func (s *executor) execute(tx model.Transaction) {
-	initiatorSwap, err := s.getInitiatorSwap(tx.FromAddress, tx.SecretHash, tx.FromExpiry, deductFee(tx.Amount))
+	initiatorSwap, err := s.getInitiatorSwap(tx.ToAddress, tx.SecretHash, tx.WBTCExpiry, deductFee(tx.Amount))
 	if err != nil {
 		panic(fmt.Errorf("Constraint Violation, this check should have been done before storage into DB: %v", err))
 	}
 
-	redeemerSwap, err := s.getRedeemerSwap(tx.ToAddress, tx.SecretHash, tx.ToExpiry, tx.Amount)
+	redeemerSwap, err := s.getRedeemerSwap(tx.FromAddress, tx.SecretHash, tx.WBTCExpiry, tx.Amount)
 	if err != nil {
 		panic(fmt.Errorf("Constraint Violation, this check should have been done before storage into DB: %v", err))
 	}
@@ -144,6 +148,9 @@ func (s *executor) execute(tx model.Transaction) {
 				fmt.Println("Failed to update transaction: ", err)
 				return
 			}
+		} else if err != nil {
+			fmt.Println("Failed to check if swap is expired: ", err)
+			return
 		} else {
 			redeemed, secret, txHash, err := initiatorSwap.IsRedeemed()
 			if err != nil {
@@ -151,6 +158,7 @@ func (s *executor) execute(tx model.Transaction) {
 				return
 			}
 
+			fmt.Println("Redeemed: ", redeemed)
 			if redeemed {
 				tx.Status = 3
 				tx.Secret = hex.EncodeToString(secret)
@@ -166,10 +174,6 @@ func (s *executor) execute(tx model.Transaction) {
 			}
 		}
 
-		if err != nil {
-			fmt.Println("Failed to check if swap is expired: ", err)
-			return
-		}
 	}
 
 	if tx.Status == 3 {
@@ -214,40 +218,39 @@ func (s *executor) GetAccount() (model.Account, error) {
 
 	ethereumAddress := crypto.PubkeyToAddress(s.ethereumPrivateKey.PublicKey)
 
-	_, btcBalance, err := s.client.GetUTXOs(bitcoinAddress, 0)
-	if err != nil {
-		return model.Account{}, err
-	}
-
+	_, btcBalance, _ := s.client.GetUTXOs(bitcoinAddress, 0)
 	ethBalance, err := s.ethereumClient.GetERC20Balance(s.wbtcAddress, ethereumAddress, nil)
 	if err != nil {
+		fmt.Println("Failed to get WBTC balance: ", err)
 		return model.Account{}, err
 	}
 
 	return model.Account{
-		BtcAddress:  bitcoinAddress.String(),
-		WbtcAddress: ethereumAddress.String(),
-		BtcBalance:  strconv.FormatUint(btcBalance, 10),
-		WbtcBalance: ethBalance.String(),
-		Fee:         0.1,
+		BtcAddress:       bitcoinAddress.EncodeAddress(),
+		BtcPubKey:        hex.EncodeToString(s.bitcoinPrivateKey.PubKey().SerializeCompressed()),
+		WbtcAddress:      ethereumAddress.String(),
+		BtcBalance:       strconv.FormatUint(btcBalance, 10),
+		WbtcBalance:      ethBalance.String(),
+		WbtcTokenAddress: s.wbtcAddress.Hex(),
+		Fee:              0.1,
 	}, nil
 }
 
-func (s *executor) ExecuteSwap(from, to, secretHash string, fromExpiry, toExpiry int64, amount uint64) error {
-	_, err := s.getInitiatorSwap(from, secretHash, fromExpiry, deductFee(amount))
+func (s *executor) ExecuteSwap(from, to, secretHash string, wbtcExpiry int64, amount uint64) error {
+	_, err := s.getInitiatorSwap(from, secretHash, wbtcExpiry, deductFee(amount))
 	if err != nil {
 		return err
 	}
-	_, err = s.getRedeemerSwap(to, secretHash, toExpiry, amount)
+	_, err = s.getRedeemerSwap(to, secretHash, wbtcExpiry, amount)
 	if err != nil {
 		return err
 	}
+
 	return s.store.PutTransaction(model.Transaction{
 		FromAddress: from,
 		ToAddress:   to,
 		SecretHash:  secretHash,
-		FromExpiry:  fromExpiry,
-		ToExpiry:    toExpiry,
+		WBTCExpiry:  wbtcExpiry,
 		Amount:      amount,
 		Fee:         amount - deductFee(amount),
 	})
@@ -280,7 +283,7 @@ func (s *executor) getInitiatorSwap(addr, secretHash string, block int64, amount
 
 	switch address := address.(type) {
 	case []byte:
-		return bitcoin.NewInitiatorSwap(s.bitcoinPrivateKey, address, secretHashBytes, block, amount, s.client)
+		return bitcoin.NewInitiatorSwap(s.bitcoinPrivateKey, address, secretHashBytes, 144, amount, s.client)
 	case common.Address:
 		return ethereum.NewInitiatorSwap(s.ethereumPrivateKey, address, s.wbtcAddress, secretHashBytes, big.NewInt(block), big.NewInt(int64(amount)), s.ethereumClient)
 	default:
@@ -288,7 +291,7 @@ func (s *executor) getInitiatorSwap(addr, secretHash string, block int64, amount
 	}
 }
 
-func (s *executor) getRedeemerSwap(addr, secretHash string, block int64, amount uint64) (swapper.RedeemerSwap, error) {
+func (s *executor) getRedeemerSwap(addr, secretHash string, wbtcExpiry int64, amount uint64) (swapper.RedeemerSwap, error) {
 	secretHashBytes, err := hex.DecodeString(secretHash)
 	if err != nil {
 		return nil, err
@@ -301,9 +304,9 @@ func (s *executor) getRedeemerSwap(addr, secretHash string, block int64, amount 
 
 	switch address := address.(type) {
 	case []byte:
-		return bitcoin.NewRedeemerSwap(s.bitcoinPrivateKey, address, secretHashBytes, block, amount, s.client)
+		return bitcoin.NewRedeemerSwap(s.bitcoinPrivateKey, address, secretHashBytes, 288, amount, s.client)
 	case common.Address:
-		return ethereum.NewRedeemerSwap(s.ethereumPrivateKey, address, s.wbtcAddress, secretHashBytes, big.NewInt(block), big.NewInt(int64(amount)), s.ethereumClient)
+		return ethereum.NewRedeemerSwap(s.ethereumPrivateKey, address, s.wbtcAddress, secretHashBytes, big.NewInt(wbtcExpiry), big.NewInt(int64(amount)), s.ethereumClient)
 	default:
 		return nil, fmt.Errorf("unknown address type")
 	}

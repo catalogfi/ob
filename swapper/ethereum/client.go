@@ -12,14 +12,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/susruth/wbtc-garden-server/swapper/ethereum/Typings/AtomicSwap"
-	"github.com/susruth/wbtc-garden-server/swapper/ethereum/Typings/ERC20"
+	"github.com/susruth/wbtc-garden-server/swapper/ethereum/typings/AtomicSwap"
+	"github.com/susruth/wbtc-garden-server/swapper/ethereum/typings/ERC20"
 )
 
 type Client interface {
 	GetTransactOpts(privKey *ecdsa.PrivateKey) *bind.TransactOpts
 	GetCallOpts() *bind.CallOpts
-	ExecuteAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secret []byte) (string, error)
+	RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secret []byte) (string, error)
+	RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address) (string, error)
 	GetPublicAddress(privKey *ecdsa.PrivateKey) common.Address
 	GetProvider() *ethclient.Client
 	TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address, auth *bind.TransactOpts) (string, error)
@@ -34,7 +35,6 @@ type client struct {
 func NewClient(url string) Client {
 	provider, _ := ethclient.Dial(url)
 	return &client{url: url, provider: provider}
-
 }
 func (client *client) GetTransactOpts(privKey *ecdsa.PrivateKey) *bind.TransactOpts {
 	provider := client.provider
@@ -49,10 +49,10 @@ func (client *client) GetTransactOpts(privKey *ecdsa.PrivateKey) *bind.TransactO
 		panic(err)
 	}
 
-	gasPrice, err := provider.SuggestGasPrice(context.Background())
-	if err != nil {
-		panic(err)
-	}
+	// gasPrice, err := provider.SuggestGasPrice(context.Background())
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	auth, err := bind.NewKeyedTransactorWithChainID(privKey, chainId)
 	if err != nil {
@@ -61,7 +61,7 @@ func (client *client) GetTransactOpts(privKey *ecdsa.PrivateKey) *bind.TransactO
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(0)      // in wei
 	auth.GasLimit = uint64(3000000) // in units
-	auth.GasPrice = gasPrice
+	auth.GasPrice = big.NewInt(20305454254)
 
 	return auth
 }
@@ -71,12 +71,24 @@ func (client *client) GetCallOpts() *bind.CallOpts {
 	auth.Pending = true
 	return auth
 }
-func (client *client) ExecuteAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secret []byte) (string, error) {
+func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secret []byte) (string, error) {
 	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
 	if err != nil {
 		return "", err
 	}
-	tx, err := instance.Execute(auth, token, secret)
+	tx, err := instance.Redeem(auth, token, secret)
+	if err != nil {
+		return "", err
+	}
+	return tx.Hash().Hex(), nil
+}
+
+func (client *client) RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address) (string, error) {
+	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
+	if err != nil {
+		return "", err
+	}
+	tx, err := instance.Refund(auth, token)
 	if err != nil {
 		return "", err
 	}
@@ -101,9 +113,11 @@ func (client *client) TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, 
 	if err != nil {
 		return "", err
 	}
-
 	tx, err := instance.Transfer(auth, toAddr, amount)
-	fmt.Printf("Transfering %s to %s txhash : %s\n", tokenAddr, toAddr, tx.Hash().Hex())
+	if err != nil {
+		return "", err
+	}
+	fmt.Printf("Transfering %v %s to %s txhash : %s\n", amount, tokenAddr, toAddr, tx.Hash().Hex())
 	return tx.Hash().Hex(), err
 }
 func (client *client) GetCurrentBlock() (uint64, error) {

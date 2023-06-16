@@ -105,6 +105,13 @@ func (client *client) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, u
 		return nil, 0, fmt.Errorf("failed to get UTXOs: %w", err)
 	}
 	utxos := UTXOs{}
+
+	// data, err := ioutil.ReadAll(resp.Body)
+	// if err != nil {
+	// 	return nil, 0, fmt.Errorf("failed to read response body: %w", err)
+	// }
+	// fmt.Println(string(data))
+
 	if err := json.NewDecoder(resp.Body).Decode(&utxos); err != nil {
 		return nil, 0, fmt.Errorf("failed to decode UTXOs: %w", err)
 	}

@@ -32,7 +32,7 @@ func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerPublicKey, secretHash
 	}
 
 	fmt.Println("script address:", scriptAddr.EncodeAddress())
-	return &initiatorSwap{initiator: initiator, htlcScript: htlcScript, scriptAddr: scriptAddr, client: client}, nil
+	return &initiatorSwap{initiator: initiator, htlcScript: htlcScript, scriptAddr: scriptAddr, waitBlocks: waitBlocks, client: client}, nil
 }
 
 func (s *initiatorSwap) Initiate() (string, error) {
@@ -46,22 +46,26 @@ func (s *initiatorSwap) Initiate() (string, error) {
 }
 
 func (initiatorSwap *initiatorSwap) Expired() (bool, error) {
-	currentBlock, err := initiatorSwap.client.GetTipBlockHeight()
-	if err != nil {
-		return false, err
-	}
+	// currentBlock, err := initiatorSwap.client.GetTipBlockHeight()
+	// if err != nil {
+	// 	return false, err
+	// }
 
-	initiateBlockHeight, err := initiatorSwap.client.GetBlockHeight(initiatorSwap.initiateTxHash)
-	if err != nil {
-		return false, err
-	}
+	// initiateBlockHeight, err := initiatorSwap.client.GetBlockHeight(initiatorSwap.initiateTxHash)
+	// if err != nil {
+	// 	return false, err
+	// }
 
-	expiryBlockHeight := initiateBlockHeight + uint64(initiatorSwap.waitBlocks)
-	if currentBlock > expiryBlockHeight {
-		return true, nil
-	} else {
-		return false, nil
-	}
+	return false, nil
+
+	// TODO: comback and fix this
+	// expiryBlockHeight := initiateBlockHeight + uint64(initiatorSwap.waitBlocks)
+	// fmt.Println("Expiry Block Height:", initiateBlockHeight, uint64(initiatorSwap.waitBlocks), expiryBlockHeight)
+	// if currentBlock > expiryBlockHeight {
+	// 	return true, nil
+	// } else {
+	// 	return false, nil
+	// }
 }
 
 func (s *initiatorSwap) Refund() (string, error) {
@@ -186,7 +190,7 @@ func (s *redeemerSwap) IsInitiated() (bool, string, error) {
 	if err != nil {
 		return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
-	if bal >= s.amount {
+	if bal >= s.amount && len(utxos) > 0 {
 		return true, utxos[0].TxID, nil
 	}
 	return false, "", nil

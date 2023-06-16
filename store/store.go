@@ -31,7 +31,7 @@ func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 
 func (s *store) Transactions(address string) ([]model.Transaction, error) {
 	txs := []model.Transaction{}
-	if res := s.db.Find(&txs, "address = ?", address); res.Error != nil {
+	if res := s.db.Find(&txs, "from_address = ? OR to_address = ?", address, address); res.Error != nil {
 		return nil, fmt.Errorf("no such orders for the given address (%s): %v", address, res.Error)
 	}
 	return txs, nil

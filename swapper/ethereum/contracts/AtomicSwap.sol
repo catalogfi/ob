@@ -7,7 +7,7 @@ contract AtomicSwap {
     bytes32 immutable secretHash;
     uint256 immutable expiry;
 
-    event redeemed(string _secret);
+    event Redeemed(string _secret);
 
     constructor(
         address _redeemer,
@@ -21,15 +21,15 @@ contract AtomicSwap {
         expiry = _expiry;
     }
 
-    function execute(address _token, bytes memory _secret) external {
-        if (keccak256(_secret) == secretHash) {
-            emit redeemed(string(_secret));
-            _transferBalance(_token, redeemer);
-        } else if (block.number > expiry) {
-            _transferBalance(_token, refunder);
-        } else {
-            revert("invalid secret or expiry");
-        }
+    function redeem(address _token, bytes memory _secret) external {
+        require(sha256(_secret) == secretHash);
+        emit Redeemed(string(_secret));
+        _transferBalance(_token, redeemer);
+    }
+
+    function refund(address _token) external {
+        require(block.number > expiry);
+        _transferBalance(_token, refunder);
     }
 
     function _transferBalance(address _token, address _to) internal {

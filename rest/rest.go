@@ -19,7 +19,7 @@ type Store interface {
 
 type Swapper interface {
 	GetAccount() (model.Account, error)
-	ExecuteSwap(from, to, secretHash string, fromExpiry, toExpiry int64, amount uint64) error
+	ExecuteSwap(from, to, secretHash string, wbtcExpiry int64, amount uint64) error
 }
 
 func NewServer(store Store, swapper Swapper) *Server {
@@ -54,8 +54,7 @@ type PostTransactionReq struct {
 	From       string  `json:"from"`
 	To         string  `json:"to"`
 	SecretHash string  `json:"secretHash"`
-	FromExpiry float64 `json:"fromExpiry"`
-	ToExpiry   float64 `json:"toExpiry"`
+	WBTCExpiry float64 `json:"wbtcExpiry"`
 	Amount     float64 `json:"amount"`
 }
 
@@ -67,7 +66,7 @@ func (s *Server) PostTransactions() gin.HandlerFunc {
 			return
 		}
 
-		if err := s.swapper.ExecuteSwap(req.From, req.To, req.SecretHash, int64(req.FromExpiry), int64(req.ToExpiry), uint64(req.Amount)); err != nil {
+		if err := s.swapper.ExecuteSwap(req.From, req.To, req.SecretHash, int64(req.WBTCExpiry), uint64(req.Amount)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":   "failed to execute the swap",
 				"message": err.Error(),
