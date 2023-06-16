@@ -210,6 +210,10 @@ func (s *executor) ExecuteSwap(from, to, secretHash string, wbtcExpiry int64) er
 		return err
 	}
 
+	if amount == 0 {
+		return fmt.Errorf("precondition violation: swap amount is 0")
+	}
+
 	_, err = s.getInitiatorSwap(from, secretHash, wbtcExpiry, deductFee(amount))
 	if err != nil {
 		return err
@@ -224,6 +228,7 @@ func (s *executor) ExecuteSwap(from, to, secretHash string, wbtcExpiry int64) er
 		return err
 	}
 
+	fmt.Println(initiated, txHash, err)
 	if !initiated {
 		return fmt.Errorf("precondition violation: swap has not been initiated")
 	}

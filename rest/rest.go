@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-contrib/cors"
@@ -68,10 +69,12 @@ func (s *Server) PostTransactions() gin.HandlerFunc {
 		}
 
 		if err := s.swapper.ExecuteSwap(req.From, req.To, req.SecretHash, int64(req.WBTCExpiry)); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
+			fmt.Println(err.Error())
+			c.JSON(http.StatusBadRequest, gin.H{
 				"error":   "failed to execute the swap",
 				"message": err.Error(),
 			})
+			return
 		}
 
 		c.JSON(http.StatusCreated, gin.H{})
