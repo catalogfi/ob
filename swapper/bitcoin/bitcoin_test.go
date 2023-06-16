@@ -11,8 +11,8 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/susruth/wbtc-garden-server/swapper"
-	"github.com/susruth/wbtc-garden-server/swapper/bitcoin"
+	"github.com/susruth/wbtc-garden/swapper"
+	"github.com/susruth/wbtc-garden/swapper/bitcoin"
 )
 
 var _ = Describe("Bitcoin", func() {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/susruth/wbtc-garden-server/swapper"
+	"github.com/susruth/wbtc-garden/swapper"
 )
 
 type initiatorSwap struct {

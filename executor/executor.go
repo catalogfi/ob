@@ -14,11 +14,11 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/susruth/wbtc-garden-server/model"
-	"github.com/susruth/wbtc-garden-server/rest"
-	"github.com/susruth/wbtc-garden-server/swapper"
-	"github.com/susruth/wbtc-garden-server/swapper/bitcoin"
-	"github.com/susruth/wbtc-garden-server/swapper/ethereum"
+	"github.com/susruth/wbtc-garden/model"
+	"github.com/susruth/wbtc-garden/rest"
+	"github.com/susruth/wbtc-garden/swapper"
+	"github.com/susruth/wbtc-garden/swapper/bitcoin"
+	"github.com/susruth/wbtc-garden/swapper/ethereum"
 )
 
 type executor struct {

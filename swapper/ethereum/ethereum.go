@@ -11,9 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/susruth/wbtc-garden-server/swapper"
-	"github.com/susruth/wbtc-garden-server/swapper/ethereum/typings/AtomicSwap"
-	"github.com/susruth/wbtc-garden-server/swapper/ethereum/typings/ERC20"
+	"github.com/susruth/wbtc-garden/swapper"
+	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
+	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/ERC20"
 )
 
 type initiatorSwap struct {

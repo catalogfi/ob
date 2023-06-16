@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/susruth/wbtc-garden-server/model"
+	"github.com/susruth/wbtc-garden/model"
 )
 
 type Server struct {

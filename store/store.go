@@ -3,9 +3,9 @@ package store
 import (
 	"fmt"
 
-	"github.com/susruth/wbtc-garden-server/executor"
-	"github.com/susruth/wbtc-garden-server/model"
-	"github.com/susruth/wbtc-garden-server/rest"
+	"github.com/susruth/wbtc-garden/executor"
+	"github.com/susruth/wbtc-garden/model"
+	"github.com/susruth/wbtc-garden/rest"
 	"gorm.io/gorm"
 )
 

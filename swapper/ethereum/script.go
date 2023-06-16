@@ -11,8 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	solsha3 "github.com/miguelmota/go-solidity-sha3"
-	"github.com/susruth/wbtc-garden-server/swapper/ethereum/typings/AtomicSwap"
-	"github.com/susruth/wbtc-garden-server/swapper/ethereum/typings/Create2Deployer"
+	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
+	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/Create2Deployer"
 )
 
 func GetAddress(deployerAddr common.Address, callOps *bind.CallOpts, client *ethclient.Client, redeemer, refunder common.Address, secretHash []byte, expiryBlockNumber *big.Int) (common.Address, error) {

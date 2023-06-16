@@ -1,4 +1,4 @@
-module github.com/susruth/wbtc-garden-server
+module github.com/susruth/wbtc-garden
 
 go 1.19
 

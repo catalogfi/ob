@@ -4,9 +4,9 @@ import (
 	"os"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/susruth/wbtc-garden-server/executor"
-	"github.com/susruth/wbtc-garden-server/rest"
-	"github.com/susruth/wbtc-garden-server/store"
+	"github.com/susruth/wbtc-garden/executor"
+	"github.com/susruth/wbtc-garden/rest"
+	"github.com/susruth/wbtc-garden/store"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
