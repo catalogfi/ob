@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/susruth/wbtc-garden-server/executor"
 	"github.com/susruth/wbtc-garden-server/rest"
 	"github.com/susruth/wbtc-garden-server/store"
@@ -13,17 +14,15 @@ import (
 func main() {
 	// psql db
 	store, err := store.New(postgres.Open(os.Getenv("PSQL_DB")), &gorm.Config{})
-	if err != nil {
-		panic(err)
-	}
 
-	// // Local ENV
+	// Local ENV
 	// os.Setenv("BITCOIN_URL", "http://localhost:30000")
 	// os.Setenv("ETHEREUM_URL", "http://localhost:8545")
 	// os.Setenv("WBTC_ADDRESS", "0x85495222Fd7069B987Ca38C2142732EbBFb7175D")
 	// os.Setenv("PRIVATE_KEY", "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+	// os.Setenv("IS_MAINNET", "false")
 
-	// // sqlite db
+	// sqlite db
 	// store, err := store.New(sqlite.Open("test.db"), &gorm.Config{})
 	// if err != nil {
 	// 	panic(err)
@@ -35,10 +34,15 @@ func main() {
 	config.WBTCAddress = os.Getenv("WBTC_ADDRESS")
 	privKey := os.Getenv("PRIVATE_KEY")
 
-	if os.Getenv("IS_MAINNET") == "" {
-		config.IsMainnet = false
-	} else {
-		config.IsMainnet = true
+	switch os.Getenv("NETWORK") {
+	case "mainnet":
+		config.Network = &chaincfg.MainNetParams
+	case "testnet":
+		config.Network = &chaincfg.TestNet3Params
+	case "regtest":
+		config.Network = &chaincfg.RegressionNetParams
+	default:
+		panic("invalid network")
 	}
 
 	swapper, err := executor.New(privKey, config, store)

@@ -37,7 +37,8 @@ type Store interface {
 }
 
 type Config struct {
-	IsMainnet   bool
+	Network *chaincfg.Params
+
 	BitcoinURL  string
 	EthereumURL string
 	WBTCAddress string
@@ -59,17 +60,10 @@ func New(privateKey string, config Config, store Store) (Executor, error) {
 		return nil, err
 	}
 
-	var params *chaincfg.Params
-	if config.IsMainnet {
-		params = &chaincfg.MainNetParams
-	} else {
-		params = &chaincfg.RegressionNetParams
-	}
-
 	return &executor{
 		bitcoinPrivateKey:  btcPrivKey,
 		ethereumPrivateKey: ethPrivKey,
-		client:             bitcoin.NewClient(config.BitcoinURL, params),
+		client:             bitcoin.NewClient(config.BitcoinURL, config.Network),
 		ethereumClient:     ethereum.NewClient(config.EthereumURL),
 		wbtcAddress:        common.HexToAddress(config.WBTCAddress),
 		store:              store,
