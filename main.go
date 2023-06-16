@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -51,7 +52,7 @@ func main() {
 	}
 	go swapper.Run()
 	server := rest.NewServer(store, swapper)
-	if err := server.Run(os.Getenv("PORT")); err != nil {
+	if err := server.Run(fmt.Sprintf(":%s", os.Getenv("PORT"))); err != nil {
 		panic(err)
 	}
 }
