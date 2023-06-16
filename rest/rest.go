@@ -32,10 +32,10 @@ func NewServer(store Store, swapper Swapper) *Server {
 }
 
 func (s *Server) Run(addr string) error {
+	s.router.Use(cors.Default())
 	s.router.GET("/", s.GetAccount())
 	s.router.POST("/transactions", s.PostTransactions())
 	s.router.GET("/transactions/:address", s.GetTransactions())
-	s.router.Use(cors.Default())
 	return s.router.Run(addr)
 }
 
