@@ -89,12 +89,12 @@ func (s *executor) Run() {
 func (s *executor) execute(tx model.Transaction) {
 	initiatorSwap, err := s.getInitiatorSwap(tx.ToAddress, tx.SecretHash, tx.WBTCExpiry, deductFee(tx.Amount))
 	if err != nil {
-		panic(fmt.Errorf("Constraint Violation, this check should have been done before storage into DB: %v", err))
+		panic(fmt.Errorf("constraint violation, this check should have been done before storage into DB: %v", err))
 	}
 
 	redeemerSwap, err := s.getRedeemerSwap(tx.FromAddress, tx.SecretHash, tx.WBTCExpiry, tx.Amount)
 	if err != nil {
-		panic(fmt.Errorf("Constraint Violation, this check should have been done before storage into DB: %v", err))
+		panic(fmt.Errorf("constraint violation, this check should have been done before storage into DB: %v", err))
 	}
 
 	if tx.Status == 1 {
@@ -223,7 +223,7 @@ func (s *executor) ExecuteSwap(from, to, secretHash string, wbtcExpiry int64, am
 	}
 
 	if !initiated {
-		return fmt.Errorf("Precondition Violation: swap has not been initiated")
+		return fmt.Errorf("precondition Violation: swap has not been initiated")
 	}
 
 	return s.store.PutTransaction(model.Transaction{
