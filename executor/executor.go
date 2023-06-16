@@ -204,11 +204,11 @@ func (s *executor) GetAccount() (model.Account, error) {
 }
 
 func (s *executor) ExecuteSwap(from, to, secretHash string, wbtcExpiry int64, amount uint64) error {
-	_, err := s.getInitiatorSwap(from, secretHash, wbtcExpiry, deductFee(amount))
+	_, err := s.getInitiatorSwap(to, secretHash, wbtcExpiry, deductFee(amount))
 	if err != nil {
 		return err
 	}
-	redeemer, err := s.getRedeemerSwap(to, secretHash, wbtcExpiry, amount)
+	redeemer, err := s.getRedeemerSwap(from, secretHash, wbtcExpiry, amount)
 	if err != nil {
 		return err
 	}
