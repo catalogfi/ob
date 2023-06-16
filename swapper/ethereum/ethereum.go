@@ -54,7 +54,7 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, tokenAddr commo
 	}
 	fmt.Println("Contract Address : ", contractAddr.String())
 
-	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(2000))
+	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(6000))
 	return &initiatorSwap{initiator: initiator, initiatorAddr: initiatorAddr, expiryBlock: expiryBlock, contractAddr: contractAddr, client: client, amount: amount, tokenAddr: tokenAddr, redeemerAddr: redeemerAddr, lastCheckedBlock: latestCheckedBlock}, nil
 }
 
@@ -158,7 +158,7 @@ func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, tokenAddr common
 	}
 	fmt.Println("Contract Address : ", contractAddr.String())
 
-	lastCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(7000))
+	lastCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(6000))
 	return &redeemerSwap{
 		redeemer:         redeemer,
 		redeemerAddress:  redeemerAddress,
