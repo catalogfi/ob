@@ -97,22 +97,6 @@ func (s *executor) execute(tx model.Transaction) {
 		panic(fmt.Errorf("Constraint Violation, this check should have been done before storage into DB: %v", err))
 	}
 
-	if tx.Status == 0 {
-		initiated, txHash, err := redeemerSwap.IsInitiated()
-		if initiated {
-			tx.Status = 1
-			tx.InitiatorInitiateTxHash = txHash
-			if err := s.store.UpdateTransaction(tx); err != nil {
-				fmt.Println("Failed to update transaction: ", err)
-				return
-			}
-		}
-		if err != nil {
-			fmt.Println("Failed to check if swap is initiated: ", err)
-			return
-		}
-	}
-
 	if tx.Status == 1 {
 		txHash, err := initiatorSwap.Initiate()
 		if err != nil {
@@ -228,18 +212,29 @@ func (s *executor) ExecuteSwap(from, to, secretHash string, wbtcExpiry int64, am
 	if err != nil {
 		return err
 	}
-	_, err = s.getRedeemerSwap(to, secretHash, wbtcExpiry, amount)
+	redeemer, err := s.getRedeemerSwap(to, secretHash, wbtcExpiry, amount)
 	if err != nil {
 		return err
 	}
 
+	initiated, txHash, err := redeemer.IsInitiated()
+	if err != nil {
+		return err
+	}
+
+	if !initiated {
+		return fmt.Errorf("Precondition Violation: swap has not been initiated")
+	}
+
 	return s.store.PutTransaction(model.Transaction{
-		FromAddress: from,
-		ToAddress:   to,
-		SecretHash:  secretHash,
-		WBTCExpiry:  wbtcExpiry,
-		Amount:      amount,
-		Fee:         amount - deductFee(amount),
+		FromAddress:             from,
+		ToAddress:               to,
+		SecretHash:              secretHash,
+		WBTCExpiry:              wbtcExpiry,
+		Amount:                  amount,
+		Fee:                     amount - deductFee(amount),
+		Status:                  1,
+		InitiatorInitiateTxHash: txHash,
 	})
 }
 
