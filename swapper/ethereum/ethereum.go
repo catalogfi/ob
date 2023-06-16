@@ -132,9 +132,8 @@ func (initiatorSwap *initiatorSwap) IsRedeemed() (bool, []byte, string, error) {
 	if err != nil {
 		return false, nil, "", err
 	}
-	fmt.Println(val...)
 
-	return true, nil, vLog.TxHash.Hex(), nil
+	return true, []byte(val[0].(string)), vLog.TxHash.Hex(), nil
 }
 
 func (initiatorSwap *initiatorSwap) Refund() (string, error) {

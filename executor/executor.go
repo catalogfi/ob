@@ -84,17 +84,10 @@ func (s *executor) Run() {
 			time.Sleep(5 * time.Minute)
 			continue
 		}
-
 		for _, tx := range txs {
 			fmt.Println("Executing transaction: ", tx)
 			s.execute(tx)
 		}
-
-		if len(txs) == 0 {
-			fmt.Println("No pending transactions, sleeping for 1 minute")
-			time.Sleep(time.Minute)
-		}
-
 		time.Sleep(10 * time.Second)
 	}
 }
