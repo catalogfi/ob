@@ -31,13 +31,9 @@ func NewServer(store Store, swapper Swapper) *Server {
 }
 
 func (s *Server) Run(addr string) error {
-	s.router.GET("/", s.GetAccount())
-	s.router.POST("/transactions", s.PostTransactions())
-	s.router.GET("/transactions/:address", s.GetTransactions())
-
 	s.router.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true") // Include this line if you need to allow credentials (e.g., cookies)
 		if c.Request.Method == "OPTIONS" {
@@ -46,6 +42,9 @@ func (s *Server) Run(addr string) error {
 		}
 		c.Next()
 	})
+	s.router.GET("/", s.GetAccount())
+	s.router.POST("/transactions", s.PostTransactions())
+	s.router.GET("/transactions/:address", s.GetTransactions())
 	return s.router.Run(addr)
 }
 
