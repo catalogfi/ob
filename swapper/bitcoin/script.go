@@ -1,6 +1,9 @@
 package bitcoin
 
-import "github.com/btcsuite/btcd/txscript"
+import (
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/txscript"
+)
 
 // OP_IF
 //
@@ -22,32 +25,41 @@ import "github.com/btcsuite/btcd/txscript"
 //	    OP_EQUALVERIFY
 //	    OP_CHECKSIG
 //	OP_ENDIF
-func NewHTLCScript(initiatorPublicKey, redeemerPublicKey, secretHash []byte, waitTime int64) ([]byte, error) {
+func NewHTLCScript(initiatorAddress, redeemerAddress btcutil.Address, secretHash []byte, waitTime int64) ([]byte, error) {
 	return txscript.NewScriptBuilder().
 		AddOp(txscript.OP_IF).
 		AddOp(txscript.OP_SHA256).
 		AddData(secretHash).
 		AddOp(txscript.OP_EQUALVERIFY).
-		AddData(redeemerPublicKey).
+		AddOp(txscript.OP_DUP).
+		AddOp(txscript.OP_HASH160).
+		AddData(redeemerAddress.ScriptAddress()).
+		AddOp(txscript.OP_EQUALVERIFY).
+		AddOp(txscript.OP_CHECKSIG).
 		AddOp(txscript.OP_ELSE).
 		AddInt64(waitTime).
 		AddOp(txscript.OP_CHECKSEQUENCEVERIFY).
 		AddOp(txscript.OP_DROP).
-		AddData(initiatorPublicKey).
-		AddOp(txscript.OP_ENDIF).
+		AddOp(txscript.OP_DUP).
+		AddOp(txscript.OP_HASH160).
+		AddData(initiatorAddress.ScriptAddress()).
+		AddOp(txscript.OP_EQUALVERIFY).
 		AddOp(txscript.OP_CHECKSIG).
+		AddOp(txscript.OP_ENDIF).
 		Script()
 }
 
-func NewHTLCRedeemScript(secret []byte) ([]byte, error) {
+func NewHTLCRedeemScript(pubKey, secret []byte) ([]byte, error) {
 	return txscript.NewScriptBuilder().
+		AddData(pubKey).
 		AddData(secret).
 		AddOp(txscript.OP_TRUE).
 		Script()
 }
 
-func NewHTLCRefundScript() ([]byte, error) {
+func NewHTLCRefundScript(pubKey []byte) ([]byte, error) {
 	return txscript.NewScriptBuilder().
+		AddData(pubKey).
 		AddOp(txscript.OP_FALSE).
 		Script()
 }

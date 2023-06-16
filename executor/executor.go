@@ -195,7 +195,6 @@ func (s *executor) GetAccount() (model.Account, error) {
 	}
 	return model.Account{
 		BtcAddress:       bitcoinAddress.EncodeAddress(),
-		BtcPubKey:        hex.EncodeToString(s.bitcoinPrivateKey.PubKey().SerializeCompressed()),
 		WbtcAddress:      ethereumAddress.String(),
 		BtcBalance:       strconv.FormatUint(btcBalance, 10),
 		WbtcBalance:      ethBalance.String(),
@@ -239,14 +238,14 @@ func deductFee(amount uint64) uint64 {
 	return amount * 999 / 1000
 }
 
-func (s *executor) decodeAddress(addr string) (interface{}, error) {
+func (s *executor) decodeAddress(addr string) interface{} {
 	if len(addr) == 40 {
-		return common.HexToAddress("0x" + addr), nil
+		return common.HexToAddress("0x" + addr)
 	}
 	if len(addr) == 42 && strings.HasPrefix(addr, "0x") {
-		return common.HexToAddress(addr), nil
+		return common.HexToAddress(addr)
 	}
-	return hex.DecodeString(addr)
+	return addr
 }
 
 func (s *executor) getInitiatorSwap(addr, secretHash string, block int64, amount uint64) (swapper.InitiatorSwap, error) {
@@ -255,14 +254,13 @@ func (s *executor) getInitiatorSwap(addr, secretHash string, block int64, amount
 		return nil, err
 	}
 
-	address, err := s.decodeAddress(addr)
-	if err != nil {
-		return nil, err
-	}
-
-	switch address := address.(type) {
-	case []byte:
-		return bitcoin.NewInitiatorSwap(s.bitcoinPrivateKey, address, secretHashBytes, 144, amount, s.client)
+	switch address := s.decodeAddress(addr).(type) {
+	case string:
+		addr, err := btcutil.DecodeAddress(address, s.client.Net())
+		if err != nil {
+			return nil, err
+		}
+		return bitcoin.NewInitiatorSwap(s.bitcoinPrivateKey, addr, secretHashBytes, 144, amount, s.client)
 	case common.Address:
 		return ethereum.NewInitiatorSwap(s.ethereumPrivateKey, address, s.wbtcAddress, secretHashBytes, big.NewInt(block), big.NewInt(int64(amount)), s.ethereumClient)
 	default:
@@ -276,14 +274,13 @@ func (s *executor) getRedeemerSwap(addr, secretHash string, wbtcExpiry int64, am
 		return nil, err
 	}
 
-	address, err := s.decodeAddress(addr)
-	if err != nil {
-		return nil, err
-	}
-
-	switch address := address.(type) {
-	case []byte:
-		return bitcoin.NewRedeemerSwap(s.bitcoinPrivateKey, address, secretHashBytes, 288, amount, s.client)
+	switch address := s.decodeAddress(addr).(type) {
+	case string:
+		addr, err := btcutil.DecodeAddress(address, s.client.Net())
+		if err != nil {
+			return nil, err
+		}
+		return bitcoin.NewRedeemerSwap(s.bitcoinPrivateKey, addr, secretHashBytes, 288, amount, s.client)
 	case common.Address:
 		return ethereum.NewRedeemerSwap(s.ethereumPrivateKey, address, s.wbtcAddress, secretHashBytes, big.NewInt(wbtcExpiry), big.NewInt(int64(amount)), s.ethereumClient)
 	default:

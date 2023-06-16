@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"os"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
@@ -17,9 +16,10 @@ import (
 
 var _ = Describe("Bitcoin", func() {
 	It("should create a new swap", func() {
-
-		PRIV_KEY_1 := os.Getenv("PRIV_KEY_1")
-		PRIV_KEY_2 := os.Getenv("PRIV_KEY_2")
+		// PRIV_KEY_1 := os.Getenv("PRIV_KEY_1")
+		// PRIV_KEY_2 := os.Getenv("PRIV_KEY_2")
+		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
 
 		privKeyBytes1, _ := hex.DecodeString(PRIV_KEY_1)
 		privKey1, _ := btcec.PrivKeyFromBytes(privKeyBytes1)
@@ -35,19 +35,19 @@ var _ = Describe("Bitcoin", func() {
 		Expect(err).To(BeNil())
 		fmt.Println(pkAddr2.EncodeAddress())
 
-		client := bitcoin.NewClient("https://blockstream.info/testnet/api", &chaincfg.TestNet3Params)
+		client := bitcoin.NewClient("http://localhost:30000", &chaincfg.TestNet3Params)
 
 		secret := []byte("super_secret_____swap")
 		secret_hash := sha256.Sum256(secret)
 
-		iSwapA, err := bitcoin.NewInitiatorSwap(privKey1, privKey2.PubKey().SerializeCompressed(), secret_hash[:], 1000, 10000, client)
+		iSwapA, err := bitcoin.NewInitiatorSwap(privKey1, pkAddr2, secret_hash[:], 1000, 10000, client)
 		Expect(err).To(BeNil())
-		rSwapA, err := bitcoin.NewRedeemerSwap(privKey1, privKey2.PubKey().SerializeCompressed(), secret_hash[:], 1000, 10000, client)
+		rSwapA, err := bitcoin.NewRedeemerSwap(privKey1, pkAddr2, secret_hash[:], 1000, 10000, client)
 		Expect(err).To(BeNil())
 
-		iSwapB, err := bitcoin.NewInitiatorSwap(privKey2, privKey1.PubKey().SerializeCompressed(), secret_hash[:], 1000, 10000, client)
+		iSwapB, err := bitcoin.NewInitiatorSwap(privKey2, pkAddr1, secret_hash[:], 1000, 10000, client)
 		Expect(err).To(BeNil())
-		rSwapB, err := bitcoin.NewRedeemerSwap(privKey2, privKey1.PubKey().SerializeCompressed(), secret_hash[:], 1000, 10000, client)
+		rSwapB, err := bitcoin.NewRedeemerSwap(privKey2, pkAddr1, secret_hash[:], 1000, 10000, client)
 		Expect(err).To(BeNil())
 
 		go func() {
