@@ -233,6 +233,16 @@ func (redeemerSwap *redeemerSwap) IsInitiated() (bool, string, error) {
 		return false, "", err
 	}
 
-	vLog := logs[0]
-	return true, vLog.TxHash.Hex(), nil
+	amount := big.NewInt(0)
+	for _, vLog := range logs {
+		inputs, err := transferEvent.Inputs.Unpack(vLog.Data)
+		if err != nil {
+			return false, "", err
+		}
+		amount.Add(amount, inputs[0].(*big.Int))
+		if amount.Cmp(redeemerSwap.amount) >= 0 {
+			return true, vLog.TxHash.Hex(), nil
+		}
+	}
+	return false, "", err
 }
