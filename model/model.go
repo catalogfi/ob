@@ -24,7 +24,6 @@ type Transaction struct {
 
 type Account struct {
 	BtcAddress       string  `json:"btcAddress"`
-	BtcPubKey        string  `json:"btcPubKey"`
 	WbtcAddress      string  `json:"wbtcAddress"`
 	WbtcTokenAddress string  `json:"wbtcTokenAddress"`
 	BtcBalance       string  `json:"btcBalance"`

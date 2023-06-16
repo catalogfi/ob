@@ -21,7 +21,7 @@ type initiatorSwap struct {
 	client                Client
 }
 
-func GetAmount(client Client, redeemerAddr, initiatorAddr, secretHash []byte, waitBlocks int64) (uint64, error) {
+func GetAmount(client Client, redeemerAddr, initiatorAddr btcutil.Address, secretHash []byte, waitBlocks int64) (uint64, error) {
 	htlcScript, err := NewHTLCScript(initiatorAddr, redeemerAddr, secretHash, waitBlocks)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create HTLC script: %w", err)
@@ -37,8 +37,13 @@ func GetAmount(client Client, redeemerAddr, initiatorAddr, secretHash []byte, wa
 	return balance, nil
 }
 
-func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerPublicKey, secretHash []byte, waitBlocks int64, amount uint64, client Client) (swapper.InitiatorSwap, error) {
-	htlcScript, err := NewHTLCScript(initiator.PubKey().SerializeCompressed(), redeemerPublicKey, secretHash, waitBlocks)
+func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerAddr btcutil.Address, secretHash []byte, waitBlocks int64, amount uint64, client Client) (swapper.InitiatorSwap, error) {
+	initiatorAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(initiator.PubKey().SerializeCompressed()), client.Net())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create initiator address: %w", err)
+	}
+
+	htlcScript, err := NewHTLCScript(initiatorAddr, redeemerAddr, secretHash, waitBlocks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTLC script: %w", err)
 	}
@@ -85,7 +90,7 @@ func (initiatorSwap *initiatorSwap) Expired() (bool, error) {
 }
 
 func (s *initiatorSwap) Refund() (string, error) {
-	script, err := NewHTLCRefundScript()
+	script, err := NewHTLCRefundScript(s.initiator.PubKey().SerializeCompressed())
 	if err != nil {
 		return "", fmt.Errorf("failed to create redeem script: %w", err)
 	}
@@ -119,9 +124,9 @@ func (s *initiatorSwap) IsRedeemed() (bool, []byte, string, error) {
 	}
 	if scriptSig != "" {
 		fmt.Println("Redeemed:", scriptSig)
-		secret, err := hex.DecodeString(strings.Split(scriptSig, " ")[3])
+		secret, err := hex.DecodeString(strings.Split(scriptSig, " ")[5])
 		if err != nil {
-			return false, nil, "", fmt.Errorf("failed to decode %s", strings.Split(scriptSig, " ")[3])
+			return false, nil, "", fmt.Errorf("failed to decode %s", strings.Split(scriptSig, " ")[5])
 		}
 		return true, secret, tx, nil
 	}
@@ -160,8 +165,13 @@ type redeemerSwap struct {
 	client     Client
 }
 
-func NewRedeemerSwap(redeemer *btcec.PrivateKey, initiatorPublicKeyBytes, secretHash []byte, waitTime int64, amount uint64, client Client) (swapper.RedeemerSwap, error) {
-	htlcScript, err := NewHTLCScript(initiatorPublicKeyBytes, redeemer.PubKey().SerializeCompressed(), secretHash, waitTime)
+func NewRedeemerSwap(redeemer *btcec.PrivateKey, initiator btcutil.Address, secretHash []byte, waitTime int64, amount uint64, client Client) (swapper.RedeemerSwap, error) {
+	redeemerAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(redeemer.PubKey().SerializeCompressed()), client.Net())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create redeemer address: %w", err)
+	}
+
+	htlcScript, err := NewHTLCScript(initiator, redeemerAddr, secretHash, waitTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTLC script: %w", err)
 	}
@@ -176,7 +186,7 @@ func NewRedeemerSwap(redeemer *btcec.PrivateKey, initiatorPublicKeyBytes, secret
 }
 
 func (s *redeemerSwap) Redeem(secret []byte) (string, error) {
-	script, err := NewHTLCRedeemScript(secret)
+	script, err := NewHTLCRedeemScript(s.redeemer.PubKey().SerializeCompressed(), secret)
 	if err != nil {
 		return "", fmt.Errorf("failed to create redeem script: %w", err)
 	}
