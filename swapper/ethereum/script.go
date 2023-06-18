@@ -15,8 +15,8 @@ import (
 	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/Create2Deployer"
 )
 
-func GetAddress(deployerAddr common.Address, callOps *bind.CallOpts, client *ethclient.Client, redeemer, refunder common.Address, secretHash []byte, expiryBlockNumber *big.Int) (common.Address, error) {
-	instance, err := Create2Deployer.NewCreate2Deployer(deployerAddr, client)
+func GetAddress(client Client, deployerAddr common.Address, redeemer, refunder common.Address, secretHash []byte, expiryBlockNumber *big.Int) (common.Address, error) {
+	instance, err := Create2Deployer.NewCreate2Deployer(deployerAddr, client.GetProvider())
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -27,12 +27,11 @@ func GetAddress(deployerAddr common.Address, callOps *bind.CallOpts, client *eth
 	hash := solsha3.SoliditySHA3(deploymentByteCode)
 	var hash32 [32]byte
 	copy(hash32[:], hash)
-	addr, err := instance.ComputeAddress(callOps, salt, hash32)
+	addr, err := instance.ComputeAddress(client.GetCallOpts(), salt, hash32)
 	if err != nil {
 		panic(err)
 	}
 	return addr, nil
-
 }
 
 func Deploy(deployerAddr common.Address, auth *bind.TransactOpts, client *ethclient.Client, redeemer, refunder common.Address, secretHash []byte, expiryBlockNumber *big.Int) (common.Hash, error) {

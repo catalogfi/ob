@@ -18,6 +18,7 @@ type Transaction struct {
 	FollowerRedeemTxHash    string `json:"followerRedeemTxHash"`
 	FollowerRefundTxHash    string `json:"followerRefundTxHash"`
 
+	Chain  string `json:"chain"`
 	Fee    uint64 `json:"fee"`
 	Status uint8  `json:"status"`
 }
@@ -26,7 +27,13 @@ type Account struct {
 	BtcAddress       string  `json:"btcAddress"`
 	WbtcAddress      string  `json:"wbtcAddress"`
 	WbtcTokenAddress string  `json:"wbtcTokenAddress"`
+	DeployerAddress  string  `json:"deployerAddress"`
 	BtcBalance       string  `json:"btcBalance"`
 	WbtcBalance      string  `json:"wbtcBalance"`
 	Fee              float64 `json:"feeInBips"`
+}
+
+type HTLCAddresses struct {
+	InitiateAddress string `json:"initiateAddress"`
+	RedeemAddress   string `json:"redeemAddress"`
 }

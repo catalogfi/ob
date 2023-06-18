@@ -27,6 +27,7 @@ type executor struct {
 	client             bitcoin.Client
 	ethereumClient     ethereum.Client
 	wbtcAddress        common.Address
+	deployerAddress    common.Address
 	store              Store
 }
 
@@ -34,14 +35,18 @@ type Store interface {
 	PendingTransactions() ([]model.Transaction, error)
 	PutTransaction(tx model.Transaction) error
 	UpdateTransaction(tx model.Transaction) error
+	Transactions(address string) ([]model.Transaction, error)
 }
 
 type Config struct {
-	Network *chaincfg.Params
+	Name            string `json:"network"`
+	PrivateKey      string `json:"privateKey"`
+	BitcoinURL      string `json:"btcURL"`
+	EthereumURL     string `json:"ethURL"`
+	WBTCAddress     string `json:"wbtcAddress"`
+	DeployerAddress string `json:"deployerAddress"`
 
-	BitcoinURL  string
-	EthereumURL string
-	WBTCAddress string
+	Params *chaincfg.Params
 }
 
 type Executor interface {
@@ -49,13 +54,13 @@ type Executor interface {
 	rest.Swapper
 }
 
-func New(privateKey string, config Config, store Store) (Executor, error) {
-	privKeyBytes, err := hex.DecodeString(privateKey)
+func New(config Config, store Store) (Executor, error) {
+	privKeyBytes, err := hex.DecodeString(config.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
 	btcPrivKey, _ := btcec.PrivKeyFromBytes(privKeyBytes)
-	ethPrivKey, err := crypto.HexToECDSA(privateKey)
+	ethPrivKey, err := crypto.HexToECDSA(config.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +68,7 @@ func New(privateKey string, config Config, store Store) (Executor, error) {
 	return &executor{
 		bitcoinPrivateKey:  btcPrivKey,
 		ethereumPrivateKey: ethPrivKey,
-		client:             bitcoin.NewClient(config.BitcoinURL, config.Network),
+		client:             bitcoin.NewClient(config.BitcoinURL, config.Params),
 		ethereumClient:     ethereum.NewClient(config.EthereumURL),
 		wbtcAddress:        common.HexToAddress(config.WBTCAddress),
 		store:              store,
@@ -82,7 +87,9 @@ func (s *executor) Run() {
 			fmt.Println("Executing transaction: ", tx)
 			s.execute(tx)
 		}
-		time.Sleep(10 * time.Second)
+		if len(txs) == 0 {
+			time.Sleep(10 * time.Second)
+		}
 	}
 }
 
@@ -196,10 +203,28 @@ func (s *executor) GetAccount() (model.Account, error) {
 	return model.Account{
 		BtcAddress:       bitcoinAddress.EncodeAddress(),
 		WbtcAddress:      ethereumAddress.String(),
+		DeployerAddress:  s.deployerAddress.String(),
 		BtcBalance:       strconv.FormatUint(btcBalance, 10),
 		WbtcBalance:      ethBalance.String(),
 		WbtcTokenAddress: s.wbtcAddress.Hex(),
 		Fee:              0.1,
+	}, nil
+}
+
+func (s *executor) GetAddresses(from string, to string, secretHash string, wbtcExpiry int64) (model.HTLCAddresses, error) {
+	addrI, err := s.getInitatorAddress(from, secretHash, wbtcExpiry)
+	if err != nil {
+		return model.HTLCAddresses{}, err
+	}
+
+	addrF, err := s.getFollowerAddress(from, secretHash, wbtcExpiry)
+	if err != nil {
+		return model.HTLCAddresses{}, err
+	}
+
+	return model.HTLCAddresses{
+		InitiateAddress: addrI,
+		RedeemAddress:   addrF,
 	}, nil
 }
 
@@ -272,7 +297,7 @@ func (s *executor) getInitiatorSwap(addr, secretHash string, block int64, amount
 		}
 		return bitcoin.NewInitiatorSwap(s.bitcoinPrivateKey, addr, secretHashBytes, 144, amount, s.client)
 	case common.Address:
-		return ethereum.NewInitiatorSwap(s.ethereumPrivateKey, address, s.wbtcAddress, secretHashBytes, big.NewInt(block), big.NewInt(int64(amount)), s.ethereumClient)
+		return ethereum.NewInitiatorSwap(s.ethereumPrivateKey, address, s.deployerAddress, s.wbtcAddress, secretHashBytes, big.NewInt(block), big.NewInt(int64(amount)), s.ethereumClient)
 	default:
 		return nil, fmt.Errorf("unknown address type")
 	}
@@ -292,7 +317,7 @@ func (s *executor) getRedeemerSwap(addr, secretHash string, wbtcExpiry int64, am
 		}
 		return bitcoin.NewRedeemerSwap(s.bitcoinPrivateKey, addr, secretHashBytes, 288, amount, s.client)
 	case common.Address:
-		return ethereum.NewRedeemerSwap(s.ethereumPrivateKey, address, s.wbtcAddress, secretHashBytes, big.NewInt(wbtcExpiry), big.NewInt(int64(amount)), s.ethereumClient)
+		return ethereum.NewRedeemerSwap(s.ethereumPrivateKey, address, s.deployerAddress, s.wbtcAddress, secretHashBytes, big.NewInt(wbtcExpiry), big.NewInt(int64(amount)), s.ethereumClient)
 	default:
 		return nil, fmt.Errorf("unknown address type")
 	}
@@ -316,8 +341,76 @@ func (s *executor) getAmount(addr, secretHash string, wbtcExpiry int64) (uint64,
 		}
 		return bitcoin.GetAmount(s.client, pkAddr, addr, secretHashBytes, 288)
 	case common.Address:
-		return ethereum.GetAmount(s.ethereumClient, s.wbtcAddress, crypto.PubkeyToAddress(s.ethereumPrivateKey.PublicKey), address, secretHashBytes, big.NewInt(wbtcExpiry))
+		return ethereum.GetAmount(s.ethereumClient, s.deployerAddress, s.wbtcAddress, crypto.PubkeyToAddress(s.ethereumPrivateKey.PublicKey), address, secretHashBytes, big.NewInt(wbtcExpiry))
 	default:
 		return 0, fmt.Errorf("unknown address type")
 	}
+}
+
+func (s *executor) getInitatorAddress(addr string, secretHash string, wbtcExpiry int64) (string, error) {
+	secretHashBytes, err := hex.DecodeString(secretHash)
+	if err != nil {
+		return "", err
+	}
+
+	switch address := s.decodeAddress(addr).(type) {
+	case string:
+		addr, err := btcutil.DecodeAddress(address, s.client.Net())
+		if err != nil {
+			return "", err
+		}
+		pkAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(s.bitcoinPrivateKey.PubKey().SerializeCompressed()), s.client.Net())
+		if err != nil {
+			return "", err
+		}
+		htlcAddr, err := bitcoin.GetAddress(s.client, pkAddr, addr, secretHashBytes, 288)
+		if err != nil {
+			return "", err
+		}
+		return htlcAddr.String(), nil
+	case common.Address:
+		addr, err := ethereum.GetAddress(s.ethereumClient, s.deployerAddress, crypto.PubkeyToAddress(s.ethereumPrivateKey.PublicKey), address, secretHashBytes, big.NewInt(wbtcExpiry))
+		if err != nil {
+			return "", err
+		}
+		return addr.String(), nil
+	default:
+		return "", fmt.Errorf("unknown address type")
+	}
+}
+
+func (s *executor) getFollowerAddress(addr string, secretHash string, wbtcExpiry int64) (string, error) {
+	secretHashBytes, err := hex.DecodeString(secretHash)
+	if err != nil {
+		return "", err
+	}
+
+	switch address := s.decodeAddress(addr).(type) {
+	case string:
+		addr, err := btcutil.DecodeAddress(address, s.client.Net())
+		if err != nil {
+			return "", err
+		}
+		pkAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(s.bitcoinPrivateKey.PubKey().SerializeCompressed()), s.client.Net())
+		if err != nil {
+			return "", err
+		}
+		htlcAddr, err := bitcoin.GetAddress(s.client, addr, pkAddr, secretHashBytes, 144)
+		if err != nil {
+			return "", err
+		}
+		return htlcAddr.String(), nil
+	case common.Address:
+		addr, err := ethereum.GetAddress(s.ethereumClient, s.deployerAddress, address, crypto.PubkeyToAddress(s.ethereumPrivateKey.PublicKey), secretHashBytes, big.NewInt(wbtcExpiry))
+		if err != nil {
+			return "", err
+		}
+		return addr.String(), nil
+	default:
+		return "", fmt.Errorf("unknown address type")
+	}
+}
+
+func (s *executor) Transactions(address string) ([]model.Transaction, error) {
+	return s.store.Transactions(address)
 }

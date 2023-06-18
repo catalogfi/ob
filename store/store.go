@@ -5,7 +5,6 @@ import (
 
 	"github.com/susruth/wbtc-garden/executor"
 	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/rest"
 	"gorm.io/gorm"
 )
 
@@ -14,8 +13,7 @@ type store struct {
 }
 
 type Store interface {
-	rest.Store
-	executor.Store
+	SubStore(chain string) executor.Store
 }
 
 func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
@@ -29,26 +27,37 @@ func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 	return &store{db: db}, nil
 }
 
-func (s *store) Transactions(address string) ([]model.Transaction, error) {
+type subStore struct {
+	db    *gorm.DB
+	chain string
+}
+
+func (s *store) SubStore(chain string) executor.Store {
+	return &subStore{db: s.db, chain: chain}
+}
+
+func (s *subStore) Transactions(address string) ([]model.Transaction, error) {
 	txs := []model.Transaction{}
-	if res := s.db.Find(&txs, "from_address = ? OR to_address = ?", address, address); res.Error != nil {
+	if res := s.db.Find(&txs, "from_address = ? OR to_address = ? AND chain = ?", address, address, s.chain); res.Error != nil {
 		return nil, fmt.Errorf("no such orders for the given address (%s): %v", address, res.Error)
 	}
 	return txs, nil
 }
 
-func (s *store) PendingTransactions() ([]model.Transaction, error) {
+func (s *subStore) PendingTransactions() ([]model.Transaction, error) {
 	txs := []model.Transaction{}
-	if res := s.db.Find(&txs, "status < 5"); res.Error != nil {
+	if res := s.db.Find(&txs, "status < 5 AND chain = ?"); res.Error != nil {
 		return nil, fmt.Errorf("no such orders for the given address: %v", res.Error)
 	}
 	return txs, nil
 }
 
-func (s *store) PutTransaction(tx model.Transaction) error {
+func (s *subStore) PutTransaction(tx model.Transaction) error {
+	tx.Chain = s.chain
 	return s.db.Create(&tx).Error
 }
 
-func (s *store) UpdateTransaction(tx model.Transaction) error {
+func (s *subStore) UpdateTransaction(tx model.Transaction) error {
+	tx.Chain = s.chain
 	return s.db.Save(&tx).Error
 }
