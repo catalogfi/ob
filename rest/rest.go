@@ -39,7 +39,7 @@ func (s *Server) Run(addr string) error {
 	chains := []string{}
 	for chain, swapper := range s.swappers {
 		s.router.GET(fmt.Sprintf("/%s", chain), s.GetAccount(swapper))
-		s.router.GET(fmt.Sprintf("/%s/addresses/:from/:to/:secretHash/:expiry", chain), s.GetAccount(swapper))
+		s.router.GET(fmt.Sprintf("/%s/addresses/:from/:to/:secretHash/:expiry", chain), s.GetAddresses(swapper))
 		s.router.POST(fmt.Sprintf("/%s/transactions", chain), s.PostTransactions(swapper))
 		s.router.GET(fmt.Sprintf("/%s/transactions/:address", chain), s.GetTransactions(swapper))
 		chains = append(chains, chain)
