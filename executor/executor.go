@@ -218,7 +218,7 @@ func (s *executor) GetAddresses(from string, to string, secretHash string, wbtcE
 		return model.HTLCAddresses{}, err
 	}
 
-	addrF, err := s.getFollowerAddress(from, secretHash, wbtcExpiry)
+	addrF, err := s.getFollowerAddress(to, secretHash, wbtcExpiry)
 	if err != nil {
 		return model.HTLCAddresses{}, err
 	}
