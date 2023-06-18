@@ -71,6 +71,7 @@ func New(config Config, store Store) (Executor, error) {
 		client:             bitcoin.NewClient(config.BitcoinURL, config.Params),
 		ethereumClient:     ethereum.NewClient(config.EthereumURL),
 		wbtcAddress:        common.HexToAddress(config.WBTCAddress),
+		deployerAddress:    common.HexToAddress(config.DeployerAddress),
 		store:              store,
 	}, nil
 }

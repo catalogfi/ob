@@ -46,7 +46,7 @@ func (s *subStore) Transactions(address string) ([]model.Transaction, error) {
 
 func (s *subStore) PendingTransactions() ([]model.Transaction, error) {
 	txs := []model.Transaction{}
-	if res := s.db.Find(&txs, "status < 5 AND chain = ?"); res.Error != nil {
+	if res := s.db.Find(&txs, "status < 5 AND chain = ?", s.chain); res.Error != nil {
 		return nil, fmt.Errorf("no such orders for the given address: %v", res.Error)
 	}
 	return txs, nil
