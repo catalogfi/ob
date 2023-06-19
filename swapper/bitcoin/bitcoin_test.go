@@ -1,6 +1,7 @@
 package bitcoin_test
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -14,12 +15,20 @@ import (
 	"github.com/susruth/wbtc-garden/swapper/bitcoin"
 )
 
+func randomHex(n int) ([]byte, error) {
+	bytes := make([]byte, n)
+	if _, err := rand.Read(bytes); err != nil {
+		return []byte{}, err
+	}
+	return bytes, nil
+}
+
 var _ = Describe("Bitcoin", func() {
 	It("should create a new swap", func() {
 		// PRIV_KEY_1 := os.Getenv("PRIV_KEY_1")
 		// PRIV_KEY_2 := os.Getenv("PRIV_KEY_2")
-		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" //mvb8yA23gtNPsBpd21Wq5J6YY4GEnfYQyX
+		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" //myS2zesC4Va7ofV5MtnqZDct8iZdaBzULE
 
 		privKeyBytes1, _ := hex.DecodeString(PRIV_KEY_1)
 		privKey1, _ := btcec.PrivKeyFromBytes(privKeyBytes1)
@@ -27,17 +36,17 @@ var _ = Describe("Bitcoin", func() {
 		privKeyBytes2, _ := hex.DecodeString(PRIV_KEY_2)
 		privKey2, _ := btcec.PrivKeyFromBytes(privKeyBytes2)
 
-		pkAddr1, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(privKey1.PubKey().SerializeCompressed()), &chaincfg.TestNet3Params)
+		pkAddr1, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(privKey1.PubKey().SerializeCompressed()), &chaincfg.RegressionNetParams)
 		Expect(err).To(BeNil())
-		fmt.Println(pkAddr1.EncodeAddress())
+		fmt.Println("pkAddr1:", pkAddr1.EncodeAddress())
 
-		pkAddr2, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(privKey2.PubKey().SerializeCompressed()), &chaincfg.TestNet3Params)
+		pkAddr2, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(privKey2.PubKey().SerializeCompressed()), &chaincfg.RegressionNetParams)
 		Expect(err).To(BeNil())
-		fmt.Println(pkAddr2.EncodeAddress())
+		fmt.Println("pkAddr2:", pkAddr2.EncodeAddress())
 
-		client := bitcoin.NewClient("http://localhost:30000", &chaincfg.TestNet3Params)
+		client := bitcoin.NewClient("http://localhost:30000", &chaincfg.RegressionNetParams)
 
-		secret := []byte("super_secret_____swap")
+		secret, _ := randomHex(32)
 		secret_hash := sha256.Sum256(secret)
 
 		iSwapA, err := bitcoin.NewInitiatorSwap(privKey1, pkAddr2, secret_hash[:], 1000, 10000, client)

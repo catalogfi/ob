@@ -135,7 +135,8 @@ func (s *initiatorSwap) IsRedeemed() (bool, []byte, string, error) {
 	}
 	if len(witness) != 0 {
 		fmt.Println("Redeemed:", witness)
-		secretString := witness[1]
+		// inputs are [ 0 : sig, 1 : spender.PubKey().SerializeCompressed(),2 : secret, 3 :[]byte{0x1}, script]
+		secretString := witness[2]
 		secretBytes := make([]byte, hex.DecodedLen(len(secretString)))
 		_, err := hex.Decode(secretBytes, []byte(secretString))
 		if err != nil {

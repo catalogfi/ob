@@ -225,7 +225,7 @@ func (client *client) Spend(script, redeemScript []byte, spender *btcec.PrivateK
 		if err != nil {
 			return "", err
 		}
-		tx.TxIn[i].Witness = wire.TxWitness{sig, secret, []byte{0x1}, script}
+		tx.TxIn[i].Witness = wire.TxWitness{sig, spender.PubKey().SerializeCompressed(), secret, []byte{0x1}, script}
 	}
 	return client.SubmitTx(tx)
 }
