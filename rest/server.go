@@ -12,17 +12,17 @@ import (
 
 type Server struct {
 	router   *gin.Engine
-	swappers map[string]Swapper
+	swappers map[string]Executor
 }
 
-type Swapper interface {
+type Executor interface {
 	GetAccount() (model.Account, error)
 	GetAddresses(from, to, secretHash string, wbtcExpiry int64) (model.HTLCAddresses, error)
 	ExecuteSwap(from, to, secretHash string, wbtcExpiry int64) error
 	Transactions(address string) ([]model.Transaction, error)
 }
 
-func NewServer(swappers map[string]Swapper) *Server {
+func NewServer(swappers map[string]Executor) *Server {
 	return &Server{
 		router:   gin.Default(),
 		swappers: swappers,
@@ -50,7 +50,7 @@ func (s *Server) Run(addr string) error {
 	return s.router.Run(addr)
 }
 
-func (s *Server) GetAccount(swapper Swapper) gin.HandlerFunc {
+func (s *Server) GetAccount(swapper Executor) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		account, err := swapper.GetAccount()
 		if err != nil {
@@ -70,7 +70,7 @@ type PostTransactionReq struct {
 	WBTCExpiry float64 `json:"wbtcExpiry"`
 }
 
-func (s *Server) PostTransactions(swapper Swapper) gin.HandlerFunc {
+func (s *Server) PostTransactions(swapper Executor) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		req := PostTransactionReq{}
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -92,7 +92,7 @@ func (s *Server) PostTransactions(swapper Swapper) gin.HandlerFunc {
 
 type GetTransactionsResp []model.Transaction
 
-func (s *Server) GetTransactions(swapper Swapper) gin.HandlerFunc {
+func (s *Server) GetTransactions(swapper Executor) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userAddress := c.Param("address")
 		transactions, err := swapper.Transactions(userAddress)
@@ -106,7 +106,7 @@ func (s *Server) GetTransactions(swapper Swapper) gin.HandlerFunc {
 	}
 }
 
-func (s *Server) GetAddresses(swapper Swapper) gin.HandlerFunc {
+func (s *Server) GetAddresses(swapper Executor) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		from := c.Param("from")
 		to := c.Param("to")

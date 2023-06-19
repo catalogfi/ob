@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -9,7 +8,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/big"
-	"net/http"
 	"os"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -17,7 +15,6 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/susruth/wbtc-garden/model"
 	"github.com/susruth/wbtc-garden/rest"
 	"github.com/susruth/wbtc-garden/swapper/bitcoin"
 	"github.com/susruth/wbtc-garden/swapper/ethereum"
@@ -45,6 +42,8 @@ func main() {
 		panic(fmt.Sprintf("error parsing config file (%s): %v", os.Args[1], err))
 	}
 
+	client := rest.NewChainClient(config.API)
+
 	switch config.Network {
 	case "regtest":
 		config.BTCParams = &chaincfg.RegressionNetParams
@@ -56,11 +55,11 @@ func main() {
 		panic(fmt.Sprintf("invalid network: %s", config.Network))
 	}
 
-	// btcToWbtc(config)
-	wbtcToBTC(config)
+	// btcToWbtc(config, client)
+	wbtcToBTC(config, client)
 }
 
-func btcToWbtc(config ClientConfig) {
+func btcToWbtc(config ClientConfig, chainClient rest.ChainClient) {
 	privKey, err := hex.DecodeString(config.PrivateKey)
 	if err != nil {
 		panic(err)
@@ -85,7 +84,10 @@ func btcToWbtc(config ClientConfig) {
 	rand.Read(secret[:])
 	secretHash := sha256.Sum256(secret[:])
 
-	account := getAccount(config.API)
+	account, err := chainClient.GetAccount()
+	if err != nil {
+		panic(err)
+	}
 
 	redeemerAddr, err := btcutil.DecodeAddress(account.BtcAddress, config.BTCParams)
 	if err != nil {
@@ -103,7 +105,7 @@ func btcToWbtc(config ClientConfig) {
 	if err != nil {
 		panic(err)
 	}
-	expiry := currBlock + 5760
+	expiry := int64(currBlock + 5760)
 
 	rSwap, err := ethereum.NewRedeemerSwap(ethPrivKey, common.HexToAddress(account.WbtcAddress), common.HexToAddress(account.DeployerAddress), common.HexToAddress(account.WbtcTokenAddress), secretHash[:], big.NewInt(int64(expiry)), big.NewInt(9990), ethClient)
 	if err != nil {
@@ -117,12 +119,9 @@ func btcToWbtc(config ClientConfig) {
 
 	fmt.Println("Atomic Swap Initiated", txHash)
 
-	postTransaction(config.API, rest.PostTransactionReq{
-		From:       bitcoinAddress.EncodeAddress(),
-		To:         ethereumAddress.Hex(),
-		SecretHash: hex.EncodeToString(secretHash[:]),
-		WBTCExpiry: float64(expiry),
-	})
+	if err := chainClient.PostTransaction(bitcoinAddress.EncodeAddress(), ethereumAddress.Hex(), hex.EncodeToString(secretHash[:]), expiry); err != nil {
+		panic(err)
+	}
 
 	itxHash, err := rSwap.WaitForInitiate()
 	if err != nil {
@@ -136,7 +135,7 @@ func btcToWbtc(config ClientConfig) {
 	fmt.Println("Atomic Swap Redeemed", rtxHash)
 }
 
-func wbtcToBTC(config ClientConfig) {
+func wbtcToBTC(config ClientConfig, chainClient rest.ChainClient) {
 	// 0.1 WBTC to 0.1 BTC
 
 	privKey, err := hex.DecodeString(config.PrivateKey)
@@ -157,7 +156,10 @@ func wbtcToBTC(config ClientConfig) {
 	rand.Read(secret[:])
 	secretHash := sha256.Sum256(secret[:])
 
-	account := getAccount(config.API)
+	account, err := chainClient.GetAccount()
+	if err != nil {
+		panic(err)
+	}
 
 	redeemerAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(btcPrivKey.PubKey().SerializeCompressed()), config.BTCParams)
 	if err != nil {
@@ -176,7 +178,7 @@ func wbtcToBTC(config ClientConfig) {
 	if err != nil {
 		panic(err)
 	}
-	expiry := currBlock + 2880
+	expiry := int64(currBlock + 2880)
 	swap, err := ethereum.NewInitiatorSwap(ethPrivKey, common.HexToAddress(account.WbtcAddress), common.HexToAddress(account.DeployerAddress), common.HexToAddress(account.WbtcTokenAddress), secretHash[:], big.NewInt(int64(expiry)), big.NewInt(10000), ethClient)
 	if err != nil {
 		panic(err)
@@ -193,12 +195,9 @@ func wbtcToBTC(config ClientConfig) {
 	}
 	fmt.Println("Atomic Swap Initiated", txHash)
 
-	postTransaction(config.API, rest.PostTransactionReq{
-		From:       ethAddr.Hex(),
-		To:         redeemerAddr.EncodeAddress(),
-		SecretHash: hex.EncodeToString(secretHash[:]),
-		WBTCExpiry: float64(expiry),
-	})
+	if err := chainClient.PostTransaction(ethAddr.Hex(), redeemerAddr.EncodeAddress(), hex.EncodeToString(secretHash[:]), expiry); err != nil {
+		panic(err)
+	}
 
 	itxHash, err := rSwap.WaitForInitiate()
 	if err != nil {
@@ -210,48 +209,4 @@ func wbtcToBTC(config ClientConfig) {
 		panic(err)
 	}
 	fmt.Println("Atomic Swap Redeemed", rtxHash)
-}
-
-func getAccount(api string) model.Account {
-	resp, err := http.Get(api)
-	if err != nil {
-		panic(err)
-	}
-
-	account := model.Account{}
-
-	if err := json.NewDecoder(resp.Body).Decode(&account); err != nil {
-		panic(err)
-	}
-
-	return account
-}
-
-func postTransaction(api string, req rest.PostTransactionReq) {
-	reqBytes, err := json.Marshal(req)
-	if err != nil {
-		panic(err)
-	}
-
-	resp, err := http.Post(fmt.Sprintf("%s/transactions", api), "application/json", bytes.NewBuffer(reqBytes))
-	if err != nil {
-		panic(err)
-	}
-	if resp.StatusCode != 201 {
-		panic(fmt.Errorf("failed to create transaction: %s", resp.Status))
-	}
-}
-
-func getTransactions(api, address string) []model.Transaction {
-	resp, err := http.Get(fmt.Sprintf("%s/transactions/%s", api, address))
-	if err != nil {
-		panic(err)
-	}
-
-	txs := []model.Transaction{}
-	if err := json.NewDecoder(resp.Body).Decode(&txs); err != nil {
-		panic(err)
-	}
-
-	return txs
 }

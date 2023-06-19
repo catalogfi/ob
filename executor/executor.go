@@ -51,7 +51,7 @@ type Config struct {
 
 type Executor interface {
 	Run()
-	rest.Swapper
+	rest.Executor
 }
 
 func New(config Config, store Store) (Executor, error) {

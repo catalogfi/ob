@@ -26,7 +26,7 @@ func main() {
 		panic(err)
 	}
 	go testnetSwapper.Run()
-	server := rest.NewServer(map[string]rest.Swapper{
+	server := rest.NewServer(map[string]rest.Executor{
 		testnet.Name: testnetSwapper,
 	})
 

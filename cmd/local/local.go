@@ -37,7 +37,7 @@ func main() {
 		panic(err)
 	}
 	go swapper.Run()
-	server := rest.NewServer(map[string]rest.Swapper{
+	server := rest.NewServer(map[string]rest.Executor{
 		config.Name: swapper,
 	})
 
