@@ -1,9 +1,9 @@
 package bitcoin
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -17,6 +17,7 @@ type initiatorSwap struct {
 	initiateTxBlockHeight uint64
 	htlcScript            []byte
 	waitBlocks            int64
+	amount                uint64
 	scriptAddr            btcutil.Address
 	client                Client
 }
@@ -26,7 +27,8 @@ func GetAddress(client Client, redeemerAddr, initiatorAddr btcutil.Address, secr
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTLC script: %w", err)
 	}
-	scriptAddr, err := btcutil.NewAddressScriptHash(htlcScript, client.Net())
+	witnessProgram := sha256.Sum256(htlcScript)
+	scriptAddr, err := btcutil.NewAddressWitnessScriptHash(witnessProgram[:], client.Net())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create script address: %w", err)
 	}
@@ -55,17 +57,18 @@ func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerAddr btcutil.Address,
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTLC script: %w", err)
 	}
-	scriptAddr, err := btcutil.NewAddressScriptHash(htlcScript, client.Net())
+	witnessProgram := sha256.Sum256(htlcScript)
+	scriptAddr, err := btcutil.NewAddressWitnessScriptHash(witnessProgram[:], client.Net())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create script address: %w", err)
 	}
 
 	fmt.Println("script address:", scriptAddr.EncodeAddress())
-	return &initiatorSwap{initiator: initiator, htlcScript: htlcScript, scriptAddr: scriptAddr, waitBlocks: waitBlocks, client: client}, nil
+	return &initiatorSwap{initiator: initiator, htlcScript: htlcScript, scriptAddr: scriptAddr, amount: amount, waitBlocks: waitBlocks, client: client}, nil
 }
 
 func (s *initiatorSwap) Initiate() (string, error) {
-	txHash, err := s.client.Send(s.scriptAddr, 100000, s.initiator)
+	txHash, err := s.client.Send(s.scriptAddr, s.amount, s.initiator)
 	if err != nil {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}
@@ -102,7 +105,7 @@ func (s *initiatorSwap) Refund() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create redeem script: %w", err)
 	}
-	txHash, err := s.client.Spend(s.htlcScript, script, s.initiator)
+	txHash, err := s.client.Spend(s.htlcScript, script, s.initiator, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}
@@ -126,17 +129,19 @@ func (s *initiatorSwap) WaitForRedeem() ([]byte, string, error) {
 }
 
 func (s *initiatorSwap) IsRedeemed() (bool, []byte, string, error) {
-	scriptSig, tx, err := s.client.GetSpendingScriptSig(s.scriptAddr)
+	witness, tx, err := s.client.GetSpendingWitness(s.scriptAddr)
 	if err != nil {
 		return false, nil, "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
-	if scriptSig != "" {
-		fmt.Println("Redeemed:", scriptSig)
-		secret, err := hex.DecodeString(strings.Split(scriptSig, " ")[5])
+	if len(witness) != 0 {
+		fmt.Println("Redeemed:", witness)
+		secretString := witness[1]
+		secretBytes := make([]byte, hex.DecodedLen(len(secretString)))
+		_, err := hex.Decode(secretBytes, []byte(secretString))
 		if err != nil {
-			return false, nil, "", fmt.Errorf("failed to decode %s", strings.Split(scriptSig, " ")[5])
+			return false, nil, "", fmt.Errorf("failed to decode secret: %w", err)
 		}
-		return true, secret, tx, nil
+		return true, secretBytes, tx, nil
 	}
 	if err := s.checkTimeout(); err != nil {
 		return false, nil, "", err
@@ -183,7 +188,8 @@ func NewRedeemerSwap(redeemer *btcec.PrivateKey, initiator btcutil.Address, secr
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTLC script: %w", err)
 	}
-	scriptAddr, err := btcutil.NewAddressScriptHash(htlcScript, client.Net())
+	witnessProgram := sha256.Sum256(htlcScript)
+	scriptAddr, err := btcutil.NewAddressWitnessScriptHash(witnessProgram[:], client.Net())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create script address: %w", err)
 	}
@@ -198,7 +204,7 @@ func (s *redeemerSwap) Redeem(secret []byte) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create redeem script: %w", err)
 	}
-	txHash, err := s.client.Spend(s.htlcScript, script, s.redeemer)
+	txHash, err := s.client.Spend(s.htlcScript, script, s.redeemer, secret)
 	if err != nil {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}
