@@ -2,10 +2,11 @@ package bitcoin
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -29,12 +30,12 @@ type UTXO struct {
 type UTXOs []UTXO
 
 type Client interface {
-	GetSpendingScriptSig(address btcutil.Address) (string, string, error)
+	GetSpendingWitness(address btcutil.Address) ([]string, string, error)
 	GetBlockHeight(txhash string) (uint64, error)
 	GetTipBlockHeight() (uint64, error)
 	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
 	Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error)
-	Spend(script []byte, scriptSig []byte, spender *btcec.PrivateKey) (string, error)
+	Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error)
 	Net() *chaincfg.Params
 }
 
@@ -56,7 +57,7 @@ func (client *client) GetTipBlockHeight() (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to get transaction: %w", err)
 	}
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return 0, fmt.Errorf("failed to read response body: %w", err)
 	}
@@ -80,23 +81,23 @@ func (client *client) GetBlockHeight(txhash string) (uint64, error) {
 	return tx.Status.BlockHeight, nil
 }
 
-func (client *client) GetSpendingScriptSig(address btcutil.Address) (string, string, error) {
+func (client *client) GetSpendingWitness(address btcutil.Address) ([]string, string, error) {
 	resp, err := http.Get(fmt.Sprintf("%s/address/%s/txs", client.url, address.EncodeAddress()))
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get transactions: %w", err)
+		return []string{}, "", fmt.Errorf("failed to get transactions: %w", err)
 	}
 	var txs []Transaction
 	if err := json.NewDecoder(resp.Body).Decode(&txs); err != nil {
-		return "", "", fmt.Errorf("failed to decode transactions: %w", err)
+		return []string{}, "", fmt.Errorf("failed to decode transactions: %w", err)
 	}
 	for _, tx := range txs {
 		for _, vin := range tx.VINs {
-			if vin.Prevout.ScriptPubKeyType == "p2sh" {
-				return vin.ScriptSigAsm, tx.TxID, nil
+			if vin.Prevout.ScriptPubKeyType == "v0_p2wsh" {
+				return *vin.Witness, tx.TxID, nil
 			}
 		}
 	}
-	return "", "", nil
+	return []string{}, "", nil
 }
 
 func (client *client) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error) {
@@ -106,7 +107,7 @@ func (client *client) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, u
 	}
 	utxos := UTXOs{}
 
-	// data, err := ioutil.ReadAll(resp.Body)
+	// data, err := io.ReadAll(resp.Body)
 	// if err != nil {
 	// 	return nil, 0, fmt.Errorf("failed to read response body: %w", err)
 	// }
@@ -184,10 +185,11 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 	return client.SubmitTx(tx)
 }
 
-func (client *client) Spend(script, redeemScript []byte, spender *btcec.PrivateKey) (string, error) {
+func (client *client) Spend(script []byte, redeemScript wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error) {
 	tx := wire.NewMsgTx(BTC_VERSION)
 
-	scriptAddr, err := btcutil.NewAddressScriptHash(script, client.Net())
+	scriptWitnessProgram := sha256.Sum256(script)
+	scriptAddr, err := btcutil.NewAddressWitnessScriptHash(scriptWitnessProgram[:], client.Net())
 	if err != nil {
 		return "", fmt.Errorf("failed to create script address: %w", err)
 	}
@@ -195,11 +197,14 @@ func (client *client) Spend(script, redeemScript []byte, spender *btcec.PrivateK
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
-	for _, utxo := range utxos {
-		txid, err := chainhash.NewHashFromStr(utxo.TxID)
+	amounts := make([]uint64, len(utxos))
+
+	for i, utxo := range utxos {
+		txid, err := chainhash.NewHashFromStr(utxos[i].TxID)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse txid in the utxo: %w", err)
 		}
+		amounts[i] = utxos[i].Amount
 		tx.AddTxIn(wire.NewTxIn(wire.NewOutPoint(txid, utxo.Vout), nil, nil))
 	}
 
@@ -214,16 +219,17 @@ func (client *client) Spend(script, redeemScript []byte, spender *btcec.PrivateK
 	tx.AddTxOut(wire.NewTxOut(int64(balance-FEE), spenderToScript))
 
 	for i := range tx.TxIn {
-		sig, err := txscript.RawTxInSignature(tx, i, script, txscript.SigHashAll, spender)
+		fetcher := txscript.NewCannedPrevOutputFetcher(script, int64(amounts[i]))
+		if waitBlocks > 0 {
+			tx.TxIn[i].Sequence = uint32(waitBlocks) + 1
+		}
+		sigHashes := txscript.NewTxSigHashes(tx, fetcher)
+		sig, err := txscript.RawTxInWitnessSignature(tx, sigHashes, i, int64(amounts[i]), script, txscript.SigHashAll, spender)
 		if err != nil {
 			return "", err
 		}
-		sigScript, err := txscript.NewScriptBuilder().AddData(sig).AddOps(redeemScript).AddData(script).Script()
-		if err != nil {
-			return "", err
-		}
-
-		tx.TxIn[i].SignatureScript = sigScript
+		tx.TxIn[i].Witness = append(wire.TxWitness{sig}, redeemScript...)
+		tx.TxIn[i].Witness = append(tx.TxIn[i].Witness, wire.TxWitness{script}...)
 	}
 	return client.SubmitTx(tx)
 }
@@ -239,11 +245,14 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}
 
+	data1, err1 := io.ReadAll(resp.Body)
+	fmt.Println(string(data1), err1)
+
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to send transaction: %s", resp.Status)
 	}
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read transaction id: %w", err)
 	}
@@ -257,10 +266,11 @@ type Transaction struct {
 }
 
 type VIN struct {
-	TxID         string  `json:"txid"`
-	Vout         int     `json:"vout"`
-	Prevout      Prevout `json:"prevout"`
-	ScriptSigAsm string  `json:"scriptsig_asm"`
+	TxID         string    `json:"txid"`
+	Vout         int       `json:"vout"`
+	Prevout      Prevout   `json:"prevout"`
+	ScriptSigAsm string    `json:"scriptsig_asm"`
+	Witness      *[]string `json:"witness" `
 }
 
 type Prevout struct {

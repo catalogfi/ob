@@ -4,6 +4,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/wire"
 )
 
 type instantClient struct {
@@ -31,14 +32,14 @@ func (client *instantClient) GetUTXOs(address btcutil.Address, amount uint64) (U
 	return client.indexerClient.GetUTXOs(address, amount)
 }
 
-func (client *instantClient) GetSpendingScriptSig(address btcutil.Address) (string, string, error) {
-	return client.indexerClient.GetSpendingScriptSig(address)
+func (client *instantClient) GetSpendingWitness(address btcutil.Address) ([]string, string, error) {
+	return client.indexerClient.GetSpendingWitness(address)
 }
 
 func (client *instantClient) Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error) {
 	panic("not implemented")
 }
 
-func (client *instantClient) Spend(script []byte, scriptSig []byte, spender *btcec.PrivateKey) (string, error) {
+func (client *instantClient) Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error) {
 	panic("not implemented")
 }
