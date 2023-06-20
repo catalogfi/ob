@@ -3,6 +3,7 @@ package bitcoin
 import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // OP_IF
@@ -49,17 +50,10 @@ func NewHTLCScript(initiatorAddress, redeemerAddress btcutil.Address, secretHash
 		Script()
 }
 
-func NewHTLCRedeemScript(pubKey, secret []byte) ([]byte, error) {
-	return txscript.NewScriptBuilder().
-		AddData(pubKey).
-		AddData(secret).
-		AddOp(txscript.OP_TRUE).
-		Script()
+func NewHTLCRedeemScript(pubKey, secret []byte) wire.TxWitness {
+	return wire.TxWitness{pubKey, secret, []byte{0x1}}
 }
 
-func NewHTLCRefundScript(pubKey []byte) ([]byte, error) {
-	return txscript.NewScriptBuilder().
-		AddData(pubKey).
-		AddOp(txscript.OP_FALSE).
-		Script()
+func NewHTLCRefundScript(pubKey []byte) wire.TxWitness {
+	return wire.TxWitness{pubKey, []byte{0x0}}
 }

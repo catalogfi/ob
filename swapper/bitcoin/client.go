@@ -35,7 +35,7 @@ type Client interface {
 	GetTipBlockHeight() (uint64, error)
 	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
 	Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error)
-	Spend(script []byte, scriptSig []byte, spender *btcec.PrivateKey, secret []byte) (string, error)
+	Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, secret []byte) (string, error)
 	Net() *chaincfg.Params
 }
 
@@ -185,7 +185,7 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 	return client.SubmitTx(tx)
 }
 
-func (client *client) Spend(script, redeemScript []byte, spender *btcec.PrivateKey, secret []byte) (string, error) {
+func (client *client) Spend(script []byte, redeemScript wire.TxWitness, spender *btcec.PrivateKey, secret []byte) (string, error) {
 	tx := wire.NewMsgTx(BTC_VERSION)
 
 	scriptWitnessProgram := sha256.Sum256(script)
@@ -225,7 +225,8 @@ func (client *client) Spend(script, redeemScript []byte, spender *btcec.PrivateK
 		if err != nil {
 			return "", err
 		}
-		tx.TxIn[i].Witness = wire.TxWitness{sig, spender.PubKey().SerializeCompressed(), secret, []byte{0x1}, script}
+		tx.TxIn[i].Witness = append(wire.TxWitness{sig}, redeemScript...)
+		tx.TxIn[i].Witness = append(tx.TxIn[i].Witness, wire.TxWitness{script}...)
 	}
 	return client.SubmitTx(tx)
 }
@@ -240,6 +241,9 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}
+
+	data1, err1 := io.ReadAll(resp.Body)
+	fmt.Println(string(data1), err1)
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to send transaction: %s", resp.Status)
