@@ -259,3 +259,112 @@ func (redeemerSwap *redeemerSwap) IsInitiated() (bool, string, error) {
 	}
 	return false, "", err
 }
+
+type watcher struct {
+	client           Client
+	tokenAddr        common.Address
+	contractAddr     common.Address
+	lastCheckedBlock *big.Int
+	amount           *big.Int
+}
+
+func NewWatcher(initiator, redeemerAddr, deployerAddr, tokenAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.Watcher, error) {
+	contractAddr, err := GetAddress(client, deployerAddr, redeemerAddr, initiator, secretHash, expiryBlock)
+	if err != nil {
+		return &watcher{}, err
+	}
+	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(6000))
+	return &watcher{
+		client:           client,
+		tokenAddr:        tokenAddr,
+		contractAddr:     contractAddr,
+		lastCheckedBlock: latestCheckedBlock,
+		amount:           amount,
+	}, nil
+}
+
+func (watcher *watcher) IsInitiated() (bool, string, error) {
+	currBlock, err := watcher.client.GetCurrentBlock()
+	if err != nil {
+		return false, "", err
+	}
+	currentBlock := big.NewInt(int64(currBlock))
+
+	erc20Abi, err := ERC20.ERC20MetaData.GetAbi()
+	if err != nil {
+		return false, "", err
+	}
+	transferEvent := erc20Abi.Events["Transfer"]
+	query := ethereum.FilterQuery{
+		FromBlock: watcher.lastCheckedBlock,
+		ToBlock:   currentBlock,
+		Addresses: []common.Address{
+			watcher.tokenAddr,
+		},
+		Topics: [][]common.Hash{{transferEvent.ID}, {}, {watcher.contractAddr.Hash()}},
+	}
+	logs, err := watcher.client.GetProvider().FilterLogs(context.Background(), query)
+	if err != nil {
+		return false, "", err
+	}
+
+	if len(logs) == 0 {
+		watcher.lastCheckedBlock = currentBlock
+		return false, "", err
+	}
+
+	amount := big.NewInt(0)
+	for _, vLog := range logs {
+		inputs, err := transferEvent.Inputs.Unpack(vLog.Data)
+		if err != nil {
+			return false, "", err
+		}
+		amount.Add(amount, inputs[0].(*big.Int))
+		if amount.Cmp(watcher.amount) >= 0 {
+			return true, vLog.TxHash.Hex(), nil
+		}
+	}
+	return false, "", err
+}
+
+func (watcher *watcher) IsRedeemed() (bool, []byte, string, error) {
+	currBlock, err := watcher.client.GetCurrentBlock()
+	if err != nil {
+		return false, nil, "", err
+	}
+	currentBlock := big.NewInt(int64(currBlock))
+
+	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	if err != nil {
+		return false, nil, "", err
+	}
+
+	redeemedEvent := atomicSwapAbi.Events["Redeemed"]
+	query := ethereum.FilterQuery{
+		FromBlock: watcher.lastCheckedBlock,
+		ToBlock:   currentBlock,
+		Addresses: []common.Address{
+			watcher.contractAddr,
+		},
+		Topics: [][]common.Hash{{redeemedEvent.ID}},
+	}
+
+	logs, err := watcher.client.GetProvider().FilterLogs(context.Background(), query)
+	if err != nil {
+		return false, nil, "", err
+	}
+
+	if len(logs) == 0 {
+		fmt.Println("No logs found")
+		return false, nil, "", err
+	}
+
+	vLog := logs[0]
+
+	val, err := redeemedEvent.Inputs.Unpack(vLog.Data)
+	if err != nil {
+		return false, nil, "", err
+	}
+
+	return true, []byte(val[0].(string)), vLog.TxHash.Hex(), nil
+}

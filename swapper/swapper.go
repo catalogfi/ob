@@ -20,6 +20,11 @@ type RedeemerSwap interface {
 	WaitForInitiate() (string, error)
 }
 
+type Watcher interface {
+	IsInitiated() (bool, string, error)
+	IsRedeemed() (bool, []byte, string, error)
+}
+
 var ErrInitiateTimeout = errors.New("initiate timeout")
 var ErrRedeemTimeout = errors.New("redeem timeout")
 

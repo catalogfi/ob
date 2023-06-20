@@ -230,3 +230,82 @@ func (s *redeemerSwap) IsInitiated() (bool, string, error) {
 	}
 	return false, "", nil
 }
+
+type watcher struct {
+	client                Client
+	scriptAddr            btcutil.Address
+	amount                uint64
+	waitBlocks            int64
+	initiateTxBlockHeight uint64
+	initiateTxHash        string
+}
+
+func NewWatcher(initiator, redeemerAddr btcutil.Address, secretHash []byte, waitBlocks int64, amount uint64, client Client) (swapper.Watcher, error) {
+	htlcScript, err := NewHTLCScript(initiator, redeemerAddr, secretHash, waitBlocks)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTLC script: %w", err)
+	}
+	witnessProgram := sha256.Sum256(htlcScript)
+	scriptAddr, err := btcutil.NewAddressWitnessScriptHash(witnessProgram[:], client.Net())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create script address: %w", err)
+	}
+
+	fmt.Println("script address:", scriptAddr.EncodeAddress())
+	return &watcher{scriptAddr: scriptAddr, amount: amount, waitBlocks: waitBlocks, client: client}, nil
+}
+
+func (w *watcher) IsInitiated() (bool, string, error) {
+	utxos, bal, err := w.client.GetUTXOs(w.scriptAddr, 0)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
+	}
+	if bal >= w.amount && len(utxos) > 0 {
+		w.initiateTxHash = utxos[0].TxID
+		return true, utxos[0].TxID, nil
+	}
+	return false, "", nil
+}
+
+func (w *watcher) IsRedeemed() (bool, []byte, string, error) {
+	witness, tx, err := w.client.GetSpendingWitness(w.scriptAddr)
+	if err != nil {
+		return false, nil, "", fmt.Errorf("failed to get UTXOs: %w", err)
+	}
+	if len(witness) != 0 {
+		fmt.Println("Redeemed:", witness)
+		// inputs are [ 0 : sig, 1 : spender.PubKey().SerializeCompressed(),2 : secret, 3 :[]byte{0x1}, script]
+		secretString := witness[2]
+		secretBytes := make([]byte, hex.DecodedLen(len(secretString)))
+		_, err := hex.Decode(secretBytes, []byte(secretString))
+		if err != nil {
+			return false, nil, "", fmt.Errorf("failed to decode secret: %w", err)
+		}
+		return true, secretBytes, tx, nil
+	}
+	if err := w.checkTimeout(); err != nil {
+		return false, nil, "", err
+	}
+	return false, nil, "", nil
+}
+
+func (w *watcher) checkTimeout() error {
+	if w.initiateTxBlockHeight == 0 {
+		blockHeight, err := w.client.GetBlockHeight(w.initiateTxHash)
+		if err != nil {
+			return fmt.Errorf("failed to get block height: %w", err)
+		}
+		if blockHeight != 0 {
+			w.initiateTxBlockHeight = blockHeight
+		}
+	} else {
+		tipBlockHeight, err := w.client.GetTipBlockHeight()
+		if err != nil {
+			return fmt.Errorf("failed to get block height: %w", err)
+		}
+		if tipBlockHeight-w.initiateTxBlockHeight > uint64(w.waitBlocks)+1 {
+			return swapper.ErrRedeemTimeout
+		}
+	}
+	return nil
+}
