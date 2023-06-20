@@ -55,5 +55,5 @@ func NewHTLCRedeemScript(pubKey, secret []byte) wire.TxWitness {
 }
 
 func NewHTLCRefundScript(pubKey []byte) wire.TxWitness {
-	return wire.TxWitness{pubKey, []byte{0x0}}
+	return wire.TxWitness{pubKey, nil}
 }
