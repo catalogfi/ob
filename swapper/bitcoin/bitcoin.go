@@ -102,7 +102,7 @@ func (initiatorSwap *initiatorSwap) Expired() (bool, error) {
 
 func (s *initiatorSwap) Refund() (string, error) {
 	script := NewHTLCRefundScript(s.initiator.PubKey().SerializeCompressed())
-	txHash, err := s.client.ASRefund(s.htlcScript, script, s.initiator, uint(s.waitBlocks))
+	txHash, err := s.client.Spend(s.htlcScript, script, s.initiator, uint(s.waitBlocks))
 	if err != nil {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}
@@ -199,7 +199,7 @@ func NewRedeemerSwap(redeemer *btcec.PrivateKey, initiator btcutil.Address, secr
 
 func (s *redeemerSwap) Redeem(secret []byte) (string, error) {
 	script := NewHTLCRedeemScript(s.redeemer.PubKey().SerializeCompressed(), secret)
-	txHash, err := s.client.ASRedeem(s.htlcScript, script, s.redeemer, secret)
+	txHash, err := s.client.Spend(s.htlcScript, script, s.redeemer, 0)
 	if err != nil {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}

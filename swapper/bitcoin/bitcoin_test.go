@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
@@ -27,6 +28,7 @@ var _ = Describe("Bitcoin", func() {
 	It("should create a new swap", func() {
 		// PRIV_KEY_1 := os.Getenv("PRIV_KEY_1")
 		// PRIV_KEY_2 := os.Getenv("PRIV_KEY_2")
+		// Skip("")
 		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" //mvb8yA23gtNPsBpd21Wq5J6YY4GEnfYQyX
 		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" //myS2zesC4Va7ofV5MtnqZDct8iZdaBzULE
 
@@ -66,7 +68,7 @@ var _ = Describe("Bitcoin", func() {
 		Expect(swapper.ExecuteAtomicSwapSecond(iSwapB, rSwapB)).To(BeNil())
 	})
 	It("should create a new swap and refund", func() {
-		Skip("")
+		// Skip("")
 		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" //mvb8yA23gtNPsBpd21Wq5J6YY4GEnfYQyX
 		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" //myS2zesC4Va7ofV5MtnqZDct8iZdaBzULE
 
@@ -96,7 +98,7 @@ var _ = Describe("Bitcoin", func() {
 		if err != nil {
 			panic(err)
 		}
-		// time.Sleep(time.Second * 10)
+		time.Sleep(time.Second * 10)
 		_, err = iSwapA.Refund()
 		if err != nil {
 			panic(err)

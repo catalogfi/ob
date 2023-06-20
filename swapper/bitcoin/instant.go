@@ -40,9 +40,6 @@ func (client *instantClient) Send(to btcutil.Address, amount uint64, from *btcec
 	panic("not implemented")
 }
 
-func (client *instantClient) ASRedeem(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, secret []byte) (string, error) {
-	panic("not implemented")
-}
-func (client *instantClient) ASRefund(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error) {
+func (client *instantClient) Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error) {
 	panic("not implemented")
 }

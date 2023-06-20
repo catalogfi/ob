@@ -35,8 +35,7 @@ type Client interface {
 	GetTipBlockHeight() (uint64, error)
 	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
 	Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error)
-	ASRedeem(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, secret []byte) (string, error)
-	ASRefund(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error)
+	Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error)
 	Net() *chaincfg.Params
 }
 
@@ -186,7 +185,7 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 	return client.SubmitTx(tx)
 }
 
-func (client *client) ASRedeem(script []byte, redeemScript wire.TxWitness, spender *btcec.PrivateKey, secret []byte) (string, error) {
+func (client *client) Spend(script []byte, redeemScript wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error) {
 	tx := wire.NewMsgTx(BTC_VERSION)
 
 	scriptWitnessProgram := sha256.Sum256(script)
@@ -221,52 +220,9 @@ func (client *client) ASRedeem(script []byte, redeemScript wire.TxWitness, spend
 
 	for i := range tx.TxIn {
 		fetcher := txscript.NewCannedPrevOutputFetcher(script, int64(amounts[i]))
-		sigHashes := txscript.NewTxSigHashes(tx, fetcher)
-		sig, err := txscript.RawTxInWitnessSignature(tx, sigHashes, i, int64(amounts[i]), script, txscript.SigHashAll, spender)
-		if err != nil {
-			return "", err
+		if waitBlocks > 0 {
+			tx.TxIn[i].Sequence = uint32(waitBlocks) + 1
 		}
-		tx.TxIn[i].Witness = append(wire.TxWitness{sig}, redeemScript...)
-		tx.TxIn[i].Witness = append(tx.TxIn[i].Witness, wire.TxWitness{script}...)
-	}
-	return client.SubmitTx(tx)
-}
-func (client *client) ASRefund(script []byte, redeemScript wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error) {
-	tx := wire.NewMsgTx(BTC_VERSION)
-
-	scriptWitnessProgram := sha256.Sum256(script)
-	scriptAddr, err := btcutil.NewAddressWitnessScriptHash(scriptWitnessProgram[:], client.Net())
-	if err != nil {
-		return "", fmt.Errorf("failed to create script address: %w", err)
-	}
-	utxos, balance, err := client.GetUTXOs(scriptAddr, 0)
-	if err != nil {
-		return "", fmt.Errorf("failed to get UTXOs: %w", err)
-	}
-	amounts := make([]uint64, len(utxos))
-
-	for i, utxo := range utxos {
-		txid, err := chainhash.NewHashFromStr(utxos[i].TxID)
-		if err != nil {
-			return "", fmt.Errorf("failed to parse txid in the utxo: %w", err)
-		}
-		amounts[i] = utxos[i].Amount
-		tx.AddTxIn(wire.NewTxIn(wire.NewOutPoint(txid, utxo.Vout), nil, nil))
-	}
-
-	spenderAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(spender.PubKey().SerializeCompressed()), client.Net())
-	if err != nil {
-		return "", fmt.Errorf("failed to create address from private key: %w", err)
-	}
-	spenderToScript, err := txscript.PayToAddrScript(spenderAddr)
-	if err != nil {
-		return "", fmt.Errorf("failed to create script for address: %w", err)
-	}
-	tx.AddTxOut(wire.NewTxOut(int64(balance-FEE), spenderToScript))
-
-	for i := range tx.TxIn {
-		fetcher := txscript.NewCannedPrevOutputFetcher(script, int64(amounts[i]))
-		tx.TxIn[i].Sequence = uint32(waitBlocks) + 1
 		sigHashes := txscript.NewTxSigHashes(tx, fetcher)
 		sig, err := txscript.RawTxInWitnessSignature(tx, sigHashes, i, int64(amounts[i]), script, txscript.SigHashAll, spender)
 		if err != nil {
