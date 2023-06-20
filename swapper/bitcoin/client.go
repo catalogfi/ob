@@ -36,6 +36,7 @@ type Client interface {
 	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
 	Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error)
 	Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error)
+	IsFinal(txHash string) (bool, error)
 	Net() *chaincfg.Params
 }
 
@@ -257,6 +258,11 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 		return "", fmt.Errorf("failed to read transaction id: %w", err)
 	}
 	return string(data), nil
+}
+
+func (client *client) IsFinal(txHash string) (bool, error) {
+	// TODO: add confirmation checks
+	return true, nil
 }
 
 type Transaction struct {

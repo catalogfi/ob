@@ -254,6 +254,13 @@ func (redeemerSwap *redeemerSwap) IsInitiated() (bool, string, error) {
 		}
 		amount.Add(amount, inputs[0].(*big.Int))
 		if amount.Cmp(redeemerSwap.amount) >= 0 {
+			final, err := redeemerSwap.client.IsFinal(vLog.TxHash.Hex())
+			if err != nil {
+				return false, "", err
+			}
+			if !final {
+				return false, "", nil
+			}
 			return true, vLog.TxHash.Hex(), nil
 		}
 	}

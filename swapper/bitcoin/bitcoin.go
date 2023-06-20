@@ -226,6 +226,13 @@ func (s *redeemerSwap) IsInitiated() (bool, string, error) {
 		return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
 	if bal >= s.amount && len(utxos) > 0 {
+		final, err := s.client.IsFinal(utxos[0].TxID)
+		if err != nil {
+			return false, "", fmt.Errorf("failed to check if final: %w", err)
+		}
+		if !final {
+			return false, utxos[0].TxID, nil
+		}
 		return true, utxos[0].TxID, nil
 	}
 	return false, "", nil

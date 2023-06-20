@@ -43,3 +43,10 @@ func (client *instantClient) Send(to btcutil.Address, amount uint64, from *btcec
 func (client *instantClient) Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error) {
 	panic("not implemented")
 }
+
+func (client *instantClient) IsFinal(txHash string) (bool, error) {
+	// TODO: check whether it is an instant wallet transaction, if it is return true, nil
+	panic("not implemented")
+
+	return client.indexerClient.IsFinal(txHash)
+}

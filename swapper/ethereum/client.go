@@ -26,6 +26,7 @@ type Client interface {
 	TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
 	GetCurrentBlock() (uint64, error)
 	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
+	IsFinal(txHash string) (bool, error)
 }
 type client struct {
 	url      string
@@ -132,4 +133,9 @@ func (client *client) GetERC20Balance(tokenAddr common.Address, ofAddr common.Ad
 	}
 	balance, err := instance.BalanceOf(client.GetCallOpts(), ofAddr)
 	return balance, err
+}
+
+func (client *client) IsFinal(txHash string) (bool, error) {
+	// TODO: add confirmation checks
+	return true, nil
 }
