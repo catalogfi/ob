@@ -23,7 +23,7 @@ type Client interface {
 	RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address) (string, error)
 	GetPublicAddress(privKey *ecdsa.PrivateKey) common.Address
 	GetProvider() *ethclient.Client
-	TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address, auth *bind.TransactOpts) (string, error)
+	TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
 	GetCurrentBlock() (uint64, error)
 	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
 }
@@ -108,12 +108,12 @@ func (client *client) GetPublicAddress(privKey *ecdsa.PrivateKey) common.Address
 func (client *client) GetProvider() *ethclient.Client {
 	return client.provider
 }
-func (client *client) TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address, auth *bind.TransactOpts) (string, error) {
+func (client *client) TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error) {
 	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
 	if err != nil {
 		return "", err
 	}
-	tx, err := instance.Transfer(auth, toAddr, amount)
+	tx, err := instance.Transfer(client.GetTransactOpts(privKey), toAddr, amount)
 	if err != nil {
 		return "", err
 	}

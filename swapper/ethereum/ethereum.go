@@ -74,7 +74,7 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, deployerAddr, t
 func (initiatorSwap *initiatorSwap) Initiate() (string, error) {
 	defer fmt.Printf("Done Initiate on contract : %s : token : %s \n", initiatorSwap.contractAddr, initiatorSwap.tokenAddr)
 
-	txHash, err := initiatorSwap.client.TransferERC20(initiatorSwap.initiator, initiatorSwap.amount, initiatorSwap.tokenAddr, initiatorSwap.contractAddr, initiatorSwap.client.GetTransactOpts(initiatorSwap.initiator))
+	txHash, err := initiatorSwap.client.TransferERC20(initiatorSwap.initiator, initiatorSwap.amount, initiatorSwap.tokenAddr, initiatorSwap.contractAddr)
 	if err != nil {
 		return "", err
 	}
