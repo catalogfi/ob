@@ -42,7 +42,7 @@ func (client *instantClient) GetProvider() *ethclient.Client {
 	return client.indexerClient.GetProvider()
 }
 
-func (client *instantClient) TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address, auth *bind.TransactOpts) (string, error) {
+func (client *instantClient) TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error) {
 	panic("not implemented")
 }
 
