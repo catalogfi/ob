@@ -26,6 +26,7 @@ type initiatorSwap struct {
 	client           Client
 	amount           *big.Int
 	tokenAddr        common.Address
+	watcher          swapper.Watcher
 }
 type redeemerSwap struct {
 	redeemer         *ecdsa.PrivateKey
@@ -39,6 +40,7 @@ type redeemerSwap struct {
 	amount           *big.Int
 	secretHash       []byte
 	client           Client
+	watcher          swapper.Watcher
 }
 
 func GetAmount(client Client, deployerAddr, tokenAddr, redeemerAddr, initiatorAddr common.Address, secretHash []byte, expiryBlock *big.Int) (uint64, error) {
@@ -68,7 +70,12 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, deployerAddr, t
 	fmt.Println("Contract Address : ", contractAddr.String())
 
 	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(6000))
-	return &initiatorSwap{initiator: initiator, initiatorAddr: initiatorAddr, expiryBlock: expiryBlock, contractAddr: contractAddr, client: client, amount: amount, tokenAddr: tokenAddr, redeemerAddr: redeemerAddr, lastCheckedBlock: latestCheckedBlock}, nil
+
+	watcher, err := NewWatcher(initiatorAddr, redeemerAddr, deployerAddr, tokenAddr, secretHash, expiryBlock, amount, client)
+	if err != nil {
+		return &initiatorSwap{}, err
+	}
+	return &initiatorSwap{initiator: initiator, watcher: watcher, initiatorAddr: initiatorAddr, expiryBlock: expiryBlock, contractAddr: contractAddr, client: client, amount: amount, tokenAddr: tokenAddr, redeemerAddr: redeemerAddr, lastCheckedBlock: latestCheckedBlock}, nil
 }
 
 func (initiatorSwap *initiatorSwap) Initiate() (string, error) {
@@ -108,45 +115,7 @@ func (initiatorSwap *initiatorSwap) WaitForRedeem() ([]byte, string, error) {
 }
 
 func (initiatorSwap *initiatorSwap) IsRedeemed() (bool, []byte, string, error) {
-	currBlock, err := initiatorSwap.client.GetCurrentBlock()
-	if err != nil {
-		return false, nil, "", err
-	}
-	currentBlock := big.NewInt(int64(currBlock))
-
-	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
-	if err != nil {
-		return false, nil, "", err
-	}
-
-	redeemedEvent := atomicSwapAbi.Events["Redeemed"]
-	query := ethereum.FilterQuery{
-		FromBlock: initiatorSwap.lastCheckedBlock,
-		ToBlock:   currentBlock,
-		Addresses: []common.Address{
-			initiatorSwap.contractAddr,
-		},
-		Topics: [][]common.Hash{{redeemedEvent.ID}},
-	}
-
-	logs, err := initiatorSwap.client.GetProvider().FilterLogs(context.Background(), query)
-	if err != nil {
-		return false, nil, "", err
-	}
-
-	if len(logs) == 0 {
-		fmt.Println("No logs found")
-		return false, nil, "", err
-	}
-
-	vLog := logs[0]
-
-	val, err := redeemedEvent.Inputs.Unpack(vLog.Data)
-	if err != nil {
-		return false, nil, "", err
-	}
-
-	return true, []byte(val[0].(string)), vLog.TxHash.Hex(), nil
+	return initiatorSwap.watcher.IsRedeemed()
 }
 
 func (initiatorSwap *initiatorSwap) Refund() (string, error) {
@@ -170,9 +139,15 @@ func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, deployerAddr, to
 	}
 	fmt.Println("Contract Address : ", contractAddr.String())
 
+	watcher, err := NewWatcher(initiatorAddr, redeemerAddress, deployerAddr, tokenAddr, secretHash, expiryBlock, amount, client)
+	if err != nil {
+		return &redeemerSwap{}, err
+	}
+
 	lastCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(6000))
 	return &redeemerSwap{
 		redeemer:         redeemer,
+		watcher:          watcher,
 		redeemerAddress:  redeemerAddress,
 		refunderAddress:  initiatorAddr,
 		lastCheckedBlock: lastCheckedBlock,
@@ -202,6 +177,10 @@ func (redeemerSwap *redeemerSwap) Redeem(secret []byte) (string, error) {
 	return redeemerSwap.client.RedeemAtomicSwap(redeemerSwap.contractAddr, redeemerSwap.client.GetTransactOpts(redeemerSwap.redeemer), redeemerSwap.tokenAddr, secret)
 }
 
+func (redeemerSwap *redeemerSwap) IsInitiated() (bool, string, error) {
+	return redeemerSwap.watcher.IsInitiated()
+}
+
 func (redeemerSwap *redeemerSwap) WaitForInitiate() (string, error) {
 	defer fmt.Println("Done WaitForInitiate")
 	for {
@@ -214,57 +193,6 @@ func (redeemerSwap *redeemerSwap) WaitForInitiate() (string, error) {
 		}
 		time.Sleep(5 * time.Second)
 	}
-}
-
-func (redeemerSwap *redeemerSwap) IsInitiated() (bool, string, error) {
-	currBlock, err := redeemerSwap.client.GetCurrentBlock()
-	if err != nil {
-		return false, "", err
-	}
-	currentBlock := big.NewInt(int64(currBlock))
-
-	erc20Abi, err := ERC20.ERC20MetaData.GetAbi()
-	if err != nil {
-		return false, "", err
-	}
-	transferEvent := erc20Abi.Events["Transfer"]
-	query := ethereum.FilterQuery{
-		FromBlock: redeemerSwap.lastCheckedBlock,
-		ToBlock:   currentBlock,
-		Addresses: []common.Address{
-			redeemerSwap.tokenAddr,
-		},
-		Topics: [][]common.Hash{{transferEvent.ID}, {}, {redeemerSwap.contractAddr.Hash()}},
-	}
-	logs, err := redeemerSwap.client.GetProvider().FilterLogs(context.Background(), query)
-	if err != nil {
-		return false, "", err
-	}
-
-	if len(logs) == 0 {
-		redeemerSwap.lastCheckedBlock = currentBlock
-		return false, "", err
-	}
-
-	amount := big.NewInt(0)
-	for _, vLog := range logs {
-		inputs, err := transferEvent.Inputs.Unpack(vLog.Data)
-		if err != nil {
-			return false, "", err
-		}
-		amount.Add(amount, inputs[0].(*big.Int))
-		if amount.Cmp(redeemerSwap.amount) >= 0 {
-			final, err := redeemerSwap.client.IsFinal(vLog.TxHash.Hex())
-			if err != nil {
-				return false, "", err
-			}
-			if !final {
-				return false, "", nil
-			}
-			return true, vLog.TxHash.Hex(), nil
-		}
-	}
-	return false, "", err
 }
 
 type watcher struct {
@@ -328,6 +256,13 @@ func (watcher *watcher) IsInitiated() (bool, string, error) {
 		}
 		amount.Add(amount, inputs[0].(*big.Int))
 		if amount.Cmp(watcher.amount) >= 0 {
+			final, err := watcher.client.IsFinal(vLog.TxHash.Hex())
+			if err != nil {
+				return false, "", err
+			}
+			if !final {
+				return false, "", nil
+			}
 			return true, vLog.TxHash.Hex(), nil
 		}
 	}

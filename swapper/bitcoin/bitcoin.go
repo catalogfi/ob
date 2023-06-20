@@ -12,14 +12,14 @@ import (
 )
 
 type initiatorSwap struct {
-	initiator             *btcec.PrivateKey
-	initiateTxHash        string
-	initiateTxBlockHeight uint64
-	htlcScript            []byte
-	waitBlocks            int64
-	amount                uint64
-	scriptAddr            btcutil.Address
-	client                Client
+	initiator      *btcec.PrivateKey
+	initiateTxHash string
+	htlcScript     []byte
+	waitBlocks     int64
+	amount         uint64
+	scriptAddr     btcutil.Address
+	watcher        swapper.Watcher
+	client         Client
 }
 
 func GetAddress(client Client, redeemerAddr, initiatorAddr btcutil.Address, secretHash []byte, waitBlocks int64) (btcutil.Address, error) {
@@ -64,7 +64,12 @@ func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerAddr btcutil.Address,
 	}
 
 	fmt.Println("script address:", scriptAddr.EncodeAddress())
-	return &initiatorSwap{initiator: initiator, htlcScript: htlcScript, scriptAddr: scriptAddr, amount: amount, waitBlocks: waitBlocks, client: client}, nil
+
+	watcher, err := NewWatcher(initiatorAddr, redeemerAddr, secretHash, waitBlocks, amount, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create watcher: %w", err)
+	}
+	return &initiatorSwap{initiator: initiator, htlcScript: htlcScript, watcher: watcher, scriptAddr: scriptAddr, amount: amount, waitBlocks: waitBlocks, client: client}, nil
 }
 
 func (s *initiatorSwap) Initiate() (string, error) {
@@ -126,46 +131,7 @@ func (s *initiatorSwap) WaitForRedeem() ([]byte, string, error) {
 }
 
 func (s *initiatorSwap) IsRedeemed() (bool, []byte, string, error) {
-	witness, tx, err := s.client.GetSpendingWitness(s.scriptAddr)
-	if err != nil {
-		return false, nil, "", fmt.Errorf("failed to get UTXOs: %w", err)
-	}
-	if len(witness) != 0 {
-		fmt.Println("Redeemed:", witness)
-		// inputs are [ 0 : sig, 1 : spender.PubKey().SerializeCompressed(),2 : secret, 3 :[]byte{0x1}, script]
-		secretString := witness[2]
-		secretBytes := make([]byte, hex.DecodedLen(len(secretString)))
-		_, err := hex.Decode(secretBytes, []byte(secretString))
-		if err != nil {
-			return false, nil, "", fmt.Errorf("failed to decode secret: %w", err)
-		}
-		return true, secretBytes, tx, nil
-	}
-	if err := s.checkTimeout(); err != nil {
-		return false, nil, "", err
-	}
-	return false, nil, "", nil
-}
-
-func (s *initiatorSwap) checkTimeout() error {
-	if s.initiateTxBlockHeight == 0 {
-		blockHeight, err := s.client.GetBlockHeight(s.initiateTxHash)
-		if err != nil {
-			return fmt.Errorf("failed to get block height: %w", err)
-		}
-		if blockHeight != 0 {
-			s.initiateTxBlockHeight = blockHeight
-		}
-	} else {
-		tipBlockHeight, err := s.client.GetTipBlockHeight()
-		if err != nil {
-			return fmt.Errorf("failed to get block height: %w", err)
-		}
-		if tipBlockHeight-s.initiateTxBlockHeight > uint64(s.waitBlocks)+1 {
-			return swapper.ErrRedeemTimeout
-		}
-	}
-	return nil
+	return s.watcher.IsRedeemed()
 }
 
 type redeemerSwap struct {
@@ -173,6 +139,7 @@ type redeemerSwap struct {
 	redeemer   *btcec.PrivateKey
 	htlcScript []byte
 	scriptAddr btcutil.Address
+	watcher    swapper.Watcher
 	client     Client
 }
 
@@ -193,8 +160,11 @@ func NewRedeemerSwap(redeemer *btcec.PrivateKey, initiator btcutil.Address, secr
 	}
 
 	fmt.Println("script address:", scriptAddr.EncodeAddress())
-
-	return &redeemerSwap{redeemer: redeemer, htlcScript: htlcScript, scriptAddr: scriptAddr, amount: amount, client: client}, nil
+	watcher, err := NewWatcher(initiator, redeemerAddr, secretHash, waitTime, amount, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create watcher: %w", err)
+	}
+	return &redeemerSwap{redeemer: redeemer, watcher: watcher, htlcScript: htlcScript, scriptAddr: scriptAddr, amount: amount, client: client}, nil
 }
 
 func (s *redeemerSwap) Redeem(secret []byte) (string, error) {
@@ -221,21 +191,7 @@ func (s *redeemerSwap) WaitForInitiate() (string, error) {
 }
 
 func (s *redeemerSwap) IsInitiated() (bool, string, error) {
-	utxos, bal, err := s.client.GetUTXOs(s.scriptAddr, 0)
-	if err != nil {
-		return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
-	}
-	if bal >= s.amount && len(utxos) > 0 {
-		final, err := s.client.IsFinal(utxos[0].TxID)
-		if err != nil {
-			return false, "", fmt.Errorf("failed to check if final: %w", err)
-		}
-		if !final {
-			return false, utxos[0].TxID, nil
-		}
-		return true, utxos[0].TxID, nil
-	}
-	return false, "", nil
+	return s.watcher.IsInitiated()
 }
 
 type watcher struct {
@@ -268,7 +224,13 @@ func (w *watcher) IsInitiated() (bool, string, error) {
 		return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
 	if bal >= w.amount && len(utxos) > 0 {
-		w.initiateTxHash = utxos[0].TxID
+		final, err := w.client.IsFinal(utxos[0].TxID)
+		if err != nil {
+			return false, "", fmt.Errorf("failed to check if final: %w", err)
+		}
+		if !final {
+			return false, utxos[0].TxID, nil
+		}
 		return true, utxos[0].TxID, nil
 	}
 	return false, "", nil
