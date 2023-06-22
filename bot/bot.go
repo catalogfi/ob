@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/susruth/wbtc-garden/orderbook/blockchain"
-	"github.com/susruth/wbtc-garden/orderbook/model"
-	"github.com/susruth/wbtc-garden/orderbook/rest"
+	"github.com/susruth/wbtc-garden/blockchain"
+	"github.com/susruth/wbtc-garden/model"
+	"github.com/susruth/wbtc-garden/rest"
 )
 
 type Bot struct {

@@ -1,39 +1,113 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"fmt"
+	"strings"
 
-type Transaction struct {
+	"gorm.io/gorm"
+)
+
+type Chain string
+
+const (
+	Bitcoin  Chain = "bitcoin"
+	Ethereum Chain = "ethereum"
+)
+
+func (c Chain) IsEVM() bool {
+	return c == Ethereum
+}
+
+type Asset string
+
+const (
+	Primary Asset = "primary"
+)
+
+func NewSecondary(address string) Asset {
+	return Asset("secondary" + address)
+}
+
+func (a Asset) SecondaryID() string {
+	if string(a[:9]) != "secondary" {
+		return ""
+	}
+	return string(a[9:])
+}
+
+type Status uint
+
+const (
+	Unknown Status = iota
+	OrderCreated
+	OrderFilled
+	InitiatorAtomicSwapInitiated
+	FollowerAtomicSwapInitiated
+	FollowerAtomicSwapRedeemed
+	InitiatorAtomicSwapRedeemed
+	InitiatorAtomicSwapRefunded
+	FollowerAtomicSwapRefunded
+	OrderExecuted
+	OrderFailedSoft
+	OrderFailedHard
+)
+
+type Order struct {
 	gorm.Model
 
-	FromAddress string `json:"fromAddress"`
-	ToAddress   string `json:"toAddress"`
-	Secret      string `json:"secret"`
-	SecretHash  string `json:"secretHash"`
-	Amount      uint64 `json:"amount"`
-	WBTCExpiry  int64  `json:"wbtcExpiry"`
+	Maker     string `json:"maker"`
+	Taker     string `json:"taker"`
+	OrderPair string `json:"orderPair"`
 
-	InitiatorInitiateTxHash string `json:"initiatorInitiateTxHash"`
-	FollowerInitiateTxHash  string `json:"followerInitiateTxHash"`
-	InitiatorRedeemTxHash   string `json:"initiatorRedeemTxHash"`
-	FollowerRedeemTxHash    string `json:"followerRedeemTxHash"`
-	FollowerRefundTxHash    string `json:"followerRefundTxHash"`
+	InitiatorAtomicSwapID uint
+	FollowerAtomicSwapID  uint
+	InitiatorAtomicSwap   *AtomicSwap `json:"initiatorAtomicSwap" gorm:"foreignKey:InitiatorAtomicSwapID"`
+	FollowerAtomicSwap    *AtomicSwap `json:"followerAtomicSwap" gorm:"foreignKey:FollowerAtomicSwapID"`
 
-	Chain  string `json:"chain"`
-	Fee    uint64 `json:"fee"`
-	Status uint8  `json:"status"`
+	SecretHash string  `json:"secretHash"`
+	Secret     string  `json:"secret"`
+	Price      float64 `json:"price"`
+	Status     Status  `json:"status"`
 }
 
-type Account struct {
-	BtcAddress       string  `json:"btcAddress"`
-	WbtcAddress      string  `json:"wbtcAddress"`
-	WbtcTokenAddress string  `json:"wbtcTokenAddress"`
-	DeployerAddress  string  `json:"deployerAddress"`
-	BtcBalance       string  `json:"btcBalance"`
-	WbtcBalance      string  `json:"wbtcBalance"`
-	Fee              float64 `json:"feeInBips"`
+type AtomicSwap struct {
+	gorm.Model
+
+	InitiatorAddress string `json:"initiatorAddress"`
+	RedeemerAddress  string `json:"redeemerAddress"`
+	Timelock         string `json:"timelock"`
+	Chain            Chain  `json:"chain"`
+	Asset            Asset  `json:"asset"`
+	Amount           string `json:"amount"`
+	InitiateTxHash   string `json:"initiateTxHash"`
+	RedeemTxHash     string `json:"redeemTxHash"`
+	RefundTxHash     string `json:"refundTxHash"`
 }
 
-type HTLCAddresses struct {
-	InitiateAddress string `json:"initiateAddress"`
-	RedeemAddress   string `json:"redeemAddress"`
+func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {
+	chainAssets := strings.Split(orderPair, "-")
+	if len(chainAssets) != 2 {
+		return "", "", "", "", fmt.Errorf("failed to parse the order pair, should be of the format <chain>:<asset>-<chain>:<asset>. got: %v", orderPair)
+	}
+	sendChain, sendAsset, err := parseChainAsset(chainAssets[0])
+	if err != nil {
+		return "", "", "", "", err
+	}
+	recieveChain, recieveAsset, err := parseChainAsset(chainAssets[1])
+	if err != nil {
+		return "", "", "", "", err
+	}
+	return sendChain, recieveChain, sendAsset, recieveAsset, nil
+}
+
+func parseChainAsset(chainAsset string) (Chain, Asset, error) {
+	chainAndAsset := strings.Split(chainAsset, ":")
+	if len(chainAndAsset) != 2 {
+		return "", "", fmt.Errorf("failed to parse the chain and asset, should be of the format <chain>:<asset>. got: %v", chainAsset)
+	}
+	return Chain(chainAndAsset[0]), Asset(chainAndAsset[1]), nil
+}
+
+func NewOrderPair(from Chain, fromAsset Asset, to Chain, toAsset Asset) string {
+	return fmt.Sprintf("%s:%s-%s:%s", from, fromAsset, to, toAsset)
 }

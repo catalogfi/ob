@@ -14,7 +14,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/susruth/wbtc-garden/orderbook/model"
+	"github.com/susruth/wbtc-garden/model"
 	"github.com/susruth/wbtc-garden/swapper"
 	"github.com/susruth/wbtc-garden/swapper/bitcoin"
 	"github.com/susruth/wbtc-garden/swapper/ethereum"

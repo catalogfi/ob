@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/susruth/wbtc-garden/orderbook/blockchain"
-	"github.com/susruth/wbtc-garden/orderbook/model"
+	"github.com/susruth/wbtc-garden/blockchain"
+	"github.com/susruth/wbtc-garden/model"
 )
 
 type Store interface {

@@ -10,113 +10,111 @@ import (
 )
 
 type Client interface {
-	Health() error
-	GetChains() ([]string, error)
-	ChainClient(chain string) ChainClient
-}
-
-type ChainClient interface {
-	GetAccount() (model.Account, error)
-	GetAddresses(from, to, secretHash string, wbtcExpiry int64) (model.HTLCAddresses, error)
-	PostTransaction(from, to, secretHash string, wbtcExpiry int64) error
-	GetTransactions(address string) ([]model.Transaction, error)
+	FillOrder(orderID uint, sendAddress, recieveAddress string) error
+	CreateOrder(sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string) error
+	GetFollowerInitiateOrders() ([]model.Order, error)
+	GetFollowerRedeemOrders() ([]model.Order, error)
+	GetInitiatorInitiateOrders() ([]model.Order, error)
+	GetInitiatorRedeemOrders() ([]model.Order, error)
 }
 
 type client struct {
 	url string
+	id  string
 }
 
-func New(url string) Client {
+func NewClient(url string) Client {
 	return &client{url: url}
 }
 
-func (c *client) Health() error {
-	resp, err := http.Get(fmt.Sprintf("%s/health", c.url))
+func (c *client) FillOrder(orderID uint, sendAddress, recieveAddress string) error {
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(FillOrder{SendAddress: sendAddress, RecieveAddress: recieveAddress}); err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("%s/orders/%d", c.url, orderID), &buf)
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("health check failed with status code %d", resp.StatusCode)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to fill order: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("failed to fill order: %v", resp.Status)
 	}
 	return nil
 }
 
-func (c *client) GetChains() ([]string, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/chains", c.url))
-	if err != nil {
-		return nil, err
-	}
-	chains := []string{}
-	if err := json.NewDecoder(resp.Body).Decode(&chains); err != nil {
-		return nil, err
-	}
-	return chains, nil
-}
-
-func (c *client) ChainClient(chain string) ChainClient {
-	return NewChainClient(fmt.Sprintf("%s/%s", c.url, chain))
-}
-
-func NewChainClient(url string) ChainClient {
-	return &chainClient{url: url}
-}
-
-type chainClient struct {
-	url string
-}
-
-func (c *chainClient) GetAccount() (model.Account, error) {
-	resp, err := http.Get(c.url)
-	if err != nil {
-		return model.Account{}, err
-	}
-	account := model.Account{}
-	if err := json.NewDecoder(resp.Body).Decode(&account); err != nil {
-		return model.Account{}, err
-	}
-	return account, nil
-}
-
-func (c *chainClient) GetAddresses(from, to, secretHash string, wbtcExpiry int64) (model.HTLCAddresses, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/addresses", c.url))
-	if err != nil {
-		return model.HTLCAddresses{}, err
-	}
-	addrs := model.HTLCAddresses{}
-	if err := json.NewDecoder(resp.Body).Decode(&addrs); err != nil {
-		return model.HTLCAddresses{}, err
-	}
-	return addrs, nil
-}
-
-func (c *chainClient) PostTransaction(from, to, secretHash string, wbtcExpiry int64) error {
-	reqBytes, err := json.Marshal(PostTransactionReq{
-		From:       from,
-		To:         to,
-		SecretHash: secretHash,
-		WBTCExpiry: float64(wbtcExpiry),
-	})
-	if err != nil {
+func (c *client) CreateOrder(sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string) error {
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(CreateOrder{SendAddress: sendAddress, RecieveAddress: recieveAddress, OrderPair: orderPair, SendAmount: sendAmount, RecieveAmount: recieveAmount, SecretHash: secretHash}); err != nil {
 		return err
 	}
-	resp, err := http.Post(fmt.Sprintf("%s/transactions", c.url), "application/json", bytes.NewBuffer(reqBytes))
+	resp, err := http.Post(fmt.Sprintf("%s/orders", c.url), "application/json", &buf)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create order: %v", err)
 	}
-	if resp.StatusCode != 201 {
-		return fmt.Errorf("failed to create transaction: %s", resp.Status)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("failed to create order: %v", resp.Status)
 	}
 	return nil
 }
 
-func (c *chainClient) GetTransactions(address string) ([]model.Transaction, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/transactions/%s", c.url, address))
+func (c *client) GetFollowerInitiateOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?taker=%s&status=3&verbose=true", c.url, c.id))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
-	txs := []model.Transaction{}
-	if err := json.NewDecoder(resp.Body).Decode(&txs); err != nil {
-		return nil, err
+	defer resp.Body.Close()
+	var orders []model.Order
+	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
+		return nil, fmt.Errorf("failed to decode orders: %v", err)
 	}
-	return txs, nil
+	return orders, nil
+}
+
+func (c *client) GetFollowerRedeemOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?taker=%s&status=5&verbose=true", c.url, c.id))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get orders: %v", err)
+	}
+	defer resp.Body.Close()
+	var orders []model.Order
+	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
+		return nil, fmt.Errorf("failed to decode orders: %v", err)
+	}
+	return orders, nil
+}
+
+func (c *client) GetInitiatorInitiateOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?maker=%s&status=2&verbose=true", c.url, c.id))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get orders: %v", err)
+	}
+	defer resp.Body.Close()
+	var orders []model.Order
+	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
+		return nil, fmt.Errorf("failed to decode orders: %v", err)
+	}
+	return orders, nil
+}
+
+func (c *client) GetInitiatorRedeemOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?maker=%s&status=4&verbose=true", c.url, c.id))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get orders: %v", err)
+	}
+	defer resp.Body.Close()
+	var orders []model.Order
+	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
+		return nil, fmt.Errorf("failed to decode orders: %v", err)
+	}
+	return orders, nil
 }
