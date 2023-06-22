@@ -12,14 +12,14 @@ import (
 )
 
 type initiatorSwap struct {
-	initiator             *btcec.PrivateKey
-	initiateTxHash        string
-	initiateTxBlockHeight uint64
-	htlcScript            []byte
-	waitBlocks            int64
-	amount                uint64
-	scriptAddr            btcutil.Address
-	client                Client
+	initiator      *btcec.PrivateKey
+	initiateTxHash string
+	htlcScript     []byte
+	waitBlocks     int64
+	amount         uint64
+	scriptAddr     btcutil.Address
+	watcher        swapper.Watcher
+	client         Client
 }
 
 func GetAddress(client Client, redeemerAddr, initiatorAddr btcutil.Address, secretHash []byte, waitBlocks int64) (btcutil.Address, error) {
@@ -64,7 +64,12 @@ func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerAddr btcutil.Address,
 	}
 
 	fmt.Println("script address:", scriptAddr.EncodeAddress())
-	return &initiatorSwap{initiator: initiator, htlcScript: htlcScript, scriptAddr: scriptAddr, amount: amount, waitBlocks: waitBlocks, client: client}, nil
+
+	watcher, err := NewWatcher(initiatorAddr, redeemerAddr, secretHash, waitBlocks, amount, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create watcher: %w", err)
+	}
+	return &initiatorSwap{initiator: initiator, htlcScript: htlcScript, watcher: watcher, scriptAddr: scriptAddr, amount: amount, waitBlocks: waitBlocks, client: client}, nil
 }
 
 func (s *initiatorSwap) Initiate() (string, error) {
@@ -78,26 +83,7 @@ func (s *initiatorSwap) Initiate() (string, error) {
 }
 
 func (initiatorSwap *initiatorSwap) Expired() (bool, error) {
-	// currentBlock, err := initiatorSwap.client.GetTipBlockHeight()
-	// if err != nil {
-	// 	return false, err
-	// }
-
-	// initiateBlockHeight, err := initiatorSwap.client.GetBlockHeight(initiatorSwap.initiateTxHash)
-	// if err != nil {
-	// 	return false, err
-	// }
-
-	return false, nil
-
-	// TODO: comback and fix this
-	// expiryBlockHeight := initiateBlockHeight + uint64(initiatorSwap.waitBlocks)
-	// fmt.Println("Expiry Block Height:", initiateBlockHeight, uint64(initiatorSwap.waitBlocks), expiryBlockHeight)
-	// if currentBlock > expiryBlockHeight {
-	// 	return true, nil
-	// } else {
-	// 	return false, nil
-	// }
+	return initiatorSwap.watcher.Expired()
 }
 
 func (s *initiatorSwap) Refund() (string, error) {
@@ -126,46 +112,7 @@ func (s *initiatorSwap) WaitForRedeem() ([]byte, string, error) {
 }
 
 func (s *initiatorSwap) IsRedeemed() (bool, []byte, string, error) {
-	witness, tx, err := s.client.GetSpendingWitness(s.scriptAddr)
-	if err != nil {
-		return false, nil, "", fmt.Errorf("failed to get UTXOs: %w", err)
-	}
-	if len(witness) != 0 {
-		fmt.Println("Redeemed:", witness)
-		// inputs are [ 0 : sig, 1 : spender.PubKey().SerializeCompressed(),2 : secret, 3 :[]byte{0x1}, script]
-		secretString := witness[2]
-		secretBytes := make([]byte, hex.DecodedLen(len(secretString)))
-		_, err := hex.Decode(secretBytes, []byte(secretString))
-		if err != nil {
-			return false, nil, "", fmt.Errorf("failed to decode secret: %w", err)
-		}
-		return true, secretBytes, tx, nil
-	}
-	if err := s.checkTimeout(); err != nil {
-		return false, nil, "", err
-	}
-	return false, nil, "", nil
-}
-
-func (s *initiatorSwap) checkTimeout() error {
-	if s.initiateTxBlockHeight == 0 {
-		blockHeight, err := s.client.GetBlockHeight(s.initiateTxHash)
-		if err != nil {
-			return fmt.Errorf("failed to get block height: %w", err)
-		}
-		if blockHeight != 0 {
-			s.initiateTxBlockHeight = blockHeight
-		}
-	} else {
-		tipBlockHeight, err := s.client.GetTipBlockHeight()
-		if err != nil {
-			return fmt.Errorf("failed to get block height: %w", err)
-		}
-		if tipBlockHeight-s.initiateTxBlockHeight > uint64(s.waitBlocks)+1 {
-			return swapper.ErrRedeemTimeout
-		}
-	}
-	return nil
+	return s.watcher.IsRedeemed()
 }
 
 type redeemerSwap struct {
@@ -173,6 +120,7 @@ type redeemerSwap struct {
 	redeemer   *btcec.PrivateKey
 	htlcScript []byte
 	scriptAddr btcutil.Address
+	watcher    swapper.Watcher
 	client     Client
 }
 
@@ -193,8 +141,11 @@ func NewRedeemerSwap(redeemer *btcec.PrivateKey, initiator btcutil.Address, secr
 	}
 
 	fmt.Println("script address:", scriptAddr.EncodeAddress())
-
-	return &redeemerSwap{redeemer: redeemer, htlcScript: htlcScript, scriptAddr: scriptAddr, amount: amount, client: client}, nil
+	watcher, err := NewWatcher(initiator, redeemerAddr, secretHash, waitTime, amount, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create watcher: %w", err)
+	}
+	return &redeemerSwap{redeemer: redeemer, watcher: watcher, htlcScript: htlcScript, scriptAddr: scriptAddr, amount: amount, client: client}, nil
 }
 
 func (s *redeemerSwap) Redeem(secret []byte) (string, error) {
@@ -221,12 +172,83 @@ func (s *redeemerSwap) WaitForInitiate() (string, error) {
 }
 
 func (s *redeemerSwap) IsInitiated() (bool, string, error) {
-	utxos, bal, err := s.client.GetUTXOs(s.scriptAddr, 0)
+	return s.watcher.IsInitiated()
+}
+
+type watcher struct {
+	client     Client
+	scriptAddr btcutil.Address
+	amount     uint64
+	waitBlocks int64
+}
+
+func NewWatcher(initiator, redeemerAddr btcutil.Address, secretHash []byte, waitBlocks int64, amount uint64, client Client) (swapper.Watcher, error) {
+	htlcScript, err := NewHTLCScript(initiator, redeemerAddr, secretHash, waitBlocks)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTLC script: %w", err)
+	}
+	witnessProgram := sha256.Sum256(htlcScript)
+	scriptAddr, err := btcutil.NewAddressWitnessScriptHash(witnessProgram[:], client.Net())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create script address: %w", err)
+	}
+
+	fmt.Println("script address:", scriptAddr.EncodeAddress())
+	return &watcher{scriptAddr: scriptAddr, amount: amount, waitBlocks: waitBlocks, client: client}, nil
+}
+
+func (w *watcher) Expired() (bool, error) {
+	currentBlock, err := w.client.GetTipBlockHeight()
+	if err != nil {
+		return false, err
+	}
+	initiated, txHash, err := w.IsInitiated()
+	if err != nil || !initiated {
+		return false, err
+	}
+	initiateBlockHeight, err := w.client.GetBlockHeight(txHash)
+	if err != nil {
+		return false, err
+	}
+	if currentBlock > initiateBlockHeight+uint64(w.waitBlocks) {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (w *watcher) IsInitiated() (bool, string, error) {
+	utxos, bal, err := w.client.GetUTXOs(w.scriptAddr, 0)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
-	if bal >= s.amount && len(utxos) > 0 {
+	if bal >= w.amount && len(utxos) > 0 {
+		final, err := w.client.IsFinal(utxos[0].TxID)
+		if err != nil {
+			return false, "", fmt.Errorf("failed to check if final: %w", err)
+		}
+		if !final {
+			return false, utxos[0].TxID, nil
+		}
 		return true, utxos[0].TxID, nil
 	}
 	return false, "", nil
+}
+
+func (w *watcher) IsRedeemed() (bool, []byte, string, error) {
+	witness, tx, err := w.client.GetSpendingWitness(w.scriptAddr)
+	if err != nil {
+		return false, nil, "", fmt.Errorf("failed to get UTXOs: %w", err)
+	}
+	if len(witness) != 0 {
+		fmt.Println("Redeemed:", witness)
+		// inputs are [ 0 : sig, 1 : spender.PubKey().SerializeCompressed(),2 : secret, 3 :[]byte{0x1}, script]
+		secretString := witness[2]
+		secretBytes := make([]byte, hex.DecodedLen(len(secretString)))
+		_, err := hex.Decode(secretBytes, []byte(secretString))
+		if err != nil {
+			return false, nil, "", fmt.Errorf("failed to decode secret: %w", err)
+		}
+		return true, secretBytes, tx, nil
+	}
+	return false, nil, "", nil
 }

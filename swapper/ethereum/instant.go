@@ -67,6 +67,13 @@ func (client *instantClient) TransferERC20(privKey *ecdsa.PrivateKey, amount *bi
 	return client.transferERC20Instant(privKey, amount, tokenAddr, toAddr)
 }
 
+func (client *instantClient) IsFinal(txHash string) (bool, error) {
+	// TODO: check whether it is an instant wallet transaction, if it is return true, nil
+	panic("not implemented")
+
+	return client.indexerClient.IsFinal(txHash)
+}
+
 func (client *instantClient) GetCurrentBlock() (uint64, error) {
 	return client.indexerClient.GetCurrentBlock()
 }
