@@ -3,14 +3,12 @@ package store
 import (
 	"fmt"
 	"math/big"
-	"strconv"
 	"strings"
 
+	"github.com/susruth/wbtc-garden/orderbook/blockchain"
 	"github.com/susruth/wbtc-garden/orderbook/model"
 	"github.com/susruth/wbtc-garden/orderbook/rest"
 	"github.com/susruth/wbtc-garden/orderbook/watcher"
-	"github.com/susruth/wbtc-garden/swapper/bitcoin"
-	"github.com/susruth/wbtc-garden/swapper/ethereum"
 	"gorm.io/gorm"
 )
 
@@ -77,10 +75,10 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 	if err != nil {
 		return 0, err
 	}
-	if _, err := calculateExpiry(fromChain, true); err != nil {
+	if _, err := blockchain.CalculateExpiry(fromChain, true); err != nil {
 		return 0, err
 	}
-	if _, err := calculateExpiry(toChain, false); err != nil {
+	if _, err := blockchain.CalculateExpiry(toChain, false); err != nil {
 		return 0, err
 	}
 
@@ -119,11 +117,11 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, recieveAddress stri
 	if err != nil {
 		panic(fmt.Errorf("constraint violation: invalid order pair: %v", err))
 	}
-	initiateAtomicSwapTimelock, err := calculateExpiry(fromChain, true)
+	initiateAtomicSwapTimelock, err := blockchain.CalculateExpiry(fromChain, true)
 	if err != nil {
 		panic(fmt.Errorf("constraint violation: invalid order pair: %v", err))
 	}
-	followerAtomicSwapTimelock, err := calculateExpiry(toChain, false)
+	followerAtomicSwapTimelock, err := blockchain.CalculateExpiry(toChain, false)
 	if err != nil {
 		panic(fmt.Errorf("constraint violation: invalid order pair: %v", err))
 	}
@@ -282,20 +280,4 @@ func (s *store) fillSwapDetails(order *model.Order) error {
 		return tx.Error
 	}
 	return nil
-}
-
-func calculateExpiry(chain model.Chain, goingFirst bool) (string, error) {
-	if chain == model.Bitcoin {
-		expiry := bitcoin.GetExpiry(goingFirst)
-		return strconv.FormatInt(expiry, 10), nil
-	}
-	client, err := ethereum.ClientFromChain(chain)
-	if err != nil {
-		return "", err
-	}
-	expiry, err := ethereum.GetExpiry(client, goingFirst)
-	if err != nil {
-		return "", err
-	}
-	return expiry.String(), nil
 }

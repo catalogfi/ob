@@ -14,6 +14,10 @@ const (
 	Ethereum Chain = "ethereum"
 )
 
+func (c Chain) IsEVM() bool {
+	return c == Ethereum
+}
+
 type Asset string
 
 const (
@@ -22,6 +26,13 @@ const (
 
 func NewSecondary(address string) Asset {
 	return Asset("secondary" + address)
+}
+
+func (a Asset) SecondaryID() string {
+	if string(a[:9]) != "secondary" {
+		return ""
+	}
+	return string(a[9:])
 }
 
 type Status uint

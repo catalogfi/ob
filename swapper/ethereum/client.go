@@ -6,15 +6,12 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"os"
-	"strings"
 
 	// "crypto/rand"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/susruth/wbtc-garden/orderbook/model"
 	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
 	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/ERC20"
 )
@@ -34,14 +31,6 @@ type Client interface {
 type client struct {
 	url      string
 	provider *ethclient.Client
-}
-
-func ClientFromChain(chain model.Chain) (Client, error) {
-	val := os.Getenv(fmt.Sprintf("%s_URL", strings.ToUpper(string(chain))))
-	if val == "" {
-		return nil, fmt.Errorf("unsupported chain %s", chain)
-	}
-	return NewClient(val)
 }
 
 func NewClient(url string) (Client, error) {

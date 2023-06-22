@@ -12,10 +12,15 @@ import (
 type Client interface {
 	FillOrder(orderID uint, sendAddress, recieveAddress string) error
 	CreateOrder(sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string) error
+	GetFollowerInitiateOrders() ([]model.Order, error)
+	GetFollowerRedeemOrders() ([]model.Order, error)
+	GetInitiatorInitiateOrders() ([]model.Order, error)
+	GetInitiatorRedeemOrders() ([]model.Order, error)
 }
 
 type client struct {
 	url string
+	id  string
 }
 
 func NewClient(url string) Client {
@@ -62,8 +67,8 @@ func (c *client) CreateOrder(sendAddress, recieveAddress, orderPair, sendAmount,
 	return nil
 }
 
-func (c *client) GetFollowerInitiateOrders(id string) ([]model.Order, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/orders?taker=%s&status=3&verbose=true", c.url, id))
+func (c *client) GetFollowerInitiateOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?taker=%s&status=3&verbose=true", c.url, c.id))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
@@ -75,8 +80,8 @@ func (c *client) GetFollowerInitiateOrders(id string) ([]model.Order, error) {
 	return orders, nil
 }
 
-func (c *client) GetFollowerRedeemOrders(id string) ([]model.Order, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/orders?taker=%s&status=5&verbose=true", c.url, id))
+func (c *client) GetFollowerRedeemOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?taker=%s&status=5&verbose=true", c.url, c.id))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
@@ -88,8 +93,8 @@ func (c *client) GetFollowerRedeemOrders(id string) ([]model.Order, error) {
 	return orders, nil
 }
 
-func (c *client) GetInitiatorInitiateOrders(id string) ([]model.Order, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/orders?maker=%s&status=2&verbose=true", c.url, id))
+func (c *client) GetInitiatorInitiateOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?maker=%s&status=2&verbose=true", c.url, c.id))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
@@ -101,8 +106,8 @@ func (c *client) GetInitiatorInitiateOrders(id string) ([]model.Order, error) {
 	return orders, nil
 }
 
-func (c *client) GetInitiatorRedeemOrders(id string) ([]model.Order, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/orders?maker=%s&status=4&verbose=true", c.url, id))
+func (c *client) GetInitiatorRedeemOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?maker=%s&status=4&verbose=true", c.url, c.id))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
