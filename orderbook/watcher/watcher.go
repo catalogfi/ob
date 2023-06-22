@@ -114,6 +114,10 @@ func (w *watcher) watch(order model.Order) error {
 	return nil
 }
 
+func (w *watcher) getInitiateWatcher(chain model.Chain) (swapper.Watcher, error) {
+	return nil, nil
+}
+
 func (w *watcher) getWatchers(order model.Order) (swapper.Watcher, swapper.Watcher, error) {
 	// fromChain, toChain, fromAsset, toAsset, err := model.ParseOrderPair(order.OrderPair)
 	// if err != nil {

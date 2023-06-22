@@ -131,39 +131,16 @@ func (s *store) CancelOrder(creator string, orderID uint) error {
 	if tx := s.db.First(order, orderID); tx.Error != nil {
 		return tx.Error
 	}
-	if order.Status != model.OrderCreated {
-		return fmt.Errorf("order can be cancelled only if it is not filled, current status: %v", order.Status)
-	}
 	if order.Maker != creator {
 		return fmt.Errorf("order can be cancelled only by its creator")
+	}
+	if order.Status != model.OrderCreated {
+		return fmt.Errorf("order can be cancelled only if it is not filled, current status: %v", order.Status)
 	}
 	if tx := s.db.Delete(order); tx.Error != nil {
 		return tx.Error
 	}
 	return nil
-}
-
-func (s *store) GetOpenOrders(orderPair string, minPrice, maxPrice float64) ([]model.Order, error) {
-	orders := []model.Order{}
-	if tx := s.db.Where("order_pair = ? AND status = 0 AND price >= ? AND price <= ?", orderPair, minPrice, maxPrice).Find(&orders); tx.Error != nil {
-		return nil, tx.Error
-	}
-	return orders, nil
-}
-
-func (s *store) GetOrders(address string, status model.Status, verbose bool) ([]model.Order, error) {
-	orders := []model.Order{}
-	if tx := s.db.Where("(maker = ? OR taker = ?) AND status = ?", address, address, status).Find(&orders); tx.Error != nil {
-		return nil, tx.Error
-	}
-	if verbose {
-		for _, order := range orders {
-			if err := s.fillSwapDetails(&order); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return orders, nil
 }
 
 func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, status model.Status, minPrice, maxPrice float64, page, perPage int, verbose bool) ([]model.Order, error) {

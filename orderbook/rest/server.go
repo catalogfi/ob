@@ -24,8 +24,6 @@ type Store interface {
 	GetOrder(orderID uint) (*model.Order, error)
 	// cancel order by id
 	CancelOrder(creator string, orderID uint) error
-	// get all open orders for the given pair
-	GetOpenOrders(orderPair string, minPrice, maxPrice float64) ([]model.Order, error)
 	// get all orders for the given user
 	FilterOrders(maker, taker, orderPair, secretHash, sort string, status model.Status, minPrice, maxPrice float64, page, perPage int, verbose bool) ([]model.Order, error)
 }
