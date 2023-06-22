@@ -201,6 +201,7 @@ type watcher struct {
 	contractAddr     common.Address
 	lastCheckedBlock *big.Int
 	amount           *big.Int
+	expiryBlock      *big.Int
 }
 
 func NewWatcher(initiator, redeemerAddr, deployerAddr, tokenAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.Watcher, error) {
@@ -214,8 +215,21 @@ func NewWatcher(initiator, redeemerAddr, deployerAddr, tokenAddr common.Address,
 		tokenAddr:        tokenAddr,
 		contractAddr:     contractAddr,
 		lastCheckedBlock: latestCheckedBlock,
+		expiryBlock:      expiryBlock,
 		amount:           amount,
 	}, nil
+}
+
+func (watcher *watcher) Expired() (bool, error) {
+	currentBlock, err := watcher.client.GetCurrentBlock()
+	if err != nil {
+		return false, err
+	}
+	if currentBlock > watcher.expiryBlock.Uint64() {
+		return true, nil
+	} else {
+		return false, nil
+	}
 }
 
 func (watcher *watcher) IsInitiated() (bool, string, error) {

@@ -19,6 +19,7 @@ type RedeemerSwap interface {
 }
 
 type Watcher interface {
+	Expired() (bool, error)
 	IsInitiated() (bool, string, error)
 	IsRedeemed() (bool, []byte, string, error)
 }

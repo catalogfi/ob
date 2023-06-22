@@ -83,26 +83,7 @@ func (s *initiatorSwap) Initiate() (string, error) {
 }
 
 func (initiatorSwap *initiatorSwap) Expired() (bool, error) {
-	// currentBlock, err := initiatorSwap.client.GetTipBlockHeight()
-	// if err != nil {
-	// 	return false, err
-	// }
-
-	// initiateBlockHeight, err := initiatorSwap.client.GetBlockHeight(initiatorSwap.initiateTxHash)
-	// if err != nil {
-	// 	return false, err
-	// }
-
-	return false, nil
-
-	// TODO: comback and fix this
-	// expiryBlockHeight := initiateBlockHeight + uint64(initiatorSwap.waitBlocks)
-	// fmt.Println("Expiry Block Height:", initiateBlockHeight, uint64(initiatorSwap.waitBlocks), expiryBlockHeight)
-	// if currentBlock > expiryBlockHeight {
-	// 	return true, nil
-	// } else {
-	// 	return false, nil
-	// }
+	return initiatorSwap.watcher.Expired()
 }
 
 func (s *initiatorSwap) Refund() (string, error) {
@@ -195,12 +176,10 @@ func (s *redeemerSwap) IsInitiated() (bool, string, error) {
 }
 
 type watcher struct {
-	client                Client
-	scriptAddr            btcutil.Address
-	amount                uint64
-	waitBlocks            int64
-	initiateTxBlockHeight uint64
-	initiateTxHash        string
+	client     Client
+	scriptAddr btcutil.Address
+	amount     uint64
+	waitBlocks int64
 }
 
 func NewWatcher(initiator, redeemerAddr btcutil.Address, secretHash []byte, waitBlocks int64, amount uint64, client Client) (swapper.Watcher, error) {
@@ -216,6 +195,25 @@ func NewWatcher(initiator, redeemerAddr btcutil.Address, secretHash []byte, wait
 
 	fmt.Println("script address:", scriptAddr.EncodeAddress())
 	return &watcher{scriptAddr: scriptAddr, amount: amount, waitBlocks: waitBlocks, client: client}, nil
+}
+
+func (w *watcher) Expired() (bool, error) {
+	currentBlock, err := w.client.GetTipBlockHeight()
+	if err != nil {
+		return false, err
+	}
+	initiated, txHash, err := w.IsInitiated()
+	if err != nil || !initiated {
+		return false, err
+	}
+	initiateBlockHeight, err := w.client.GetBlockHeight(txHash)
+	if err != nil {
+		return false, err
+	}
+	if currentBlock > initiateBlockHeight+uint64(w.waitBlocks) {
+		return true, nil
+	}
+	return false, nil
 }
 
 func (w *watcher) IsInitiated() (bool, string, error) {
@@ -252,29 +250,5 @@ func (w *watcher) IsRedeemed() (bool, []byte, string, error) {
 		}
 		return true, secretBytes, tx, nil
 	}
-	if err := w.checkTimeout(); err != nil {
-		return false, nil, "", err
-	}
 	return false, nil, "", nil
-}
-
-func (w *watcher) checkTimeout() error {
-	if w.initiateTxBlockHeight == 0 {
-		blockHeight, err := w.client.GetBlockHeight(w.initiateTxHash)
-		if err != nil {
-			return fmt.Errorf("failed to get block height: %w", err)
-		}
-		if blockHeight != 0 {
-			w.initiateTxBlockHeight = blockHeight
-		}
-	} else {
-		tipBlockHeight, err := w.client.GetTipBlockHeight()
-		if err != nil {
-			return fmt.Errorf("failed to get block height: %w", err)
-		}
-		if tipBlockHeight-w.initiateTxBlockHeight > uint64(w.waitBlocks)+1 {
-			return swapper.ErrRedeemTimeout
-		}
-	}
-	return nil
 }
