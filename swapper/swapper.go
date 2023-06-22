@@ -22,6 +22,7 @@ type Watcher interface {
 	Expired() (bool, error)
 	IsInitiated() (bool, string, error)
 	IsRedeemed() (bool, []byte, string, error)
+	IsRefunded() (bool, string, error)
 }
 
 var ErrInitiateTimeout = errors.New("initiate timeout")

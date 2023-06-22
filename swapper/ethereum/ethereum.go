@@ -335,3 +335,37 @@ func (watcher *watcher) IsRedeemed() (bool, []byte, string, error) {
 
 	return true, []byte(val[0].(string)), vLog.TxHash.Hex(), nil
 }
+
+func (watcher *watcher) IsRefunded() (bool, string, error) {
+	currBlock, err := watcher.client.GetCurrentBlock()
+	if err != nil {
+		return false, "", err
+	}
+	currentBlock := big.NewInt(int64(currBlock))
+
+	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	if err != nil {
+		return false, "", err
+	}
+
+	refundedEvent := atomicSwapAbi.Events["Refunded"]
+	query := ethereum.FilterQuery{
+		FromBlock: watcher.lastCheckedBlock,
+		ToBlock:   currentBlock,
+		Addresses: []common.Address{
+			watcher.contractAddr,
+		},
+		Topics: [][]common.Hash{{refundedEvent.ID}},
+	}
+
+	logs, err := watcher.client.GetProvider().FilterLogs(context.Background(), query)
+	if err != nil {
+		return false, "", err
+	}
+
+	if len(logs) == 0 {
+		fmt.Println("No logs found")
+		return false, "", err
+	}
+	return true, logs[0].TxHash.Hex(), nil
+}

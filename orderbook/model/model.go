@@ -37,7 +37,8 @@ const (
 	InitiatorAtomicSwapRefunded
 	FollowerAtomicSwapRefunded
 	OrderExecuted
-	OrderFailed
+	OrderFailedSoft
+	OrderFailedHard
 )
 
 type Order struct {

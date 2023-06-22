@@ -165,8 +165,8 @@ func (s *Server) GetOrders() gin.HandlerFunc {
 		}
 
 		status, err := strconv.Atoi(c.DefaultQuery("status", "0"))
-		if err != nil && status < int(model.Unknown) || status > int(model.OrderFailed) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode status has to be a number between %d and %d", model.Unknown, model.OrderFailed)})
+		if err != nil && status < int(model.Unknown) || status > int(model.OrderFailedSoft) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode status has to be a number between %d and %d", model.Unknown, model.OrderFailedSoft)})
 			return
 		}
 
