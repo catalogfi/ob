@@ -19,7 +19,7 @@ type Store interface {
 	// create order
 	CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string) (uint, error)
 	// fill order
-	FillOrder(orderID uint, filler, sendAddress, recieveAddress string, initiateAtomicSwapTimelock, followerAtomicSwapTimelock uint64) error
+	FillOrder(orderID uint, filler, sendAddress, recieveAddress string) error
 	// get order by id
 	GetOrder(orderID uint) (*model.Order, error)
 	// cancel order by id
@@ -94,13 +94,8 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode id has to be a number: %v", err.Error())})
 			return
 		}
-
 		// TODO: extract from auth token
 		filler := ""
-
-		// TODO: calculate initiator and follower timelocks
-		initiatorTimeLock := uint64(0)
-		followerTimeLock := uint64(0)
 
 		req := FillOrder{}
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -108,7 +103,7 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 			return
 		}
 
-		if err := s.store.FillOrder(uint(orderID), filler, req.SendAddress, req.RecieveAddress, initiatorTimeLock, followerTimeLock); err != nil {
+		if err := s.store.FillOrder(uint(orderID), filler, req.SendAddress, req.RecieveAddress); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":   "failed to get account details",
 				"message": err.Error(),

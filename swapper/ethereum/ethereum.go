@@ -43,6 +43,17 @@ type redeemerSwap struct {
 	watcher          swapper.Watcher
 }
 
+func GetExpiry(client Client, goingFirst bool) (*big.Int, error) {
+	blockNumber, err := client.GetProvider().BlockNumber(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	if goingFirst {
+		return new(big.Int).Add(new(big.Int).SetUint64(blockNumber), big.NewInt(11520)), nil
+	}
+	return new(big.Int).Add(new(big.Int).SetUint64(blockNumber), big.NewInt(5760)), nil
+}
+
 func GetAmount(client Client, deployerAddr, tokenAddr, redeemerAddr, initiatorAddr common.Address, secretHash []byte, expiryBlock *big.Int) (uint64, error) {
 	contractAddr, err := GetAddress(client, deployerAddr, redeemerAddr, initiatorAddr, secretHash, expiryBlock)
 	if err != nil {

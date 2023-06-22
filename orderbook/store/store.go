@@ -3,11 +3,14 @@ package store
 import (
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 
 	"github.com/susruth/wbtc-garden/orderbook/model"
 	"github.com/susruth/wbtc-garden/orderbook/rest"
 	"github.com/susruth/wbtc-garden/orderbook/watcher"
+	"github.com/susruth/wbtc-garden/swapper/bitcoin"
+	"github.com/susruth/wbtc-garden/swapper/ethereum"
 	"gorm.io/gorm"
 )
 
@@ -69,6 +72,18 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		return 0, fmt.Errorf("invalid recieve amount: %s", recieveAmount)
 	}
 
+	// validate orderpair
+	fromChain, toChain, _, _, err := model.ParseOrderPair(orderPair)
+	if err != nil {
+		return 0, err
+	}
+	if _, err := calculateExpiry(fromChain, true); err != nil {
+		return 0, err
+	}
+	if _, err := calculateExpiry(toChain, false); err != nil {
+		return 0, err
+	}
+
 	// ignoring accuracy
 	price, _ := new(big.Float).Quo(new(big.Float).SetInt(sendAmt), new(big.Float).SetInt(recieveAmt)).Float64()
 
@@ -91,13 +106,26 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 	return order.ID, nil
 }
 
-func (s *store) FillOrder(orderID uint, filler, sendAddress, recieveAddress string, initiateAtomicSwapTimelock, followerAtomicSwapTimelock uint64) error {
+func (s *store) FillOrder(orderID uint, filler, sendAddress, recieveAddress string) error {
 	order := &model.Order{}
 	if tx := s.db.First(order, orderID); tx.Error != nil {
 		return tx.Error
 	}
 	if order.Status != model.OrderCreated {
 		return fmt.Errorf("order already filled, current status: %v", order.Status)
+	}
+
+	fromChain, toChain, _, _, err := model.ParseOrderPair(order.OrderPair)
+	if err != nil {
+		panic(fmt.Errorf("constraint violation: invalid order pair: %v", err))
+	}
+	initiateAtomicSwapTimelock, err := calculateExpiry(fromChain, true)
+	if err != nil {
+		panic(fmt.Errorf("constraint violation: invalid order pair: %v", err))
+	}
+	followerAtomicSwapTimelock, err := calculateExpiry(toChain, false)
+	if err != nil {
+		panic(fmt.Errorf("constraint violation: invalid order pair: %v", err))
 	}
 
 	initiateAtomicSwap := &model.AtomicSwap{}
@@ -254,4 +282,20 @@ func (s *store) fillSwapDetails(order *model.Order) error {
 		return tx.Error
 	}
 	return nil
+}
+
+func calculateExpiry(chain model.Chain, goingFirst bool) (string, error) {
+	if chain == model.Bitcoin {
+		expiry := bitcoin.GetExpiry(goingFirst)
+		return strconv.FormatInt(expiry, 10), nil
+	}
+	client, err := ethereum.ClientFromChain(chain)
+	if err != nil {
+		return "", err
+	}
+	expiry, err := ethereum.GetExpiry(client, goingFirst)
+	if err != nil {
+		return "", err
+	}
+	return expiry.String(), nil
 }

@@ -95,7 +95,10 @@ func btcToWbtc(config ClientConfig, chainClient rest.ChainClient) {
 	}
 
 	btcClient := bitcoin.NewClient(config.BitcoinURL, config.BTCParams)
-	ethClient := ethereum.NewClient(config.EthereumURL)
+	ethClient, err := ethereum.NewClient(config.EthereumURL)
+	if err != nil {
+		panic(err)
+	}
 
 	swap, err := bitcoin.NewInitiatorSwap(btcPrivKey, redeemerAddr, secretHash[:], 288, 10000, btcClient)
 	if err != nil {
@@ -172,7 +175,10 @@ func wbtcToBTC(config ClientConfig, chainClient rest.ChainClient) {
 	}
 
 	btcClient := bitcoin.NewClient(config.BitcoinURL, config.BTCParams)
-	ethClient := ethereum.NewClient(config.EthereumURL)
+	ethClient, err := ethereum.NewClient(config.EthereumURL)
+	if err != nil {
+		panic(err)
+	}
 
 	currBlock, err := ethClient.GetCurrentBlock()
 	if err != nil {

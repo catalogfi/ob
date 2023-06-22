@@ -63,7 +63,7 @@ type AtomicSwap struct {
 
 	InitiatorAddress string `json:"initiatorAddress"`
 	RedeemerAddress  string `json:"redeemerAddress"`
-	Timelock         uint64 `json:"timelock"`
+	Timelock         string `json:"timelock"`
 	Chain            Chain  `json:"chain"`
 	Asset            Asset  `json:"asset"`
 	Amount           string `json:"amount"`

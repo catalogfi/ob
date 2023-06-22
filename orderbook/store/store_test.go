@@ -37,9 +37,9 @@ var _ = Describe("Store", func() {
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash")
 		Expect(err).NotTo(HaveOccurred())
-		err = store.FillOrder(id, "filler", "sendFollowerAddress", "reciveFollowerAddress", 144, 144)
+		err = store.FillOrder(id, "filler", "sendFollowerAddress", "reciveFollowerAddress")
 		Expect(err).NotTo(HaveOccurred())
-		err = store.FillOrder(id, "filler2", "sendFollowerAddress2", "reciveFollowerAddress2", 144, 144)
+		err = store.FillOrder(id, "filler2", "sendFollowerAddress2", "reciveFollowerAddress2")
 		Expect(err).To(HaveOccurred())
 		order, err := store.GetOrder(id)
 		Expect(err).NotTo(HaveOccurred())
@@ -72,7 +72,7 @@ var _ = Describe("Store", func() {
 		Expect(err).NotTo(HaveOccurred())
 		cid, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash")
 		Expect(err).NotTo(HaveOccurred())
-		err = store.FillOrder(cid, "filler", "sendFollowerAddress", "reciveFollowerAddress", 144, 144)
+		err = store.FillOrder(cid, "filler", "sendFollowerAddress", "reciveFollowerAddress")
 		Expect(err).NotTo(HaveOccurred())
 		order, err := store.GetOrder(cid)
 		Expect(err).NotTo(HaveOccurred())
@@ -101,21 +101,21 @@ var _ = Describe("Store", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(orders)).To(Equal(0))
 
-		err = store.FillOrder(cid1, "filler", "sendFollowerAddress", "reciveFollowerAddress", 144, 144)
+		err = store.FillOrder(cid1, "filler", "sendFollowerAddress", "reciveFollowerAddress")
 		Expect(err).NotTo(HaveOccurred())
 
 		orders, err = store.GetActiveOrders()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(orders)).To(Equal(1))
 
-		err = store.FillOrder(cid2, "filler", "sendFollowerAddress", "reciveFollowerAddress", 144, 144)
+		err = store.FillOrder(cid2, "filler", "sendFollowerAddress", "reciveFollowerAddress")
 		Expect(err).NotTo(HaveOccurred())
 
 		orders, err = store.GetActiveOrders()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(orders)).To(Equal(2))
 
-		err = store.FillOrder(cid3, "filler", "sendFollowerAddress", "reciveFollowerAddress", 144, 144)
+		err = store.FillOrder(cid3, "filler", "sendFollowerAddress", "reciveFollowerAddress")
 		Expect(err).NotTo(HaveOccurred())
 
 		orders, err = store.GetActiveOrders()
@@ -155,7 +155,7 @@ var _ = Describe("Store", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(unfilledOrders)).To(Equal(1))
 
-		err = store.FillOrder(cid, "filler", "sendFollowerAddress", "reciveFollowerAddress", 144, 144)
+		err = store.FillOrder(cid, "filler", "sendFollowerAddress", "reciveFollowerAddress")
 		Expect(err).NotTo(HaveOccurred())
 
 		unfilledOrders, err = store.FilterOrders("creator", "", "", "", "", model.Status(1), 0, 0, 0, 0, true)

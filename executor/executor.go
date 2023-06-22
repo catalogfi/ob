@@ -65,11 +65,16 @@ func New(config Config, store Store) (Executor, error) {
 		return nil, err
 	}
 
+	client, err := ethereum.NewClient(config.EthereumURL)
+	if err != nil {
+		return nil, err
+	}
+
 	return &executor{
 		bitcoinPrivateKey:  btcPrivKey,
 		ethereumPrivateKey: ethPrivKey,
 		client:             bitcoin.NewClient(config.BitcoinURL, config.Params),
-		ethereumClient:     ethereum.NewClient(config.EthereumURL),
+		ethereumClient:     client,
 		wbtcAddress:        common.HexToAddress(config.WBTCAddress),
 		deployerAddress:    common.HexToAddress(config.DeployerAddress),
 		store:              store,

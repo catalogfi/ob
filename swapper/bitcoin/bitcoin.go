@@ -22,6 +22,13 @@ type initiatorSwap struct {
 	client         Client
 }
 
+func GetExpiry(goingFirst bool) int64 {
+	if goingFirst {
+		return 288
+	}
+	return 144
+}
+
 func GetAddress(client Client, redeemerAddr, initiatorAddr btcutil.Address, secretHash []byte, waitBlocks int64) (btcutil.Address, error) {
 	htlcScript, err := NewHTLCScript(initiatorAddr, redeemerAddr, secretHash, waitBlocks)
 	if err != nil {
