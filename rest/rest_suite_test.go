@@ -7,10 +7,9 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/susruth/wbtc-garden/orderbook/model"
-	"github.com/susruth/wbtc-garden/orderbook/rest"
-	"github.com/susruth/wbtc-garden/orderbook/store"
-	"github.com/susruth/wbtc-garden/orderbook/user"
+	"github.com/susruth/wbtc-garden/model"
+	"github.com/susruth/wbtc-garden/rest"
+	"github.com/susruth/wbtc-garden/store"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -114,9 +113,9 @@ var _ = Describe("Rest", func() {
 
 func StartServer() {
 	go func() {
-		store, err := store.NewStore(sqlite.Open("gorm.db"), &gorm.Config{})
+		store, err := store.New(sqlite.Open("gorm.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
-		auth := user.NewAuth()
+		auth := rest.NewAuth()
 		s := rest.NewServer(store, auth, "PANTHER")
 		s.Run(":8080")
 	}()

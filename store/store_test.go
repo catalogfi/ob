@@ -5,15 +5,15 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/susruth/wbtc-garden/orderbook/model"
-	. "github.com/susruth/wbtc-garden/orderbook/store"
+	"github.com/susruth/wbtc-garden/model"
+	. "github.com/susruth/wbtc-garden/store"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 var _ = Describe("Store", func() {
 	It("should be able to create an order", func() {
-		store, err := NewStore(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash")
 		Expect(err).NotTo(HaveOccurred())
@@ -33,7 +33,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("should be able to fill an order", func() {
-		store, err := NewStore(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash")
 		Expect(err).NotTo(HaveOccurred())
@@ -53,7 +53,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("should be able to cancel an order", func() {
-		store, err := NewStore(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		cid, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash")
 		Expect(err).NotTo(HaveOccurred())
@@ -68,7 +68,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("shouldn't be able to cancel a filled order", func() {
-		store, err := NewStore(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		cid, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash")
 		Expect(err).NotTo(HaveOccurred())
@@ -83,7 +83,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("should be able to get all open orders", func() {
-		store, err := NewStore(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		cid1, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash")
 		Expect(err).NotTo(HaveOccurred())
@@ -125,7 +125,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("should be able to get all user's orders", func() {
-		store, err := NewStore(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		cid, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:WBTC-BTC:BTC", "100", "200", "secretHash")
 		Expect(err).NotTo(HaveOccurred())

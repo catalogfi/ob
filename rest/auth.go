@@ -1,4 +1,4 @@
-package user
+package rest
 
 import (
 	"fmt"
@@ -7,13 +7,8 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/spruceid/siwe-go"
-	"github.com/susruth/wbtc-garden/orderbook/model"
-	"github.com/susruth/wbtc-garden/orderbook/rest"
+	"github.com/susruth/wbtc-garden/model"
 )
-
-type Auth interface {
-	rest.Auth
-}
 
 type auth struct {
 }
