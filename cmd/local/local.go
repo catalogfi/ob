@@ -16,7 +16,8 @@ func main() {
 	}
 	watcher := watcher.NewWatcher(store)
 	go watcher.Run()
-	server := rest.NewServer(store)
+	auth := rest.NewAuth()
+	server := rest.NewServer(store ,auth , "SECRET")
 	if err := server.Run(":8080"); err != nil {
 		panic(err)
 	}

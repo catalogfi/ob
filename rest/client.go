@@ -87,7 +87,7 @@ func (c *client) CreateOrder(sendAddress, recieveAddress, orderPair, sendAmount,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		var errorResponse map[string]map[string]string
+		var errorResponse map[string]string
 		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
 			return 0, fmt.Errorf("failed to decode error response: %v", err)
 		}

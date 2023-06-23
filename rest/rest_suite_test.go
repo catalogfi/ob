@@ -59,7 +59,7 @@ var _ = Describe("Rest", func() {
 		c.SetJwt(verified)
 	})
 
-	It("check create order", func() {
+	It("should create Order", func() {
 		OrderID, err := c.CreateOrder("mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin:primary-ethereum:primary", "1", "10", "0xd87c01599e0f31a714ca73e5de993e274430101d4675d80da19d84b2bf19817d")
 		CurrentOrderID = OrderID
 		Expect(err).NotTo(HaveOccurred())

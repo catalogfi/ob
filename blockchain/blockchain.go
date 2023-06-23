@@ -37,6 +37,7 @@ func LoadClient(chain model.Chain) (interface{}, error) {
 		return bitcoin.NewClient(vals[1], params), nil
 	}
 	if chain.IsEVM() {
+		fmt.Println( "ERORR" , fmt.Sprintf("%s_RPC", strings.ToUpper(string(chain))))
 		return ethereum.NewClient(os.Getenv(fmt.Sprintf("%s_RPC", strings.ToUpper(string(chain)))))
 	}
 	return nil, fmt.Errorf("invalid chain: %s", chain)

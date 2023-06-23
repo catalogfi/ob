@@ -78,9 +78,11 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 	if _, err := blockchain.CalculateExpiry(fromChain, true); err != nil {
 		return 0, err
 	}
+	fmt.Println("toChain:11", toChain)
 	if _, err := blockchain.CalculateExpiry(toChain, false); err != nil {
 		return 0, err
 	}
+	fmt.Println("toChain:12", toChain)
 
 	// ignoring accuracy
 	price, _ := new(big.Float).Quo(new(big.Float).SetInt(sendAmt), new(big.Float).SetInt(recieveAmt)).Float64()

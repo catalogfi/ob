@@ -19,7 +19,8 @@ func main() {
 	}
 	watcher := watcher.NewWatcher(store)
 	go watcher.Run()
-	server := rest.NewServer(store)
+	auth := rest.NewAuth()
+	server := rest.NewServer(store , auth , "SECRET")
 	if err := server.Run(fmt.Sprintf(":%s", os.Getenv("PORT"))); err != nil {
 		panic(err)
 	}
