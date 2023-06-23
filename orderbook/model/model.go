@@ -73,6 +73,11 @@ type AtomicSwap struct {
 	RefundTxHash     string `json:"refundTxHash"`
 }
 
+type VerifySiwe struct {
+	Message   string `json:"message" binding:"required"`
+	Signature string `json:"signature" binding:"required"`
+}
+
 func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {
 	chainAssets := strings.Split(orderPair, "-")
 	if len(chainAssets) != 2 {

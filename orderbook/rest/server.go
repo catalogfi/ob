@@ -5,14 +5,18 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/spruceid/siwe-go"
 	"github.com/susruth/wbtc-garden/orderbook/model"
 )
 
 type Server struct {
 	router *gin.Engine
 	store  Store
+	auth   Auth
+	secret string
 }
 
 type Store interface {
@@ -28,15 +32,21 @@ type Store interface {
 	FilterOrders(maker, taker, orderPair, secretHash, sort string, status model.Status, minPrice, maxPrice float64, page, perPage int, verbose bool) ([]model.Order, error)
 }
 
-func NewServer(store Store) *Server {
+func NewServer(store Store, auth Auth, secret string) *Server {
 	return &Server{
 		router: gin.Default(),
 		store:  store,
+		secret: secret,
+		auth:   auth,
 	}
 }
 
 func (s *Server) Run(addr string) error {
 	s.router.Use(cors.Default())
+
+	authRoutes := s.router.Group("/")
+	authRoutes.Use(s.authenticateJWT)
+
 	s.router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "ok",
@@ -44,9 +54,13 @@ func (s *Server) Run(addr string) error {
 	})
 	s.router.GET("/orders/:id", s.GetOrder())
 	s.router.GET("/orders", s.GetOrders())
-	s.router.POST("/orders", s.PostOrders())        // TODO: add auth middleware
-	s.router.PUT("/orders/:id", s.FillOrder())      // TODO: add auth middleware
-	s.router.DELETE("/orders/:id", s.CancelOrder()) // TODO: add auth middleware
+	s.router.GET("/nonce", s.Nonce())
+	s.router.POST("/verify", s.Verify())
+	{
+		authRoutes.POST("/orders", s.PostOrders())
+		authRoutes.PUT("/orders/:id", s.FillOrder())
+		authRoutes.DELETE("/orders/:id", s.CancelOrder())
+	}
 	return s.router.Run(addr)
 }
 
@@ -59,23 +73,73 @@ type CreateOrder struct {
 	SecretHash     string `json:"secretHash"`
 }
 
+type Auth interface {
+	Verfiy(req model.VerifySiwe) (*jwt.Token, error)
+}
+
+func (s *Server) authenticateJWT(ctx *gin.Context) {
+	tokenString := ctx.GetHeader("Authorization")
+	if tokenString == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Missing authorization token"})
+		ctx.Abort()
+		return
+	}
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("Invalid signing method")
+		}
+
+		return []byte(s.secret), nil
+	})
+
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		ctx.Abort()
+		return
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		if userWallet, exists := claims["userWallet"]; exists {
+			ctx.Set("userWallet", userWallet.(string))
+
+		} else {
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			ctx.Abort()
+			return
+		}
+	} else {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+		ctx.Abort()
+		return
+	}
+
+	ctx.Next()
+}
+
 func (s *Server) PostOrders() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// TODO: extract from auth token
-		creator := ""
+		creator, exists := c.Get("userWallet")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			return
+		}
 		req := CreateOrder{}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		oid, err := s.store.CreateOrder(creator, req.SendAddress, req.RecieveAddress, req.OrderPair, req.SendAmount, req.RecieveAmount, req.SecretHash)
+
+		oid, err := s.store.CreateOrder(creator.(string), req.SendAddress, req.RecieveAddress, req.OrderPair, req.SendAmount, req.RecieveAmount, req.SecretHash)
 		if err != nil {
+			errorMessage := fmt.Sprintf("failed to create order: %v", err.Error())
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "failed to create order",
-				"message": err.Error(),
+				"error": errorMessage,
 			})
+			fmt.Println(errorMessage)
 			return
 		}
+
 		c.JSON(http.StatusCreated, gin.H{
 			"orderId": oid,
 		})
@@ -95,7 +159,11 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 			return
 		}
 		// TODO: extract from auth token
-		filler := ""
+		filler, exists := c.Get("userWallet")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			return
+		}
 
 		req := FillOrder{}
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -103,7 +171,7 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 			return
 		}
 
-		if err := s.store.FillOrder(uint(orderID), filler, req.SendAddress, req.RecieveAddress); err != nil {
+		if err := s.store.FillOrder(uint(orderID), filler.(string), req.SendAddress, req.RecieveAddress); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":   "failed to get account details",
 				"message": err.Error(),
@@ -134,14 +202,18 @@ func (s *Server) GetOrder() gin.HandlerFunc {
 func (s *Server) CancelOrder() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// TODO: extract from auth token
-		maker := ""
+		maker, exists := c.Get("userWallet")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			return
+		}
 
 		orderID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode id has to be a number: %v", err.Error())})
 			return
 		}
-		if err := s.store.CancelOrder(maker, uint(orderID)); err != nil {
+		if err := s.store.CancelOrder(maker.(string), uint(orderID)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":   "failed to get account details",
 				"message": err.Error(),
@@ -201,5 +273,37 @@ func (s *Server) GetOrders() gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, orders)
+	}
+}
+
+func (s *Server) Nonce() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{
+			"nonce": siwe.GenerateNonce(),
+		})
+	}
+}
+
+func (s *Server) Verify() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		req := model.VerifySiwe{}
+		if err := ctx.ShouldBindJSON(&req); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		token, err := s.auth.Verfiy(req)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		tokenString, err := token.SignedString([]byte(s.secret))
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"token": tokenString})
+
 	}
 }
