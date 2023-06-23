@@ -20,8 +20,10 @@ require (
 
 require (
 	github.com/dchest/uniuri v0.0.0-20200228104902-7aecb25e1fe5 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/relvacode/iso8601 v1.1.0 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 )
 
@@ -65,6 +67,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
+	github.com/spf13/cobra v1.7.0
 	github.com/spruceid/siwe-go v0.2.0
 	github.com/tklauser/go-sysconf v0.3.5 // indirect
 	github.com/tklauser/numcpus v0.2.2 // indirect
