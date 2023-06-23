@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -18,11 +19,11 @@ import (
 type Client interface {
 	FillOrder(orderID uint, sendAddress, recieveAddress string) error
 	CreateOrder(sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string) (uint, error)
-	GetFollowerInitiateOrders(id string) ([]model.Order, error)
-	GetFollowerRedeemOrders(id string) ([]model.Order, error)
-	GetInitiatorInitiateOrders(id string) ([]model.Order, error)
-	GetInitiatorRedeemOrders(id string) ([]model.Order, error)
-	SetJwt(token string)
+	GetFollowerInitiateOrders() ([]model.Order, error)
+	GetFollowerRedeemOrders() ([]model.Order, error)
+	GetInitiatorInitiateOrders() ([]model.Order, error)
+	GetInitiatorRedeemOrders() ([]model.Order, error)
+	SetJwt(token string) error
 	Health() (string, error)
 	GetNonce() (string, error)
 	Verify(address string) (string, error)
@@ -31,6 +32,7 @@ type Client interface {
 type client struct {
 	url      string
 	JwtToken string
+	id 	string
 }
 
 func NewClient(url string) Client {
@@ -103,8 +105,8 @@ func (c *client) CreateOrder(sendAddress, recieveAddress, orderPair, sendAmount,
 	return orderResponse.ID, nil
 }
 
-func (c *client) GetFollowerInitiateOrders(id string) ([]model.Order, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/orders?taker=%s&status=3&verbose=true", c.url, id))
+func (c *client) GetFollowerInitiateOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?taker=%s&status=3&verbose=true", c.url, c.id))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
@@ -116,8 +118,8 @@ func (c *client) GetFollowerInitiateOrders(id string) ([]model.Order, error) {
 	return orders, nil
 }
 
-func (c *client) GetFollowerRedeemOrders(id string) ([]model.Order, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/orders?taker=%s&status=5&verbose=true", c.url, id))
+func (c *client) GetFollowerRedeemOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?taker=%s&status=5&verbose=true", c.url, c.id))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
@@ -129,8 +131,8 @@ func (c *client) GetFollowerRedeemOrders(id string) ([]model.Order, error) {
 	return orders, nil
 }
 
-func (c *client) GetInitiatorInitiateOrders(id string) ([]model.Order, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/orders?maker=%s&status=2&verbose=true", c.url, id))
+func (c *client) GetInitiatorInitiateOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?maker=%s&status=2&verbose=true", c.url, c.id))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
@@ -142,8 +144,8 @@ func (c *client) GetInitiatorInitiateOrders(id string) ([]model.Order, error) {
 	return orders, nil
 }
 
-func (c *client) GetInitiatorRedeemOrders(id string) ([]model.Order, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/orders?maker=%s&status=4&verbose=true", c.url, id))
+func (c *client) GetInitiatorRedeemOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?maker=%s&status=4&verbose=true", c.url, c.id))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
@@ -172,8 +174,14 @@ func (c *client) Health() (string, error) {
 	return HealthPayload.Status, nil
 }
 
-func (c *client) SetJwt(jwt string) {
+func (c *client) SetJwt(jwt string) error {
 	c.JwtToken = jwt
+	id , err := GetUserWalletFromJWT(jwt)
+	if err != nil {
+		return fmt.Errorf("failed to get user wallet from jwt: %v", err)
+	}
+	c.id = id
+	return nil
 }
 
 func (c *client) GetNonce() (string, error) {
@@ -237,6 +245,20 @@ func (c *client) Verify(address string) (string, error) {
 
 	return VerifyPayload.Token, nil
 }
+
+func GetUserWalletFromJWT(jwtString string) (string, error) {
+    token, _, err := new(jwt.Parser).ParseUnverified(jwtString, &Claims{})
+    if err != nil {
+        return "", err
+    }
+
+    if claims, ok := token.Claims.(*Claims); ok {
+        return claims.UserWallet, nil
+    }
+
+    return "", fmt.Errorf("unable to extract UserWallet from JWT")
+}
+
 
 func signHash(data []byte) common.Hash {
 	msg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(data), data)

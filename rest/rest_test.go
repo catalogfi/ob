@@ -67,7 +67,7 @@ var _ = Describe("Rest", func() {
 	})
 
 	It("get Initiator Initiate Orders", func() {
-		orders, err := c.GetInitiatorInitiateOrders("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da")
+		orders, err := c.GetInitiatorInitiateOrders()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(orders).ToNot(BeNil())
 		Expect(len(orders)).To(BeNumerically(">=", 1))
@@ -82,7 +82,7 @@ var _ = Describe("Rest", func() {
 	})
 
 	It("get Followers init Orders", func() {
-		orders, err := c.GetFollowerInitiateOrders("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da")
+		orders, err := c.GetFollowerInitiateOrders()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(orders).ToNot(BeNil())
 		Expect(len(orders)).To(BeNumerically(">=", 0))
@@ -91,14 +91,14 @@ var _ = Describe("Rest", func() {
 	})
 
 	It("get Initiator Redeem Orders", func() {
-		order, err := c.GetInitiatorRedeemOrders("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da")
+		order, err := c.GetInitiatorRedeemOrders()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(order).ToNot(BeNil())
 		Expect(len(order)).To(BeNumerically("==", 0)) // as atomic swap is not implemented yet
 	})
 
 	It("get Followers Redeem Orders", func() {
-		order, err := c.GetFollowerRedeemOrders("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da")
+		order, err := c.GetFollowerRedeemOrders()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(order).ToNot(BeNil())
 		Expect(len(order)).To(BeNumerically("==", 0)) // as atomic swap is not implemented yet
