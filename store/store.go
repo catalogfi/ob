@@ -32,7 +32,7 @@ func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 	return &store{db: db}, nil
 }
 
-func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string) (uint, error) {
+func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string, urls map[model.Chain]string) (uint, error) {
 	sendChain, recieveChain, sendAsset, recieveAsset, err := model.ParseOrderPair(orderPair)
 	if err != nil {
 		return 0, err
@@ -70,19 +70,20 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		return 0, fmt.Errorf("invalid recieve amount: %s", recieveAmount)
 	}
 
+	fmt.Println("Validating order pair")
 	// validate orderpair
 	fromChain, toChain, _, _, err := model.ParseOrderPair(orderPair)
 	if err != nil {
 		return 0, err
 	}
-	if _, err := blockchain.CalculateExpiry(fromChain, true); err != nil {
+	if _, err := blockchain.CalculateExpiry(fromChain, true, urls); err != nil {
 		return 0, err
 	}
-	fmt.Println("toChain:11", toChain)
-	if _, err := blockchain.CalculateExpiry(toChain, false); err != nil {
+	if _, err := blockchain.CalculateExpiry(toChain, false, urls); err != nil {
 		return 0, err
 	}
-	fmt.Println("toChain:12", toChain)
+
+	fmt.Println("Validated order pair")
 
 	// ignoring accuracy
 	price, _ := new(big.Float).Quo(new(big.Float).SetInt(sendAmt), new(big.Float).SetInt(recieveAmt)).Float64()
@@ -106,7 +107,7 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 	return order.ID, nil
 }
 
-func (s *store) FillOrder(orderID uint, filler, sendAddress, recieveAddress string) error {
+func (s *store) FillOrder(orderID uint, filler, sendAddress, recieveAddress string, urls map[model.Chain]string) error {
 	order := &model.Order{}
 	if tx := s.db.First(order, orderID); tx.Error != nil {
 		return tx.Error
@@ -119,11 +120,11 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, recieveAddress stri
 	if err != nil {
 		panic(fmt.Errorf("constraint violation: invalid order pair: %v", err))
 	}
-	initiateAtomicSwapTimelock, err := blockchain.CalculateExpiry(fromChain, true)
+	initiateAtomicSwapTimelock, err := blockchain.CalculateExpiry(fromChain, true, urls)
 	if err != nil {
 		panic(fmt.Errorf("constraint violation: invalid order pair: %v", err))
 	}
-	followerAtomicSwapTimelock, err := blockchain.CalculateExpiry(toChain, false)
+	followerAtomicSwapTimelock, err := blockchain.CalculateExpiry(toChain, false, urls)
 	if err != nil {
 		panic(fmt.Errorf("constraint violation: invalid order pair: %v", err))
 	}
@@ -226,8 +227,8 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 	}
 
 	if verbose {
-		for _, order := range orders {
-			if err := s.fillSwapDetails(&order); err != nil {
+		for i := range orders {
+			if err := s.fillSwapDetails(&orders[i]); err != nil {
 				return nil, err
 			}
 		}
@@ -240,8 +241,8 @@ func (s *store) GetActiveOrders() ([]model.Order, error) {
 	if tx := s.db.Where("status > ? AND status < ?", model.OrderCreated, model.OrderExecuted).Find(&orders); tx.Error != nil {
 		return nil, tx.Error
 	}
-	for _, order := range orders {
-		if err := s.fillSwapDetails(&order); err != nil {
+	for i := range orders {
+		if err := s.fillSwapDetails(&orders[i]); err != nil {
 			return nil, err
 		}
 	}

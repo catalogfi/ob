@@ -3,6 +3,7 @@ package watcher
 import (
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/susruth/wbtc-garden/blockchain"
 	"github.com/susruth/wbtc-garden/model"
@@ -16,12 +17,14 @@ type Store interface {
 }
 
 type watcher struct {
-	store Store
+	store  Store
+	config model.Config
 }
 
-func NewWatcher(store Store) *watcher {
+func NewWatcher(store Store, config model.Config) *watcher {
 	return &watcher{
-		store: store,
+		store:  store,
+		config: config,
 	}
 }
 
@@ -37,16 +40,20 @@ func (w *watcher) Run() {
 				fmt.Printf("error updating order: %v\n", err)
 			}
 		}
+		time.Sleep(10 * time.Second)
 	}
 }
 
 func (w *watcher) watch(order model.Order) error {
-	iW, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash)
+	fmt.Println("Inside Watch")
+	fmt.Println(order, order.SecretHash, w.config.RPC, w.config.DEPLOYERS)
+
+	iW, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config.RPC, w.config.DEPLOYERS)
 	if err != nil {
 		return err
 	}
 
-	fW, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash)
+	fW, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config.RPC, w.config.DEPLOYERS)
 	if err != nil {
 		return err
 	}

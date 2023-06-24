@@ -16,14 +16,15 @@ type Server struct {
 	router *gin.Engine
 	store  Store
 	auth   Auth
+	config model.Config
 	secret string
 }
 
 type Store interface {
 	// create order
-	CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string) (uint, error)
+	CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string, urls map[model.Chain]string) (uint, error)
 	// fill order
-	FillOrder(orderID uint, filler, sendAddress, recieveAddress string) error
+	FillOrder(orderID uint, filler, sendAddress, recieveAddress string, urls map[model.Chain]string) error
 	// get order by id
 	GetOrder(orderID uint) (*model.Order, error)
 	// cancel order by id
@@ -32,12 +33,13 @@ type Store interface {
 	FilterOrders(maker, taker, orderPair, secretHash, sort string, status model.Status, minPrice, maxPrice float64, page, perPage int, verbose bool) ([]model.Order, error)
 }
 
-func NewServer(store Store, auth Auth, secret string) *Server {
+func NewServer(store Store, config model.Config, secret string) *Server {
 	return &Server{
 		router: gin.Default(),
 		store:  store,
 		secret: secret,
-		auth:   auth,
+		auth:   NewAuth(),
+		config: config,
 	}
 }
 
@@ -130,7 +132,7 @@ func (s *Server) PostOrders() gin.HandlerFunc {
 			return
 		}
 
-		oid, err := s.store.CreateOrder(creator.(string), req.SendAddress, req.RecieveAddress, req.OrderPair, req.SendAmount, req.RecieveAmount, req.SecretHash)
+		oid, err := s.store.CreateOrder(creator.(string), req.SendAddress, req.RecieveAddress, req.OrderPair, req.SendAmount, req.RecieveAmount, req.SecretHash, s.config.RPC)
 		if err != nil {
 			errorMessage := fmt.Sprintf("failed to create order: %v", err.Error())
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -171,7 +173,7 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 			return
 		}
 
-		if err := s.store.FillOrder(uint(orderID), filler.(string), req.SendAddress, req.RecieveAddress); err != nil {
+		if err := s.store.FillOrder(uint(orderID), filler.(string), req.SendAddress, req.RecieveAddress, s.config.RPC); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":   "failed to get account details",
 				"message": err.Error(),

@@ -2,6 +2,7 @@ package rest_test
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -26,10 +27,9 @@ var _ = BeforeSuite(func() {
 	StartServer()
 	// <-done
 	time.Sleep(3 * time.Second) // await server to start
-	c = rest.NewClient("http://localhost:8080")
+	c = rest.NewClient("http://localhost:8080", os.Getenv("PRIVATE_KEY"))
 	jwtToken = ""
 	CurrentOrderID = 0
-
 })
 
 var _ = Describe("Rest", func() {
@@ -47,7 +47,7 @@ var _ = Describe("Rest", func() {
 	})
 
 	It("check verify", func() {
-		verified, err := c.Verify("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da")
+		verified, err := c.Login()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(verified).ToNot(BeNil())
 		fmt.Println("verified: ", verified)
@@ -110,8 +110,16 @@ func StartServer() {
 	go func() {
 		store, err := store.New(sqlite.Open("gorm.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
-		auth := rest.NewAuth()
-		s := rest.NewServer(store, auth, "PANTHER")
+		config := model.Config{
+			RPC: map[model.Chain]string{
+				model.BitcoinRegtest:   "http://localhost:30000",
+				model.EthereumLocalnet: "http://localhost:8545",
+			},
+			DEPLOYERS: map[model.Chain]string{
+				model.EthereumLocalnet: "0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2",
+			},
+		}
+		s := rest.NewServer(store, config, "PANTHER")
 		s.Run(":8080")
 	}()
 }

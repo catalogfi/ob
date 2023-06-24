@@ -1,11 +1,12 @@
-package bot
+package cobi
 
 import "gorm.io/gorm"
 
 type Status uint
 
 const (
-	Filled Status = iota
+	Unknown Status = iota
+	Filled
 	InitiatorInitiated
 	FollowerInitiated
 	FollowerRedeemed
@@ -16,6 +17,7 @@ type Order struct {
 	gorm.Model
 
 	SecretHash string
+	Secret     string
 	Status     Status
 }
 
@@ -23,7 +25,7 @@ type Store interface {
 	PutSecret(secretHash, secret string) error
 	Secret(secretHash string) (string, error)
 	PutStatus(secretHash string, status Status) error
-	Status(secretHash string) (Status, error)
+	Status(secretHash string) Status
 }
 
 type store struct {
@@ -44,6 +46,7 @@ func NewStore(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 func (s *store) PutSecret(secretHash, secret string) error {
 	order := Order{
 		SecretHash: secretHash,
+		Secret:     secret,
 		Status:     0,
 	}
 	if tx := s.db.Create(&order); tx.Error != nil {
@@ -57,7 +60,7 @@ func (s *store) Secret(secretHash string) (string, error) {
 	if tx := s.db.Where("secret_hash = ?", secretHash).First(&order); tx.Error != nil {
 		return "", tx.Error
 	}
-	return order.SecretHash, nil
+	return order.Secret, nil
 }
 
 func (s *store) PutStatus(secretHash string, status Status) error {
@@ -72,10 +75,10 @@ func (s *store) PutStatus(secretHash string, status Status) error {
 	return nil
 }
 
-func (s *store) Status(secretHash string) (Status, error) {
+func (s *store) Status(secretHash string) Status {
 	var order Order
 	if tx := s.db.Where("secret_hash = ?", secretHash).First(&order); tx.Error != nil {
-		return 0, tx.Error
+		return 0
 	}
-	return order.Status, nil
+	return order.Status
 }

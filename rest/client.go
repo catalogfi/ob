@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/ethereum/go-ethereum/common"
@@ -19,6 +18,7 @@ import (
 type Client interface {
 	FillOrder(orderID uint, sendAddress, recieveAddress string) error
 	CreateOrder(sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string) (uint, error)
+	GetOrder(id uint) (model.Order, error)
 	GetFollowerInitiateOrders() ([]model.Order, error)
 	GetFollowerRedeemOrders() ([]model.Order, error)
 	GetInitiatorInitiateOrders() ([]model.Order, error)
@@ -26,17 +26,19 @@ type Client interface {
 	SetJwt(token string) error
 	Health() (string, error)
 	GetNonce() (string, error)
-	Verify(address string) (string, error)
+	Login() (string, error)
 }
 
 type client struct {
-	url      string
+	url     string
+	privKey string
+
 	JwtToken string
-	id 	string
+	id       string
 }
 
-func NewClient(url string) Client {
-	return &client{url: url, JwtToken: ""}
+func NewClient(url, privKey string) Client {
+	return &client{url: url, privKey: privKey}
 }
 
 type ErrorResponse struct {
@@ -74,6 +76,7 @@ func (c *client) CreateOrder(sendAddress, recieveAddress, orderPair, sendAmount,
 		return 0, err
 	}
 
+	fmt.Println("URL: ", fmt.Sprintf("%s/orders", c.url))
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/orders", c.url), &buf)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %v", err)
@@ -103,6 +106,19 @@ func (c *client) CreateOrder(sendAddress, recieveAddress, orderPair, sendAmount,
 		return 0, fmt.Errorf("failed to decode order response: %v", err)
 	}
 	return orderResponse.ID, nil
+}
+
+func (c *client) GetOrder(id uint) (model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders/%d", c.url, id))
+	if err != nil {
+		return model.Order{}, fmt.Errorf("failed to get orders: %v", err)
+	}
+	defer resp.Body.Close()
+	var order model.Order
+	if err := json.NewDecoder(resp.Body).Decode(&order); err != nil {
+		return model.Order{}, fmt.Errorf("failed to decode orders: %v", err)
+	}
+	return order, nil
 }
 
 func (c *client) GetFollowerInitiateOrders() ([]model.Order, error) {
@@ -176,7 +192,7 @@ func (c *client) Health() (string, error) {
 
 func (c *client) SetJwt(jwt string) error {
 	c.JwtToken = jwt
-	id , err := GetUserWalletFromJWT(jwt)
+	id, err := GetUserWalletFromJWT(jwt)
 	if err != nil {
 		return fmt.Errorf("failed to get user wallet from jwt: %v", err)
 	}
@@ -201,17 +217,24 @@ func (c *client) GetNonce() (string, error) {
 	return NoncePayload.Nonce, nil
 }
 
-func (c *client) Verify(address string) (string, error) {
+func (c *client) Login() (string, error) {
 	nonce, err := c.GetNonce()
 	if err != nil {
 		return "", fmt.Errorf("failed to get nonce: %v", err)
 	}
-	message, err := CreateEip4361TestMessage(address, nonce)
+
+	key, err := crypto.HexToECDSA(c.privKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to get private key: %v", err)
+	}
+
+	address := crypto.PubkeyToAddress(key.PublicKey)
+	message, err := CreateEip4361TestMessage(address.Hex(), nonce)
 	if err != nil {
 		return "", fmt.Errorf("failed to create message: %v", err)
 	}
 
-	ethPrivKey, err := crypto.HexToECDSA(os.Getenv("PRIVATE_KEY"))
+	ethPrivKey, err := crypto.HexToECDSA(c.privKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to get private key: %v", err)
 	}
@@ -247,18 +270,17 @@ func (c *client) Verify(address string) (string, error) {
 }
 
 func GetUserWalletFromJWT(jwtString string) (string, error) {
-    token, _, err := new(jwt.Parser).ParseUnverified(jwtString, &Claims{})
-    if err != nil {
-        return "", err
-    }
+	token, _, err := new(jwt.Parser).ParseUnverified(jwtString, &Claims{})
+	if err != nil {
+		return "", err
+	}
 
-    if claims, ok := token.Claims.(*Claims); ok {
-        return claims.UserWallet, nil
-    }
+	if claims, ok := token.Claims.(*Claims); ok {
+		return claims.UserWallet, nil
+	}
 
-    return "", fmt.Errorf("unable to extract UserWallet from JWT")
+	return "", fmt.Errorf("unable to extract UserWallet from JWT")
 }
-
 
 func signHash(data []byte) common.Hash {
 	msg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(data), data)

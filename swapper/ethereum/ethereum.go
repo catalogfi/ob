@@ -80,7 +80,7 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, deployerAddr, t
 	}
 	fmt.Println("Contract Address : ", contractAddr.String())
 
-	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(6000))
+	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(12000))
 
 	watcher, err := NewWatcher(initiatorAddr, redeemerAddr, deployerAddr, tokenAddr, secretHash, expiryBlock, amount, client)
 	if err != nil {
@@ -155,7 +155,7 @@ func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, deployerAddr, to
 		return &redeemerSwap{}, err
 	}
 
-	lastCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(6000))
+	lastCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(12000))
 	return &redeemerSwap{
 		redeemer:         redeemer,
 		watcher:          watcher,
@@ -220,7 +220,7 @@ func NewWatcher(initiator, redeemerAddr, deployerAddr, tokenAddr common.Address,
 	if err != nil {
 		return &watcher{}, err
 	}
-	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(6000))
+	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(12000))
 	return &watcher{
 		client:           client,
 		tokenAddr:        tokenAddr,
@@ -270,7 +270,7 @@ func (watcher *watcher) IsInitiated() (bool, string, error) {
 
 	if len(logs) == 0 {
 		watcher.lastCheckedBlock = currentBlock
-		return false, "", err
+		return false, "", fmt.Errorf("no logs")
 	}
 
 	amount := big.NewInt(0)

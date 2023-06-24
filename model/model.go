@@ -7,15 +7,47 @@ import (
 	"gorm.io/gorm"
 )
 
+type Config struct {
+	RPC       map[Chain]string `json:"rpc"`
+	DEPLOYERS map[Chain]string `json:"url"`
+}
+
 type Chain string
 
 const (
-	Bitcoin  Chain = "bitcoin"
-	Ethereum Chain = "ethereum"
+	Bitcoin          Chain = "bitcoin"
+	BitcoinTestnet   Chain = "bitcoin_testnet"
+	BitcoinRegtest   Chain = "bitcoin_regtest"
+	Ethereum         Chain = "ethereum"
+	EthereumSepolia  Chain = "ethereum_sepolia"
+	EthereumLocalnet Chain = "ethereum_localnet"
 )
 
+func ParseChain(c string) (Chain, error) {
+	switch strings.ToLower(c) {
+	case "bitcoin":
+		return Bitcoin, nil
+	case "bitcoin_testnet", "bitcoin-testnet", "bitcoin-testnet3":
+		return BitcoinTestnet, nil
+	case "bitcoin_regtest", "bitcoin-regtest", "bitcoin-localnet":
+		return BitcoinRegtest, nil
+	case "ethereum":
+		return Ethereum, nil
+	case "ethereum_sepolia", "sepolia", "ethereum-sepolia":
+		return EthereumSepolia, nil
+	case "ethereum_localnet", "ethereum-localnet":
+		return EthereumLocalnet, nil
+	default:
+		return Chain(""), fmt.Errorf("unknown chain %v", c)
+	}
+}
+
 func (c Chain) IsEVM() bool {
-	return c == Ethereum
+	return c == Ethereum || c == EthereumSepolia || c == EthereumLocalnet
+}
+
+func (c Chain) IsBTC() bool {
+	return c == Bitcoin || c == BitcoinTestnet || c == BitcoinRegtest
 }
 
 type Asset string
@@ -116,3 +148,4 @@ func parseChainAsset(chainAsset string) (Chain, Asset, error) {
 func NewOrderPair(from Chain, fromAsset Asset, to Chain, toAsset Asset) string {
 	return fmt.Sprintf("%s:%s-%s:%s", from, fromAsset, to, toAsset)
 }
+

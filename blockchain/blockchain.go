@@ -5,9 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"os"
 	"strconv"
-	"strings"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
@@ -20,35 +18,19 @@ import (
 	"github.com/susruth/wbtc-garden/swapper/ethereum"
 )
 
-func LoadClient(chain model.Chain) (interface{}, error) {
-	if chain == model.Bitcoin {
-		vals := strings.Split(os.Getenv("BITCOIN_RPC"), "-")
-		var params *chaincfg.Params
-		switch vals[0] {
-		case "mainnet":
-			params = &chaincfg.MainNetParams
-		case "testnet":
-			params = &chaincfg.TestNet3Params
-		case "regtest":
-			params = &chaincfg.RegressionNetParams
-		default:
-			return nil, fmt.Errorf("invalid bitcoin network: %s", vals[0])
-		}
-		return bitcoin.NewClient(vals[1], params), nil
+func LoadClient(chain model.Chain, urls map[model.Chain]string) (interface{}, error) {
+	fmt.Println(chain, urls)
+	if chain.IsBTC() {
+		return bitcoin.NewClient(urls[chain], getParams(chain)), nil
 	}
 	if chain.IsEVM() {
-		return ethereum.NewClient(os.Getenv(fmt.Sprintf("%s_RPC", strings.ToUpper(string(chain)))))
+		return ethereum.NewClient(urls[chain])
 	}
 	return nil, fmt.Errorf("invalid chain: %s", chain)
 }
 
-func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorKey, secretHash string) (swapper.InitiatorSwap, error) {
-	client, err := LoadClient(atomicSwap.Chain)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	initiatorPrivateKey, err := ParseKey(atomicSwap.Chain, initiatorKey)
+func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interface{}, secretHash string, urls, deployers map[model.Chain]string) (swapper.InitiatorSwap, error) {
+	client, err := LoadClient(atomicSwap.Chain, urls)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -77,7 +59,7 @@ func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorKey, secretHash str
 	case bitcoin.Client:
 		return bitcoin.NewInitiatorSwap(initiatorPrivateKey.(*btcec.PrivateKey), redeemerAddress.(btcutil.Address), secHash, expiry.Int64(), amt.Uint64(), client)
 	case ethereum.Client:
-		deployerAddress := common.HexToAddress(os.Getenv(fmt.Sprintf("%s_DEPLOYER_ADDRESS", strings.ToUpper(string(atomicSwap.Chain)))))
+		deployerAddress := common.HexToAddress(deployers[atomicSwap.Chain])
 		tokenAddress := common.HexToAddress(atomicSwap.Asset.SecondaryID())
 		return ethereum.NewInitiatorSwap(initiatorPrivateKey.(*ecdsa.PrivateKey), redeemerAddress.(common.Address), deployerAddress, tokenAddress, secHash, expiry, amt, client)
 	default:
@@ -85,25 +67,25 @@ func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorKey, secretHash str
 	}
 }
 
-func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string) (swapper.Watcher, error) {
-	client, err := LoadClient(atomicSwap.Chain)
+func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, urls, deployers map[model.Chain]string) (swapper.Watcher, error) {
+	client, err := LoadClient(atomicSwap.Chain, urls)
 	if err != nil {
-		fmt.Println(err)
+		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
 
 	initiatorAddress, err := ParseAddress(client, atomicSwap.InitiatorAddress)
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
 
 	redeemerAddress, err := ParseAddress(client, atomicSwap.RedeemerAddress)
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
 
 	secHash, err := hex.DecodeString(secretHash)
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
 
 	amt, ok := new(big.Int).SetString(atomicSwap.Amount, 10)
@@ -120,7 +102,7 @@ func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string) (swapper.Watche
 	case bitcoin.Client:
 		return bitcoin.NewWatcher(initiatorAddress.(btcutil.Address), redeemerAddress.(btcutil.Address), secHash, expiry.Int64(), amt.Uint64(), client)
 	case ethereum.Client:
-		deployerAddress := common.HexToAddress(os.Getenv(fmt.Sprintf("%s_DEPLOYER_ADDRESS", strings.ToUpper(string(atomicSwap.Chain)))))
+		deployerAddress := common.HexToAddress(deployers[atomicSwap.Chain])
 		tokenAddress := common.HexToAddress(atomicSwap.Asset.SecondaryID())
 		return ethereum.NewWatcher(initiatorAddress.(common.Address), redeemerAddress.(common.Address), deployerAddress, tokenAddress, secHash, expiry, amt, client)
 	default:
@@ -128,12 +110,12 @@ func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string) (swapper.Watche
 	}
 }
 
-func CalculateExpiry(chain model.Chain, goingFirst bool) (string, error) {
-	if chain == model.Bitcoin {
+func CalculateExpiry(chain model.Chain, goingFirst bool, urls map[model.Chain]string) (string, error) {
+	if chain.IsBTC() {
 		expiry := bitcoin.GetExpiry(goingFirst)
 		return strconv.FormatInt(expiry, 10), nil
 	}
-	client, err := LoadClient(chain)
+	client, err := LoadClient(chain, urls)
 	if err != nil {
 		return "", err
 	}
@@ -144,13 +126,8 @@ func CalculateExpiry(chain model.Chain, goingFirst bool) (string, error) {
 	return expiry.String(), nil
 }
 
-func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerKey, secretHash string) (swapper.RedeemerSwap, error) {
-	client, err := LoadClient(atomicSwap.Chain)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	redeemerPrivateKey, err := ParseKey(atomicSwap.Chain, redeemerKey)
+func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerPrivateKey interface{}, secretHash string, urls, deployers map[model.Chain]string) (swapper.RedeemerSwap, error) {
+	client, err := LoadClient(atomicSwap.Chain, urls)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -179,7 +156,7 @@ func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerKey, secretHash strin
 	case bitcoin.Client:
 		return bitcoin.NewRedeemerSwap(redeemerPrivateKey.(*btcec.PrivateKey), initiatorAddress.(btcutil.Address), secHash, expiry.Int64(), amt.Uint64(), client)
 	case ethereum.Client:
-		deployerAddress := common.HexToAddress(os.Getenv(fmt.Sprintf("%s_DEPLOYER_ADDRESS", strings.ToUpper(string(atomicSwap.Chain)))))
+		deployerAddress := common.HexToAddress(deployers[atomicSwap.Chain])
 		tokenAddress := common.HexToAddress(atomicSwap.Asset.SecondaryID())
 		return ethereum.NewRedeemerSwap(redeemerPrivateKey.(*ecdsa.PrivateKey), initiatorAddress.(common.Address), deployerAddress, tokenAddress, secHash, expiry, amt, client)
 	default:
@@ -212,5 +189,18 @@ func ParseAddress(client interface{}, address string) (interface{}, error) {
 		return common.HexToAddress(address), nil
 	default:
 		return nil, fmt.Errorf("unknown chain: %T", client)
+	}
+}
+
+func getParams(chain model.Chain) *chaincfg.Params {
+	switch chain {
+	case model.Bitcoin:
+		return &chaincfg.MainNetParams
+	case model.BitcoinTestnet:
+		return &chaincfg.TestNet3Params
+	case model.BitcoinRegtest:
+		return &chaincfg.RegressionNetParams
+	default:
+		panic("constraint violation: unknown chain")
 	}
 }
