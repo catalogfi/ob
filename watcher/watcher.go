@@ -153,7 +153,7 @@ func (w *watcher) watch(order model.Order) error {
 		}
 	}
 
-	if order.InitiatorAtomicSwap.RefundTxHash != "" && order.FollowerAtomicSwap.InitiateTxHash == "" {
+	if order.InitiatorAtomicSwap.RefundTxHash != "" && order.FollowerAtomicSwap.InitiateTxHash == nil {
 		order.Status = model.OrderFailedSoft
 		if err := w.store.UpdateOrder(&order); err != nil {
 			return err

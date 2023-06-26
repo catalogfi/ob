@@ -34,7 +34,7 @@ func Accounts(entropy []byte) *cobra.Command {
 				return
 			}
 			for i, addr := range addrs {
-				fmt.Printf("[%d] %s\n", i, addr)
+				fmt.Printf("[%d] %s\n", selectors[i], addr)
 			}
 		},
 		DisableAutoGenTag: true,

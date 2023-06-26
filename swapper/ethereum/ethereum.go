@@ -178,6 +178,7 @@ func (redeemerSwap *redeemerSwap) Redeem(secret []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	fmt.Println("redeeming...")
 	if len(data) == 0 {
 		txHash, err := Deploy(redeemerSwap.deployerAddress, redeemerSwap.client.GetTransactOpts(redeemerSwap.redeemer), redeemerSwap.client.GetProvider(), redeemerSwap.redeemerAddress, redeemerSwap.refunderAddress, redeemerSwap.secretHash, redeemerSwap.expiryBlock)
 		if err != nil {
@@ -188,15 +189,16 @@ func (redeemerSwap *redeemerSwap) Redeem(secret []byte) (string, error) {
 	return redeemerSwap.client.RedeemAtomicSwap(redeemerSwap.contractAddr, redeemerSwap.client.GetTransactOpts(redeemerSwap.redeemer), redeemerSwap.tokenAddr, secret)
 }
 
-func (redeemerSwap *redeemerSwap) IsInitiated() (bool, string, error) {
+func (redeemerSwap *redeemerSwap) IsInitiated() (bool, []string, error) {
 	return redeemerSwap.watcher.IsInitiated()
 }
 
-func (redeemerSwap *redeemerSwap) WaitForInitiate() (string, error) {
+func (redeemerSwap *redeemerSwap) WaitForInitiate() ([]string, error) {
 	defer fmt.Println("Done WaitForInitiate")
 	for {
 		initiated, txHash, err := redeemerSwap.IsInitiated()
 		if initiated {
+			fmt.Printf("Initiation Found on contract : %s : token : %s \n", redeemerSwap.contractAddr, redeemerSwap.tokenAddr)
 			return txHash, nil
 		}
 		if err != nil {
@@ -243,55 +245,63 @@ func (watcher *watcher) Expired() (bool, error) {
 	}
 }
 
-func (watcher *watcher) IsInitiated() (bool, string, error) {
+func (watcher *watcher) IsInitiated() (bool, []string, error) {
+	fmt.Println("Checking if initiated")
 	currBlock, err := watcher.client.GetCurrentBlock()
 	if err != nil {
-		return false, "", err
+		return false, nil, err
 	}
 	currentBlock := big.NewInt(int64(currBlock))
 
 	erc20Abi, err := ERC20.ERC20MetaData.GetAbi()
 	if err != nil {
-		return false, "", err
+		return false, nil, err
 	}
+
 	transferEvent := erc20Abi.Events["Transfer"]
 	query := ethereum.FilterQuery{
 		FromBlock: watcher.lastCheckedBlock,
-		ToBlock:   currentBlock,
+		ToBlock:   nil,
 		Addresses: []common.Address{
 			watcher.tokenAddr,
 		},
-		Topics: [][]common.Hash{{transferEvent.ID}, {}, {watcher.contractAddr.Hash()}},
+		Topics: [][]common.Hash{{common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")}, {}, {watcher.contractAddr.Hash()}},
 	}
+	fmt.Println("watching", watcher.contractAddr.Hex(), "for", watcher.tokenAddr.Hex(), watcher.lastCheckedBlock, currentBlock)
+
+	fmt.Println("Querying logs")
 	logs, err := watcher.client.GetProvider().FilterLogs(context.Background(), query)
 	if err != nil {
-		return false, "", err
+		return false, nil, err
 	}
+	fmt.Println("Recieved logs")
 
 	if len(logs) == 0 {
-		watcher.lastCheckedBlock = currentBlock
-		return false, "", fmt.Errorf("no logs")
+		fmt.Println("No logs")
+		return false, nil, fmt.Errorf("no logs")
 	}
 
 	amount := big.NewInt(0)
+	txHashes := []string{}
 	for _, vLog := range logs {
 		inputs, err := transferEvent.Inputs.Unpack(vLog.Data)
 		if err != nil {
-			return false, "", err
+			return false, nil, err
 		}
 		amount.Add(amount, inputs[0].(*big.Int))
+		final, err := watcher.client.IsFinal(vLog.TxHash.Hex())
+		if err != nil {
+			return false, nil, err
+		}
+		if !final {
+			return false, nil, nil
+		}
+		txHashes = append(txHashes, vLog.TxHash.Hex())
 		if amount.Cmp(watcher.amount) >= 0 {
-			final, err := watcher.client.IsFinal(vLog.TxHash.Hex())
-			if err != nil {
-				return false, "", err
-			}
-			if !final {
-				return false, "", nil
-			}
-			return true, vLog.TxHash.Hex(), nil
+			return true, txHashes, nil
 		}
 	}
-	return false, "", err
+	return false, nil, err
 }
 
 func (watcher *watcher) IsRedeemed() (bool, []byte, string, error) {
@@ -369,3 +379,5 @@ func (watcher *watcher) IsRefunded() (bool, string, error) {
 	}
 	return true, logs[0].TxHash.Hex(), nil
 }
+
+ 

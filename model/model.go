@@ -110,15 +110,15 @@ type Order struct {
 type AtomicSwap struct {
 	gorm.Model
 
-	InitiatorAddress string `json:"initiatorAddress"`
-	RedeemerAddress  string `json:"redeemerAddress"`
-	Timelock         string `json:"timelock"`
-	Chain            Chain  `json:"chain"`
-	Asset            Asset  `json:"asset"`
-	Amount           string `json:"amount"`
-	InitiateTxHash   string `json:"initiateTxHash"`
-	RedeemTxHash     string `json:"redeemTxHash"`
-	RefundTxHash     string `json:"refundTxHash"`
+	InitiatorAddress string   `json:"initiatorAddress"`
+	RedeemerAddress  string   `json:"redeemerAddress"`
+	Timelock         string   `json:"timelock"`
+	Chain            Chain    `json:"chain"`
+	Asset            Asset    `json:"asset"`
+	Amount           string   `json:"amount"`
+	InitiateTxHash   []string `json:"initiateTxHash"`
+	RedeemTxHash     string   `json:"redeemTxHash"`
+	RefundTxHash     string   `json:"refundTxHash"`
 }
 
 func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {
@@ -148,4 +148,3 @@ func parseChainAsset(chainAsset string) (Chain, Asset, error) {
 func NewOrderPair(from Chain, fromAsset Asset, to Chain, toAsset Asset) string {
 	return fmt.Sprintf("%s:%s-%s:%s", from, fromAsset, to, toAsset)
 }
-

@@ -165,11 +165,11 @@ func (s *redeemerSwap) Redeem(secret []byte) (string, error) {
 	return txHash, nil
 }
 
-func (s *redeemerSwap) WaitForInitiate() (string, error) {
+func (s *redeemerSwap) WaitForInitiate() ([]string, error) {
 	for {
-		initiated, txHash, err := s.IsInitiated()
+		initiated, txHashes, err := s.IsInitiated()
 		if initiated {
-			return txHash, nil
+			return txHashes, nil
 		}
 		if err != nil {
 			fmt.Println("failed to check if initiated:", err)
@@ -178,7 +178,7 @@ func (s *redeemerSwap) WaitForInitiate() (string, error) {
 	}
 }
 
-func (s *redeemerSwap) IsInitiated() (bool, string, error) {
+func (s *redeemerSwap) IsInitiated() (bool, []string, error) {
 	return s.watcher.IsInitiated()
 }
 
@@ -209,11 +209,11 @@ func (w *watcher) Expired() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	initiated, txHash, err := w.IsInitiated()
+	initiated, txHashes, err := w.IsInitiated()
 	if err != nil || !initiated {
 		return false, err
 	}
-	initiateBlockHeight, err := w.client.GetBlockHeight(txHash)
+	initiateBlockHeight, err := w.client.GetBlockHeight(txHashes[0])
 	if err != nil {
 		return false, err
 	}
@@ -223,22 +223,26 @@ func (w *watcher) Expired() (bool, error) {
 	return false, nil
 }
 
-func (w *watcher) IsInitiated() (bool, string, error) {
+func (w *watcher) IsInitiated() (bool, []string, error) {
 	utxos, bal, err := w.client.GetUTXOs(w.scriptAddr, 0)
 	if err != nil {
-		return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
+		return false, nil, fmt.Errorf("failed to get UTXOs: %w", err)
 	}
 	if bal >= w.amount && len(utxos) > 0 {
-		final, err := w.client.IsFinal(utxos[0].TxID)
-		if err != nil {
-			return false, "", fmt.Errorf("failed to check if final: %w", err)
+		txHashes := make([]string, len(utxos))
+		for i, utxo := range utxos {
+			final, err := w.client.IsFinal(utxo.TxID)
+			if err != nil {
+				return false, nil, fmt.Errorf("failed to check if final: %w", err)
+			}
+			if !final {
+				return false, nil, nil
+			}
+			txHashes[i] = utxo.TxID
 		}
-		if !final {
-			return false, utxos[0].TxID, nil
-		}
-		return true, utxos[0].TxID, nil
+		return true, txHashes, nil
 	}
-	return false, "", nil
+	return false, nil, nil
 }
 
 func (w *watcher) IsRedeemed() (bool, []byte, string, error) {

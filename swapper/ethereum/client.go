@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"time"
 
 	// "crypto/rand"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -34,7 +35,8 @@ type client struct {
 }
 
 func NewClient(url string) (Client, error) {
-	provider, err := ethclient.Dial(url)
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	provider, err := ethclient.DialContext(ctx, url)
 	if err != nil {
 		return nil, err
 	}
