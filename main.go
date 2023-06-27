@@ -8,13 +8,13 @@ import (
 	"github.com/susruth/wbtc-garden/rest"
 	"github.com/susruth/wbtc-garden/store"
 	"github.com/susruth/wbtc-garden/watcher"
-	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func main() {
 	// psql db
-	store, err := store.New(postgres.Open(os.Getenv("PSQL_DB")), &gorm.Config{})
+	store, err := store.New(sqlite.Open("test.db"), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}

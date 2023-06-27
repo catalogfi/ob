@@ -87,6 +87,7 @@ func (w *watcher) watch(order model.Order) error {
 	}
 
 	if order.Status == model.FollowerAtomicSwapInitiated {
+		fmt.Println("ckeckpoint one")
 		expired, err := fW.Expired()
 		if err != nil {
 			return err
@@ -118,6 +119,9 @@ func (w *watcher) watch(order model.Order) error {
 	}
 
 	if order.Status == model.FollowerAtomicSwapRedeemed {
+		fmt.Println("")
+		fmt.Println("are we here")
+		fmt.Println("")
 		expired, err := iW.Expired()
 		if err != nil {
 			return err

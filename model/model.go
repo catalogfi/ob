@@ -1,6 +1,7 @@
 package model
 
 import (
+	"database/sql/driver"
 	"fmt"
 	"strings"
 
@@ -61,7 +62,7 @@ func NewSecondary(address string) Asset {
 }
 
 func (a Asset) SecondaryID() string {
-	if string(a[:9]) != "secondary" {
+	if string(a) == "primary" || string(a[:9]) != "secondary" {
 		return ""
 	}
 	return string(a[9:])
@@ -116,9 +117,33 @@ type AtomicSwap struct {
 	Chain            Chain    `json:"chain"`
 	Asset            Asset    `json:"asset"`
 	Amount           string   `json:"amount"`
-	InitiateTxHash   []string `json:"initiateTxHash"`
+	InitiateTxHash   StringArray `gorm:"type:text"`
 	RedeemTxHash     string   `json:"redeemTxHash"`
 	RefundTxHash     string   `json:"refundTxHash"`
+}
+
+type StringArray []string
+
+func (sa StringArray) Value() (driver.Value, error) {
+    return strings.Join(sa, ","), nil
+}
+
+func (sa *StringArray) Scan(value interface{}) error {
+    if value == nil {
+        *sa = make([]string, 0)
+        return nil
+    }
+
+    switch v := value.(type) {
+    case string:
+        *sa = strings.Split(v, ",")
+    case []byte:
+        *sa = strings.Split(string(v), ",")
+    default:
+        return fmt.Errorf("unsupported data type for StringArray: %T", value)
+    }
+
+    return nil
 }
 
 func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {

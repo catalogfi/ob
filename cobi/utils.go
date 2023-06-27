@@ -1,6 +1,7 @@
 package cobi
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 
@@ -9,7 +10,10 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/susruth/wbtc-garden/blockchain"
 	"github.com/susruth/wbtc-garden/model"
+	"github.com/susruth/wbtc-garden/swapper/bitcoin"
+	"github.com/susruth/wbtc-garden/swapper/ethereum"
 	"github.com/tyler-smith/go-bip32"
 )
 
@@ -103,6 +107,61 @@ func getParams(chain model.Chain) *chaincfg.Params {
 	default:
 		panic("constraint violation: unknown chain")
 	}
+}
+
+func getBalances(entropy []byte, chain model.Chain, user uint32, selector []uint32, config model.Config, asset model.Asset) ([]uint64, []interface{}, error) {
+	addresses, err := getAddresses(entropy, chain, user, selector)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	balances := make([]uint64, len(addresses))
+	addrs := make([]interface{}, len(addresses))
+	client, err := blockchain.LoadClient(chain, config.RPC)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to load client: %v", err)
+	}
+
+	for i, addr := range addresses {
+
+		switch client := client.(type) {
+		case bitcoin.Client:
+			addrs[i], err = btcutil.NewAddressPubKeyHash(btcutil.Hash160(addr.(*btcec.PrivateKey).PubKey().SerializeCompressed()), getParams(chain))
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create address: %v", err)
+			}
+
+			_, balance, err := client.GetUTXOs(addr.(*btcutil.AddressPubKeyHash), 0)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to get UTXOs: %v", err)
+			}
+			balances[i] = balance
+		case ethereum.Client:
+			fmt.Println("ethereum", crypto.PubkeyToAddress(addr.(*ecdsa.PrivateKey).PublicKey))
+			addrs[i] = crypto.PubkeyToAddress(addr.(*ecdsa.PrivateKey).PublicKey)
+			if asset == model.Asset("primary") {
+				balance, err := client.GetProvider().BalanceAt(context.Background(), addr.(common.Address), nil)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to get ETH balance: %v", err)
+				}
+				balances[i] = balance.Uint64()
+			}
+
+			token := asset.SecondaryID()
+			if token == "" {
+				return nil, nil, fmt.Errorf("failed to get token: %v", err)
+			}
+
+			balance, err := client.GetERC20Balance(addr.(common.Address), common.BytesToAddress(common.FromHex(token)))
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to get ERC20 balance: %v", err)
+			}
+			balances[i] = balance.Uint64()
+		default:
+			return nil, nil, fmt.Errorf("unknown chain: %T", client)
+		}
+	}
+	return balances, addrs, nil
 }
 
 func getAddressString(entropy []byte, chain model.Chain, account, selector uint32) (string, error) {

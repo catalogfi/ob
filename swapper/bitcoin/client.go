@@ -102,6 +102,7 @@ func (client *client) GetSpendingWitness(address btcutil.Address) ([]string, str
 }
 
 func (client *client) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error) {
+	fmt.Println(fmt.Sprintf("%s/address/%s/utxo", client.url, address.EncodeAddress()))
 	resp, err := http.Get(fmt.Sprintf("%s/address/%s/utxo", client.url, address.EncodeAddress()))
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get UTXOs: %w", err)
