@@ -54,8 +54,8 @@ func GetExpiry(client Client, goingFirst bool) (*big.Int, error) {
 	return new(big.Int).Add(new(big.Int).SetUint64(blockNumber), big.NewInt(5760)), nil
 }
 
-func GetAmount(client Client, deployerAddr, tokenAddr, redeemerAddr, initiatorAddr common.Address, secretHash []byte, expiryBlock *big.Int) (uint64, error) {
-	contractAddr, err := GetAddress(client, deployerAddr, redeemerAddr, initiatorAddr, secretHash, expiryBlock)
+func GetAmount(client Client, deployerAddr, tokenAddr, redeemerAddr, initiatorAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int) (uint64, error) {
+	contractAddr, err := GetAddress(client, deployerAddr, redeemerAddr, initiatorAddr, tokenAddr, secretHash, expiryBlock, amount)
 	if err != nil {
 		return 0, err
 	}
@@ -69,12 +69,10 @@ func GetAmount(client Client, deployerAddr, tokenAddr, redeemerAddr, initiatorAd
 // var deployerAddr = common.HexToAddress("0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2")
 
 func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, deployerAddr, tokenAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.InitiatorSwap, error) {
-	fmt.Println(expiryBlock.Text(10), hex.EncodeToString(secretHash))
 
 	initiatorAddr := client.GetPublicAddress(initiator)
 
-	fmt.Println(redeemerAddr, initiatorAddr, secretHash, expiryBlock)
-	contractAddr, err := GetAddress(client, deployerAddr, redeemerAddr, initiatorAddr, secretHash, expiryBlock)
+	contractAddr, err := GetAddress(client, deployerAddr, redeemerAddr, initiatorAddr, tokenAddr, secretHash, expiryBlock, amount)
 	if err != nil {
 		return &initiatorSwap{}, err
 	}
@@ -144,7 +142,7 @@ func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, deployerAddr, to
 	redeemerAddress := crypto.PubkeyToAddress(redeemer.PublicKey)
 
 	fmt.Println(redeemerAddress, initiatorAddr, secretHash, expiryBlock)
-	contractAddr, err := GetAddress(client, deployerAddr, redeemerAddress, initiatorAddr, secretHash, expiryBlock)
+	contractAddr, err := GetAddress(client, deployerAddr, redeemerAddress, initiatorAddr, tokenAddr, secretHash, expiryBlock, amount)
 	if err != nil {
 		return &redeemerSwap{}, err
 	}
@@ -180,7 +178,7 @@ func (redeemerSwap *redeemerSwap) Redeem(secret []byte) (string, error) {
 	}
 	fmt.Println("redeeming...")
 	if len(data) == 0 {
-		txHash, err := Deploy(redeemerSwap.deployerAddress, redeemerSwap.client.GetTransactOpts(redeemerSwap.redeemer), redeemerSwap.client.GetProvider(), redeemerSwap.redeemerAddress, redeemerSwap.refunderAddress, redeemerSwap.secretHash, redeemerSwap.expiryBlock)
+		txHash, err := Deploy(redeemerSwap.client.GetTransactOpts(redeemerSwap.redeemer), redeemerSwap.client.GetProvider(), redeemerSwap.deployerAddress, redeemerSwap.redeemerAddress, redeemerSwap.refunderAddress, redeemerSwap.tokenAddr, redeemerSwap.secretHash, redeemerSwap.expiryBlock, redeemerSwap.amount)
 		if err != nil {
 			return "", err
 		}
@@ -218,7 +216,7 @@ type watcher struct {
 }
 
 func NewWatcher(initiator, redeemerAddr, deployerAddr, tokenAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.Watcher, error) {
-	contractAddr, err := GetAddress(client, deployerAddr, redeemerAddr, initiator, secretHash, expiryBlock)
+	contractAddr, err := GetAddress(client, deployerAddr, redeemerAddr, initiator, tokenAddr, secretHash, expiryBlock, amount)
 	if err != nil {
 		return &watcher{}, err
 	}
@@ -343,7 +341,7 @@ func (watcher *watcher) IsRedeemed() (bool, []byte, string, error) {
 		return false, nil, "", err
 	}
 
-	return true, []byte(val[0].(string)), vLog.TxHash.Hex(), nil
+	return true, []byte(val[0].([]uint8)), vLog.TxHash.Hex(), nil
 }
 
 func (watcher *watcher) IsRefunded() (bool, string, error) {
@@ -379,5 +377,3 @@ func (watcher *watcher) IsRefunded() (bool, string, error) {
 	}
 	return true, logs[0].TxHash.Hex(), nil
 }
-
- 
