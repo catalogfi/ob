@@ -20,10 +20,12 @@ import (
 type Client interface {
 	GetTransactOpts(privKey *ecdsa.PrivateKey) *bind.TransactOpts
 	GetCallOpts() *bind.CallOpts
+	InitiateAtomicSwap(contract common.Address, auth *bind.TransactOpts, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error)
 	RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secret []byte) (string, error)
-	RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address) (string, error)
+	RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secretHash []byte) (string, error)
 	GetPublicAddress(privKey *ecdsa.PrivateKey) common.Address
 	GetProvider() *ethclient.Client
+	ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
 	TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
 	GetCurrentBlock() (uint64, error)
 	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
@@ -88,13 +90,29 @@ func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.Trans
 	}
 	return tx.Hash().Hex(), nil
 }
-
-func (client *client) RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address) (string, error) {
+func (client *client) InitiateAtomicSwap(contract common.Address, auth *bind.TransactOpts, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error) {
 	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
 	if err != nil {
 		return "", err
 	}
-	tx, err := instance.Refund(auth)
+	var hash [32]byte
+	copy(hash[:], secretHash)
+	tx, err := instance.Initiate(auth, redeemerAddr, expiry, amount, hash)
+	if err != nil {
+		return "", err
+	}
+	fmt.Println("hash", tx.Hash().Hex())
+	return tx.Hash().Hex(), nil
+}
+
+func (client *client) RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secretHash []byte) (string, error) {
+	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
+	if err != nil {
+		return "", err
+	}
+	var hash [32]byte
+	copy(hash[:], secretHash)
+	tx, err := instance.Refund(auth, hash)
 	if err != nil {
 		return "", err
 	}
@@ -124,6 +142,18 @@ func (client *client) TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, 
 		return "", err
 	}
 	fmt.Printf("Transfering %v %s to %s txhash : %s\n", amount, tokenAddr, toAddr, tx.Hash().Hex())
+	return tx.Hash().Hex(), err
+}
+func (client *client) ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error) {
+	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
+	if err != nil {
+		return "", err
+	}
+	tx, err := instance.Approve(client.GetTransactOpts(privKey), toAddr, amount)
+	if err != nil {
+		return "", err
+	}
+	fmt.Printf("Approving %v %s to %s txhash : %s\n", amount, tokenAddr, toAddr, tx.Hash().Hex())
 	return tx.Hash().Hex(), err
 }
 func (client *client) GetCurrentBlock() (uint64, error) {
