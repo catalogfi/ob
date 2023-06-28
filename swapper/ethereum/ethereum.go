@@ -79,6 +79,9 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, deployerAddr, t
 	fmt.Println("Contract Address : ", contractAddr.String())
 
 	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(12000))
+	if latestCheckedBlock.Cmp(big.NewInt(0)) == -1 {
+		latestCheckedBlock = big.NewInt(0)
+	}
 
 	watcher, err := NewWatcher(initiatorAddr, redeemerAddr, deployerAddr, tokenAddr, secretHash, expiryBlock, amount, client)
 	if err != nil {
@@ -221,6 +224,9 @@ func NewWatcher(initiator, redeemerAddr, deployerAddr, tokenAddr common.Address,
 		return &watcher{}, err
 	}
 	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(12000))
+	if latestCheckedBlock.Cmp(big.NewInt(0)) == -1 {
+		latestCheckedBlock = big.NewInt(0)
+	}
 	return &watcher{
 		client:           client,
 		tokenAddr:        tokenAddr,
