@@ -1,40 +1,10 @@
- [
+[
     {
       "inputs": [
         {
           "internalType": "address",
-          "name": "_redeemer",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "_initiator",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
           "name": "_token",
           "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "_feeCollector",
-          "type": "address"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "_secretHash",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_expiry",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_amount",
-          "type": "uint256"
         }
       ],
       "stateMutability": "nonpayable",
@@ -43,6 +13,31 @@
     {
       "anonymous": false,
       "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "secrectHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "Initiated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "secrectHash",
+          "type": "bytes32"
+        },
         {
           "indexed": false,
           "internalType": "bytes",
@@ -54,10 +49,51 @@
       "type": "event"
     },
     {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "secrectHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "Refunded",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_redeemer",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_expiry",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "_secretHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "initiate",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "bytes",
-          "name": "secret",
+          "name": "_secret",
           "type": "bytes"
         }
       ],
@@ -67,7 +103,13 @@
       "type": "function"
     },
     {
-      "inputs": [],
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "_secretHash",
+          "type": "bytes32"
+        }
+      ],
       "name": "refund",
       "outputs": [],
       "stateMutability": "nonpayable",
