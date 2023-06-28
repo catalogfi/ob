@@ -116,7 +116,7 @@ type AtomicSwap struct {
 	Chain            Chain    `json:"chain"`
 	Asset            Asset    `json:"asset"`
 	Amount           string   `json:"amount"`
-	InitiateTxHash   []string `json:"initiateTxHash"`
+	InitiateTxHash   []string `json:"initiateTxHash" gorm:"type:string[]"`
 	RedeemTxHash     string   `json:"redeemTxHash"`
 	RefundTxHash     string   `json:"refundTxHash"`
 }
