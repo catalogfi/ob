@@ -1,31 +1,16 @@
-// SPDX-License-Identifier: MIT
-// Further information: https://eips.ethereum.org/EIPS/eip-1014
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.18;
 
-pragma solidity ^0.8.9;
+import {AtomicSwap} from "./AtomicSwap.sol";
 
-interface IERC1820Implementer {
-    /**
-     * @dev Returns a special value (`ERC1820_ACCEPT_MAGIC`) if this contract
-     * implements `interfaceHash` for `account`.
-     *
-     * See {IERC1820Registry-setInterfaceImplementer}.
-     */
-    function canImplementInterfaceForAddress(
-        bytes32 interfaceHash,
-        address account
-    ) external view returns (bytes32);
-}
-
-abstract contract Context {
-    function _msgSender() internal view virtual returns (address) {
-        return msg.sender;
-    }
-
-    function _msgData() internal view virtual returns (bytes calldata) {
-        return msg.data;
-    }
-}
-
+/* @dev Helper to make usage of the `CREATE2` EVM opcode easier and safer.
+ * `CREATE2` can be used to compute in advance the address where a smart
+ * contract will be deployed, which allows for interesting new mechanisms known
+ * as 'counterfactual interactions'.
+ *
+ * See the https://eips.ethereum.org/EIPS/eip-1014#motivation[EIP] for more
+ * information.
+ */
 library Create2 {
     /**
      * @dev Deploys a contract using `CREATE2`. The address where the contract
@@ -45,18 +30,17 @@ library Create2 {
         uint256 amount,
         bytes32 salt,
         bytes memory bytecode
-    ) internal returns (address) {
-        address addr;
+    ) internal returns (address addr) {
         require(
             address(this).balance >= amount,
             "Create2: insufficient balance"
         );
         require(bytecode.length != 0, "Create2: bytecode length is zero");
+        /// @solidity memory-safe-assembly
         assembly {
             addr := create2(amount, add(bytecode, 0x20), mload(bytecode), salt)
         }
         require(addr != address(0), "Create2: Failed on deploy");
-        return addr;
     }
 
     /**
@@ -78,48 +62,63 @@ library Create2 {
         bytes32 salt,
         bytes32 bytecodeHash,
         address deployer
-    ) internal pure returns (address) {
-        bytes32 _data = keccak256(
-            abi.encodePacked(bytes1(0xff), deployer, salt, bytecodeHash)
-        );
-        return address(uint160(uint256(_data)));
+    ) internal pure returns (address addr) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let ptr := mload(0x40) // Get free memory pointer
+
+            // |                   | ↓ ptr ...  ↓ ptr + 0x0B (start) ...  ↓ ptr + 0x20 ...  ↓ ptr + 0x40 ...   |
+            // |-------------------|---------------------------------------------------------------------------|
+            // | bytecodeHash      |                                                        CCCCCCCCCCCCC...CC |
+            // | salt              |                                      BBBBBBBBBBBBB...BB                   |
+            // | deployer          | 000000...0000AAAAAAAAAAAAAAAAAAA...AA                                     |
+            // | 0xFF              |            FF                                                             |
+            // |-------------------|---------------------------------------------------------------------------|
+            // | memory            | 000000...00FFAAAAAAAAAAAAAAAAAAA...AABBBBBBBBBBBBB...BBCCCCCCCCCCCCC...CC |
+            // | keccak(start, 85) |            ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ |
+
+            mstore(add(ptr, 0x40), bytecodeHash)
+            mstore(add(ptr, 0x20), salt)
+            mstore(ptr, deployer) // Right-aligned with 12 preceding garbage bytes
+            let start := add(ptr, 0x0b) // The hashed data starts at the final garbage byte which we will set to 0xff
+            mstore8(start, 0xff)
+            addr := keccak256(start, 85)
+        }
     }
 }
 
-contract ERC1820Implementer is IERC1820Implementer {
-    bytes32 private constant _ERC1820_ACCEPT_MAGIC =
-        keccak256("ERC1820_ACCEPT_MAGIC");
-
-    mapping(bytes32 => mapping(address => bool)) private _supportedInterfaces;
-
-    /**
-     * @dev See {IERC1820Implementer-canImplementInterfaceForAddress}.
-     */
-    function canImplementInterfaceForAddress(
-        bytes32 interfaceHash,
-        address account
-    ) public view virtual override returns (bytes32) {
-        return
-            _supportedInterfaces[interfaceHash][account]
-                ? _ERC1820_ACCEPT_MAGIC
-                : bytes32(0x00);
+/**
+ * @dev Provides information about the current execution context, including the
+ * sender of the transaction and its data. While these are generally available
+ * via msg.sender and msg.data, they should not be accessed in such a direct
+ * manner, since when dealing with meta-transactions the account sending and
+ * paying for execution may not be the actual sender (as far as an application
+ * is concerned).
+ *
+ * This contract is only required for intermediate, library-like contracts.
+ */
+abstract contract Context {
+    function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
     }
 
-    /**
-     * @dev Declares the contract as willing to be an implementer of
-     * `interfaceHash` for `account`.
-     *
-     * See {IERC1820Registry-setInterfaceImplementer} and
-     * {IERC1820Registry-interfaceHash}.
-     */
-    function _registerInterfaceForAddress(
-        bytes32 interfaceHash,
-        address account
-    ) internal virtual {
-        _supportedInterfaces[interfaceHash][account] = true;
+    function _msgData() internal view virtual returns (bytes calldata) {
+        return msg.data;
     }
 }
 
+/**
+ * @dev Contract module which provides a basic access control mechanism, where
+ * there is an account (an owner) that can be granted exclusive access to
+ * specific functions.
+ *
+ * By default, the owner account will be the one that deploys the contract. This
+ * can later be changed with {transferOwnership}.
+ *
+ * This module is used through inheritance. It will make available the modifier
+ * `onlyOwner`, which can be applied to your functions to restrict their use to
+ * the owner.
+ */
 abstract contract Ownable is Context {
     address private _owner;
 
@@ -136,6 +135,14 @@ abstract contract Ownable is Context {
     }
 
     /**
+     * @dev Throws if called by any account other than the owner.
+     */
+    modifier onlyOwner() {
+        _checkOwner();
+        _;
+    }
+
+    /**
      * @dev Returns the address of the current owner.
      */
     function owner() public view virtual returns (address) {
@@ -143,11 +150,10 @@ abstract contract Ownable is Context {
     }
 
     /**
-     * @dev Throws if called by any account other than the owner.
+     * @dev Throws if the sender is not the owner.
      */
-    modifier onlyOwner() {
+    function _checkOwner() internal view virtual {
         require(owner() == _msgSender(), "Ownable: caller is not the owner");
-        _;
     }
 
     /**
@@ -184,6 +190,15 @@ abstract contract Ownable is Context {
     }
 }
 
+/**
+ * @dev Contract module which allows children to implement an emergency stop
+ * mechanism that can be triggered by an authorized account.
+ *
+ * This module is used through inheritance. It will make available the
+ * modifiers `whenNotPaused` and `whenPaused`, which can be applied to
+ * the functions of your contract. Note that they will not be pausable by
+ * simply including this module, only once the modifiers are put in place.
+ */
 abstract contract Pausable is Context {
     /**
      * @dev Emitted when the pause is triggered by `account`.
@@ -205,13 +220,6 @@ abstract contract Pausable is Context {
     }
 
     /**
-     * @dev Returns true if the contract is paused, and false otherwise.
-     */
-    function paused() public view virtual returns (bool) {
-        return _paused;
-    }
-
-    /**
      * @dev Modifier to make a function callable only when the contract is not paused.
      *
      * Requirements:
@@ -219,7 +227,7 @@ abstract contract Pausable is Context {
      * - The contract must not be paused.
      */
     modifier whenNotPaused() {
-        require(!paused(), "Pausable: paused");
+        _requireNotPaused();
         _;
     }
 
@@ -231,8 +239,29 @@ abstract contract Pausable is Context {
      * - The contract must be paused.
      */
     modifier whenPaused() {
-        require(paused(), "Pausable: not paused");
+        _requirePaused();
         _;
+    }
+
+    /**
+     * @dev Returns true if the contract is paused, and false otherwise.
+     */
+    function paused() public view virtual returns (bool) {
+        return _paused;
+    }
+
+    /**
+     * @dev Throws if the contract is paused.
+     */
+    function _requireNotPaused() internal view virtual {
+        require(!paused(), "Pausable: paused");
+    }
+
+    /**
+     * @dev Throws if the contract is not paused.
+     */
+    function _requirePaused() internal view virtual {
+        require(paused(), "Pausable: not paused");
     }
 
     /**
@@ -260,107 +289,134 @@ abstract contract Pausable is Context {
     }
 }
 
-/**
- * @title CREATE2 Deployer Smart Contract
- * @author Pascal Marco Caversaccio, pascal.caversaccio@hotmail.ch
- * @dev Helper smart contract to make easier and safer usage of the
- * `CREATE2` EVM opcode. `CREATE2` can be used to compute in advance
- * the address where a smart contract will be deployed, which allows
- * for interesting new mechanisms known as 'counterfactual interactions'.
- */
+contract Deployer is Ownable, Pausable {
+    //Catalog atomic swap contract deployer
+    address private feeCollector;
+    mapping(address => bool) supportedTokens;
 
-contract Create2Deployer is Ownable, Pausable {
-    /**
-     * @dev Deploys a contract using `CREATE2`. The address where the
-     * contract will be deployed can be known in advance via {computeAddress}.
-     *
-     * The bytecode for a contract can be obtained from Solidity with
-     * `type(contractName).creationCode`.
-     *
-     * Requirements:
-     * - `bytecode` must not be empty.
-     * - `salt` must have not been used for `bytecode` already.
-     * - the factory must have a balance of at least `value`.
-     * - if `value` is non-zero, `bytecode` must have a `payable` constructor.
-     */
+    event FeeCollectorUpdated(address newFeeCollector);
+
+    modifier checkSafe(
+        address redeemer,
+        address refunder,
+        address tokenAddr
+    ) {
+        _;
+        require(
+            redeemer != address(0),
+            "Deployer: redeemer cannot be null address"
+        );
+        require(
+            redeemer != address(0),
+            "Deployer: initiator cannot be null address"
+        );
+        require(
+            refunder != redeemer,
+            "Deployer: initiator cannot be equal to redeemer"
+        );
+        require(supportedTokens[tokenAddr], "Deployer: Token not supported");
+    }
+
+    constructor(address _feeCollector) {
+        feeCollector = _feeCollector;
+    }
+
     function deploy(
-        uint256 value,
-        bytes32 salt,
-        bytes memory code
-    ) public whenNotPaused {
-        Create2.deploy(value, salt, code);
+        address redeemer,
+        address refunder,
+        address tokenAddr,
+        bytes32 secretHash,
+        uint256 expiry,
+        uint256 amount
+    ) external checkSafe(redeemer, refunder, tokenAddr) {
+        require(
+            expiry > block.number,
+            "Deployer: expiry must be > current block number"
+        );
+        bytes memory code = abi.encodePacked(
+            type(AtomicSwap).creationCode,
+            abi.encode(
+                redeemer,
+                refunder,
+                tokenAddr,
+                feeCollector,
+                secretHash,
+                expiry,
+                amount
+            )
+        );
+        Create2.deploy(0, secretHash, code);
     }
 
-    /**
-     * @dev Deployment of the {ERC1820Implementer}.
-     * Further information: https://eips.ethereum.org/EIPS/eip-1820
-     */
-    function deployERC1820Implementer(
-        uint256 value,
-        bytes32 salt
-    ) public whenNotPaused {
-        Create2.deploy(value, salt, type(ERC1820Implementer).creationCode);
-    }
-
-    /**
-     * @dev Returns the address where a contract will be stored if deployed via {deploy}.
-     * Any change in the `bytecodeHash` or `salt` will result in a new destination address.
-     */
     function computeAddress(
-        bytes32 salt,
-        bytes32 codeHash
-    ) public view returns (address) {
-        return Create2.computeAddress(salt, codeHash);
+        address redeemer,
+        address refunder,
+        address tokenAddr,
+        bytes32 secretHash,
+        uint256 expiry,
+        uint256 amount
+    ) external view checkSafe(redeemer, refunder, tokenAddr) returns (address) {
+        bytes memory code = abi.encodePacked(
+            type(AtomicSwap).creationCode,
+            abi.encode(
+                redeemer,
+                refunder,
+                tokenAddr,
+                feeCollector,
+                secretHash,
+                expiry,
+                amount
+            )
+        );
+        return Create2.computeAddress(secretHash, keccak256(code));
     }
 
-    /**
-     * @dev Returns the address where a contract will be stored if deployed via {deploy} from a
-     * contract located at `deployer`. If `deployer` is this contract's address, returns the
-     * same value as {computeAddress}.
-     */
-    function computeAddressWithDeployer(
-        bytes32 salt,
-        bytes32 codeHash,
-        address deployer
-    ) public pure returns (address) {
-        return Create2.computeAddress(salt, codeHash, deployer);
+    function deployAndRedeem(
+        address redeemer,
+        address refunder,
+        address tokenAddr,
+        bytes32 secretHash,
+        uint256 expiry,
+        bytes memory secret,
+        uint256 amount
+    ) external checkSafe(redeemer, refunder, tokenAddr) {
+        require(
+            expiry > block.number,
+            "Deployer: expiry must be > current block number"
+        );
+        bytes memory code = abi.encodePacked(
+            type(AtomicSwap).creationCode,
+            abi.encode(
+                redeemer,
+                refunder,
+                tokenAddr,
+                feeCollector,
+                secretHash,
+                expiry,
+                amount
+            )
+        );
+        AtomicSwap(Create2.deploy(0, secretHash, code)).redeem(secret);
     }
 
-    /**
-     * @dev Contract can receive ether. However, the only way to transfer this ether is
-     * to call the function `killCreate2Deployer`.
-     */
-    receive() external payable {}
+    function addToken(address tokenAddr) external onlyOwner {
+        supportedTokens[tokenAddr] = true;
+    }
 
-    /**
-     * @dev Triggers stopped state.
-     * Requirements: The contract must not be paused.
-     */
+    function removeToken(address tokenAddr) external onlyOwner {
+        supportedTokens[tokenAddr] = false;
+    }
+
+    function updateFeeCollector(address newFeeCollector) public onlyOwner {
+        feeCollector = newFeeCollector;
+        emit FeeCollectorUpdated(newFeeCollector);
+    }
+
     function pause() public onlyOwner {
         _pause();
     }
 
-    /**
-     * @dev Returns to normal state.
-     * Requirements: The contract must be paused.
-     */
     function unpause() public onlyOwner {
         _unpause();
-    }
-
-    /**
-     * @dev Destroys the Create2Deployer contract and transfers all ether to a pre-defined payout address.
-     * @notice Using the `CREATE2` EVM opcode always allows to redeploy a new smart contract to a
-     * previously seldestructed contract address. However, if a contract creation is attempted,
-     * due to either a creation transaction or the `CREATE`/`CREATE2` EVM opcode, and the destination
-     * address already has either nonzero nonce, or non-empty code, then the creation throws immediately,
-     * with exactly the same behavior as would arise if the first byte in the init code were an invalid opcode.
-     * This applies retroactively starting from genesis.
-     */
-    function killCreate2Deployer(
-        address payable payoutAddress
-    ) public onlyOwner {
-        payoutAddress.transfer(address(this).balance);
-        selfdestruct(payoutAddress);
     }
 }
