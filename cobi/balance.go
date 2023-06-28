@@ -29,13 +29,20 @@ func Balances(entropy []byte, config model.Config) *cobra.Command {
 				selectors = append(selectors, uint32(i))
 			}
 
-			balances, addrs, err := getBalances(entropy, ch, user, selectors, config, model.Asset(asset))
+			var units string
+			if ch.IsBTC() {
+				units = "satoshi"
+			} else {
+				units = "wei"
+			}
+
+			addrs, balances, err := getBalances(entropy, ch, user, selectors, config, model.Asset(asset))
 			if err != nil {
 				cobra.CheckErr(fmt.Sprintf("Error while getting addresses: %v", err))
 				return
 			}
 			for i, addr := range addrs {
-				fmt.Printf("[%d] %s\n -> balance %d", selectors[i], addr, balances[i])
+				fmt.Printf("[%d] %s -> Balance %d %s\n ", selectors[i], addr, balances[i], units)
 			}
 		},
 		DisableAutoGenTag: true,
