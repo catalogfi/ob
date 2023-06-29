@@ -23,7 +23,7 @@ func Create(entropy []byte, store Store) *cobra.Command {
 
 	var cmd = &cobra.Command{
 		Use:   "create",
-		Short: "create a new order",
+		Short: "Create a new order",
 		Run: func(c *cobra.Command, args []string) {
 			secret := [32]byte{}
 			if _, err := rand.Read(secret[:]); err != nil {

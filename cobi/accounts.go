@@ -17,7 +17,8 @@ func Accounts(entropy []byte, config model.Config) *cobra.Command {
 		perPage int
 	)
 	cmd := &cobra.Command{
-		Use: "accounts",
+		Use:   "accounts",
+		Short: "List account addresses and balances",
 		Run: func(c *cobra.Command, args []string) {
 			ch, a, err := model.ParseChainAsset(asset)
 			if err != nil {
@@ -41,7 +42,7 @@ func Accounts(entropy []byte, config model.Config) *cobra.Command {
 			t.AppendHeader(table.Row{"#", "Address", "Balance"})
 			rows := make([]table.Row, len(balances))
 			for i, balance := range balances {
-				rows[i] = table.Row{i, addrs[i], balance}
+				rows[i] = table.Row{selectors[i], addrs[i], balance}
 			}
 			t.AppendRows(rows)
 			t.Render()
@@ -50,8 +51,8 @@ func Accounts(entropy []byte, config model.Config) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&asset, "asset", "a", "", "user should provide the asset")
 	cmd.MarkFlagRequired("asset")
-	cmd.Flags().Uint32Var(&user, "account", 0, "user can provide the user id (default: 0)")
-	cmd.Flags().IntVar(&perPage, "per-page", 10, "User can provide number of accounts to display per page (default: 10)")
-	cmd.Flags().IntVar(&page, "page", 1, "User can provide which page to display (default: 1)")
+	cmd.Flags().Uint32Var(&user, "account", 0, "user can provide the user id")
+	cmd.Flags().IntVar(&perPage, "per-page", 10, "User can provide number of accounts to display per page")
+	cmd.Flags().IntVar(&page, "page", 1, "User can provide which page to display")
 	return cmd
 }

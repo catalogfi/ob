@@ -26,7 +26,8 @@ func List() *cobra.Command {
 	)
 
 	var cmd = &cobra.Command{
-		Use: "list",
+		Use:   "list",
+		Short: "List all open orders in the orderbook",
 		Run: func(c *cobra.Command, args []string) {
 			privKey, err := crypto.GenerateKey()
 			if err != nil {

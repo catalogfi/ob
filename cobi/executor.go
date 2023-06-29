@@ -19,7 +19,8 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 	)
 
 	var cmd = &cobra.Command{
-		Use: "start",
+		Use:   "start",
+		Short: "Start the atomic swap executor",
 		Run: func(c *cobra.Command, args []string) {
 			fmt.Println("check")
 			for {

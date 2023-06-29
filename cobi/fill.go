@@ -17,7 +17,7 @@ func Fill(entropy []byte) *cobra.Command {
 	)
 	var cmd = &cobra.Command{
 		Use:   "fill",
-		Short: "fill an order",
+		Short: "Fill an order",
 		Run: func(c *cobra.Command, args []string) {
 			vals, err := getKeys(entropy, model.Ethereum, account, []uint32{0})
 			if err != nil {
