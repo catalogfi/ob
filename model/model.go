@@ -139,12 +139,11 @@ func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {
 
 func parseChainAsset(chainAsset string) (Chain, Asset, error) {
 	chainAndAsset := strings.Split(chainAsset, ":")
-	if len(chainAndAsset) != 2 {
+	if len(chainAndAsset) > 2 {
 		return "", "", fmt.Errorf("failed to parse the chain and asset, should be of the format <chain>:<asset>. got: %v", chainAsset)
 	}
-	return Chain(chainAndAsset[0]), Asset(chainAndAsset[1]), nil
-}
-
-func NewOrderPair(from Chain, fromAsset Asset, to Chain, toAsset Asset) string {
-	return fmt.Sprintf("%s:%s-%s:%s", from, fromAsset, to, toAsset)
+	if len(chainAndAsset) == 1 {
+		return Chain(chainAndAsset[0]), Primary, nil
+	}
+	return Chain(chainAndAsset[0]), NewSecondary(chainAndAsset[1]), nil
 }
