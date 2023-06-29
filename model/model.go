@@ -151,18 +151,18 @@ func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {
 	if len(chainAssets) != 2 {
 		return "", "", "", "", fmt.Errorf("failed to parse the order pair, should be of the format <chain>:<asset>-<chain>:<asset>. got: %v", orderPair)
 	}
-	sendChain, sendAsset, err := parseChainAsset(chainAssets[0])
+	sendChain, sendAsset, err := ParseChainAsset(chainAssets[0])
 	if err != nil {
 		return "", "", "", "", err
 	}
-	recieveChain, recieveAsset, err := parseChainAsset(chainAssets[1])
+	recieveChain, recieveAsset, err := ParseChainAsset(chainAssets[1])
 	if err != nil {
 		return "", "", "", "", err
 	}
 	return sendChain, recieveChain, sendAsset, recieveAsset, nil
 }
 
-func parseChainAsset(chainAsset string) (Chain, Asset, error) {
+func ParseChainAsset(chainAsset string) (Chain, Asset, error) {
 	chainAndAsset := strings.Split(chainAsset, ":")
 	if len(chainAndAsset) > 2 {
 		return "", "", fmt.Errorf("failed to parse the chain and asset, should be of the format <chain>:<asset>. got: %v", chainAsset)

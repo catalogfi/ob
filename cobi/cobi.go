@@ -31,11 +31,11 @@ func Run(config model.Config) error {
 		return err
 	}
 
-	cmd.AddCommand(Accounts(entropy))
+	// cmd.AddCommand(Accounts(entropy))
 	cmd.AddCommand(Create(entropy, store))
 	cmd.AddCommand(Fill(entropy))
 	cmd.AddCommand(Execute(entropy, store, config))
-	cmd.AddCommand(Balances(entropy, config))
+	cmd.AddCommand(Accounts(entropy, config))
 	cmd.AddCommand(List())
 
 	if err := cmd.Execute(); err != nil {

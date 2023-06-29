@@ -4,6 +4,9 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"math"
+	"math/big"
+	"strconv"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
@@ -14,6 +17,7 @@ import (
 	"github.com/susruth/wbtc-garden/model"
 	"github.com/susruth/wbtc-garden/swapper/bitcoin"
 	"github.com/susruth/wbtc-garden/swapper/ethereum"
+	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/ERC20"
 	"github.com/tyler-smith/go-bip32"
 )
 
@@ -108,14 +112,14 @@ func getParams(chain model.Chain) *chaincfg.Params {
 	}
 }
 
-func getBalances(entropy []byte, chain model.Chain, user uint32, selector []uint32, config model.Config, asset model.Asset) ([]interface{}, []uint64, error) {
+func getBalances(entropy []byte, chain model.Chain, user uint32, selector []uint32, config model.Config, asset model.Asset) ([]interface{}, []string, error) {
 	keys, err := getKeys(entropy, chain, user, selector)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	addrs := make([]interface{}, len(keys))
-	balances := make([]uint64, len(keys))
+	balances := make([]string, len(keys))
 
 	client, err := blockchain.LoadClient(chain, config.RPC)
 	if err != nil {
@@ -135,16 +139,32 @@ func getBalances(entropy []byte, chain model.Chain, user uint32, selector []uint
 				return nil, nil, fmt.Errorf("failed to get UTXOs: %v", err)
 			}
 			addrs[i] = address
-			balances[i] = balance
+			balances[i] = strconv.FormatFloat(float64(balance)/float64(100000000), 'f', -1, 64)
 		case ethereum.Client:
 			address := crypto.PubkeyToAddress(key.(*ecdsa.PrivateKey).PublicKey)
-			if asset == model.Asset("primary") {
+			if asset == model.Primary {
 				balance, err := client.GetProvider().BalanceAt(context.Background(), address, nil)
 				if err != nil {
 					return nil, nil, fmt.Errorf("failed to get ETH balance: %v", err)
 				}
 				addrs[i] = address
-				balances[i] = balance.Uint64()
+				balances[i] = new(big.Float).Quo(new(big.Float).SetInt(balance), big.NewFloat(math.Pow10(18))).String()
+			} else {
+				balance, err := client.GetERC20Balance(common.HexToAddress(asset.SecondaryID()), address)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to get ERC20 balance: %v", err)
+				}
+				erc20, err := ERC20.NewERC20(common.HexToAddress(asset.SecondaryID()), client.GetProvider())
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to get ERC20 contract: %v", err)
+				}
+
+				decimals, err := erc20.Decimals(nil)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to get ERC20 decimals: %v", err)
+				}
+				addrs[i] = address
+				balances[i] = new(big.Float).Quo(new(big.Float).SetInt(balance), big.NewFloat(math.Pow10(int(decimals)))).String()
 			}
 		default:
 			return nil, nil, fmt.Errorf("unsupported chain: %s", chain)
