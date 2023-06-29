@@ -22,7 +22,7 @@ func main() {
 			model.EthereumLocalnet: "http://localhost:8545",
 		},
 		DEPLOYERS: map[model.Chain]string{
-			model.EthereumLocalnet: "0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2",
+			model.EthereumLocalnet: "0x2D914D5a5F9d66c16475B2F5cA9a820308F8B35a",
 		},
 	}
 

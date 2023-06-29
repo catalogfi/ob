@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/ethereum/go-ethereum/common"
@@ -19,6 +20,7 @@ type Client interface {
 	FillOrder(orderID uint, sendAddress, recieveAddress string) error
 	CreateOrder(sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string) (uint, error)
 	GetOrder(id uint) (model.Order, error)
+	GetOrders(filter GetOrdersFilter) ([]model.Order, error)
 	GetFollowerInitiateOrders() ([]model.Order, error)
 	GetFollowerRedeemOrders() ([]model.Order, error)
 	GetInitiatorInitiateOrders() ([]model.Order, error)
@@ -119,6 +121,88 @@ func (c *client) GetOrder(id uint) (model.Order, error) {
 		return model.Order{}, fmt.Errorf("failed to decode orders: %v", err)
 	}
 	return order, nil
+}
+
+type GetOrdersFilter struct {
+	Maker      string
+	Taker      string
+	OrderPair  string
+	SecretHash string
+	OrderBy    string
+	Verbose    bool
+	Status     int
+	MinPrice   float64
+	MaxPrice   float64
+	Page       int
+	PerPage    int
+}
+
+func appendFilterString(filterString, filterName, filterValue string) string {
+	if filterString == "" {
+		filterString += "?"
+	} else {
+		filterString += "&"
+	}
+	filterString += fmt.Sprintf("%s=%s", filterName, filterValue)
+	return filterString
+}
+
+func (c *client) GetOrders(filter GetOrdersFilter) ([]model.Order, error) {
+	filterString := ""
+	if filter.Maker != "" {
+		filterString = appendFilterString(filterString, "maker", filter.Maker)
+	}
+
+	if filter.Taker != "" {
+		filterString = appendFilterString(filterString, "taker", filter.Taker)
+	}
+
+	if filter.OrderPair != "" {
+		filterString = appendFilterString(filterString, "orderPair", filter.OrderPair)
+	}
+
+	if filter.SecretHash != "" {
+		filterString = appendFilterString(filterString, "secretHash", filter.SecretHash)
+	}
+
+	if filter.OrderBy != "" {
+		filterString = appendFilterString(filterString, "orderBy", filter.OrderBy)
+	}
+
+	if filter.Verbose {
+		filterString = appendFilterString(filterString, "verbose", "true")
+	}
+
+	if filter.Status != 0 {
+		filterString = appendFilterString(filterString, "status", strconv.Itoa(filter.Status))
+	}
+
+	if filter.MinPrice != 0 {
+		filterString = appendFilterString(filterString, "minPrice", strconv.FormatFloat(filter.MinPrice, 'f', -1, 64))
+	}
+
+	if filter.MaxPrice != 0 {
+		filterString = appendFilterString(filterString, "maxPrice", strconv.FormatFloat(filter.MaxPrice, 'f', -1, 64))
+	}
+
+	if filter.Page != 0 {
+		filterString = appendFilterString(filterString, "page", strconv.Itoa(filter.Page))
+	}
+
+	if filter.PerPage != 0 {
+		filterString = appendFilterString(filterString, "perPage", strconv.Itoa(filter.PerPage))
+	}
+
+	resp, err := http.Get(fmt.Sprintf("%s/orders%s", c.url, filterString))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get orders: %v", err)
+	}
+	defer resp.Body.Close()
+	var orders []model.Order
+	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
+		return nil, fmt.Errorf("failed to decode orders: %v", err)
+	}
+	return orders, nil
 }
 
 func (c *client) GetFollowerInitiateOrders() ([]model.Order, error) {

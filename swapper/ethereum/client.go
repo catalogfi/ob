@@ -82,7 +82,7 @@ func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.Trans
 	if err != nil {
 		return "", err
 	}
-	tx, err := instance.Redeem(auth, token, secret)
+	tx, err := instance.Redeem(auth, secret)
 	if err != nil {
 		return "", err
 	}
@@ -94,7 +94,7 @@ func (client *client) RefundAtomicSwap(contract common.Address, auth *bind.Trans
 	if err != nil {
 		return "", err
 	}
-	tx, err := instance.Refund(auth, token)
+	tx, err := instance.Refund(auth)
 	if err != nil {
 		return "", err
 	}
