@@ -56,6 +56,9 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr,
 	initiatorAddr := client.GetPublicAddress(initiator)
 
 	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(12000))
+	if latestCheckedBlock.Cmp(big.NewInt(0)) == -1 {
+		latestCheckedBlock = big.NewInt(0)
+	}
 
 	watcher, err := NewWatcher(atomicSwapAddr, secretHash, expiryBlock, amount, client)
 	if err != nil {
@@ -168,12 +171,8 @@ type watcher struct {
 }
 
 func NewWatcher(atomicSwapAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.Watcher, error) {
-
-	initBlockNumber := new(big.Int).Sub(expiryBlock, big.NewInt(12000))
-	var latestCheckedBlock *big.Int
-	if initBlockNumber.Cmp(big.NewInt(0)) == 1 {
-		latestCheckedBlock = initBlockNumber
-	} else {
+	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(12000))
+	if latestCheckedBlock.Cmp(big.NewInt(0)) == -1 {
 		latestCheckedBlock = big.NewInt(0)
 	}
 	return &watcher{

@@ -261,6 +261,11 @@ func (s *store) GetOrder(orderID uint) (*model.Order, error) {
 }
 
 func (s *store) UpdateOrder(order *model.Order) error {
+	fmt.Println("")
+	fmt.Println("order" , order)
+	fmt.Println("_InitiatorAtomicSwap" , order.InitiatorAtomicSwap.InitiateTxHash)
+	fmt.Println("")
+	
 	if tx := s.db.Save(order.FollowerAtomicSwap); tx.Error != nil {
 		return tx.Error
 	}

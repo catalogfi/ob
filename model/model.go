@@ -1,6 +1,7 @@
 package model
 
 import (
+	"database/sql/driver"
 	"fmt"
 	"strings"
 
@@ -61,7 +62,7 @@ func NewSecondary(address string) Asset {
 }
 
 func (a Asset) SecondaryID() string {
-	if string(a[:9]) != "secondary" {
+	if string(a) == "primary" || string(a[:9]) != "secondary" {
 		return ""
 	}
 	return string(a[9:])
@@ -110,15 +111,39 @@ type Order struct {
 type AtomicSwap struct {
 	gorm.Model
 
-	InitiatorAddress string   `json:"initiatorAddress"`
-	RedeemerAddress  string   `json:"redeemerAddress"`
-	Timelock         string   `json:"timelock"`
-	Chain            Chain    `json:"chain"`
-	Asset            Asset    `json:"asset"`
-	Amount           string   `json:"amount"`
-	InitiateTxHash   []string `json:"initiateTxHash" gorm:"type:string[]"`
-	RedeemTxHash     string   `json:"redeemTxHash"`
-	RefundTxHash     string   `json:"refundTxHash"`
+	InitiatorAddress string `json:"initiatorAddress"`
+	RedeemerAddress  string `json:"redeemerAddress"`
+	Timelock         string `json:"timelock"`
+	Chain            Chain  `json:"chain"`
+	Asset            Asset  `json:"asset"`
+	Amount           string `json:"amount"`
+	InitiateTxHash   string `json:"initiateTxHash"`
+	RedeemTxHash     string `json:"redeemTxHash"`
+	RefundTxHash     string `json:"refundTxHash"`
+}
+
+type StringArray []string
+
+func (sa StringArray) Value() (driver.Value, error) {
+	return strings.Join(sa, ","), nil
+}
+
+func (sa *StringArray) Scan(value interface{}) error {
+	if value == nil {
+		*sa = make([]string, 0)
+		return nil
+	}
+
+	switch v := value.(type) {
+	case string:
+		*sa = strings.Split(v, ",")
+	case []byte:
+		*sa = strings.Split(string(v), ",")
+	default:
+		return fmt.Errorf("unsupported data type for StringArray: %T", value)
+	}
+
+	return nil
 }
 
 func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {
@@ -126,25 +151,24 @@ func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {
 	if len(chainAssets) != 2 {
 		return "", "", "", "", fmt.Errorf("failed to parse the order pair, should be of the format <chain>:<asset>-<chain>:<asset>. got: %v", orderPair)
 	}
-	sendChain, sendAsset, err := parseChainAsset(chainAssets[0])
+	sendChain, sendAsset, err := ParseChainAsset(chainAssets[0])
 	if err != nil {
 		return "", "", "", "", err
 	}
-	recieveChain, recieveAsset, err := parseChainAsset(chainAssets[1])
+	recieveChain, recieveAsset, err := ParseChainAsset(chainAssets[1])
 	if err != nil {
 		return "", "", "", "", err
 	}
 	return sendChain, recieveChain, sendAsset, recieveAsset, nil
 }
 
-func parseChainAsset(chainAsset string) (Chain, Asset, error) {
+func ParseChainAsset(chainAsset string) (Chain, Asset, error) {
 	chainAndAsset := strings.Split(chainAsset, ":")
-	if len(chainAndAsset) != 2 {
+	if len(chainAndAsset) > 2 {
 		return "", "", fmt.Errorf("failed to parse the chain and asset, should be of the format <chain>:<asset>. got: %v", chainAsset)
 	}
-	return Chain(chainAndAsset[0]), Asset(chainAndAsset[1]), nil
-}
-
-func NewOrderPair(from Chain, fromAsset Asset, to Chain, toAsset Asset) string {
-	return fmt.Sprintf("%s:%s-%s:%s", from, fromAsset, to, toAsset)
+	if len(chainAndAsset) == 1 {
+		return Chain(chainAndAsset[0]), Primary, nil
+	}
+	return Chain(chainAndAsset[0]), NewSecondary(chainAndAsset[1]), nil
 }

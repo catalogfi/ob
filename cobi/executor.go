@@ -19,8 +19,10 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 	)
 
 	var cmd = &cobra.Command{
-		Use: "start",
+		Use:   "start",
+		Short: "Start the atomic swap executor",
 		Run: func(c *cobra.Command, args []string) {
+			fmt.Println("check")
 			for {
 				vals, err := getKeys(entropy, model.Ethereum, account, []uint32{0})
 				if err != nil {
@@ -38,11 +40,15 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 					cobra.CheckErr(fmt.Sprintf("Error to parse signing key: %v", err))
 					return
 				}
+				fmt.Println("")
+				fmt.Println("ORDER")
+				fmt.Println("")
 				orders, err := client.GetInitiatorInitiateOrders()
 				if err != nil {
 					fmt.Println(err)
 					continue
 				}
+
 				for _, order := range orders {
 					fmt.Println(order, entropy, account, config, store)
 					if err := handleInitiatorInitiateOrder(order, entropy, account, config, store); err != nil {

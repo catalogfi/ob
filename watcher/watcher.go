@@ -3,6 +3,7 @@ package watcher
 import (
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/susruth/wbtc-garden/blockchain"
@@ -65,7 +66,7 @@ func (w *watcher) watch(order model.Order) error {
 		}
 		if initiated {
 			order.Status = model.InitiatorAtomicSwapInitiated
-			order.InitiatorAtomicSwap.InitiateTxHash = txHash
+			order.InitiatorAtomicSwap.InitiateTxHash = strings.Join(txHash, ",")
 			if err := w.store.UpdateOrder(&order); err != nil {
 				return err
 			}
@@ -79,7 +80,7 @@ func (w *watcher) watch(order model.Order) error {
 		}
 		if initiated {
 			order.Status = model.FollowerAtomicSwapInitiated
-			order.FollowerAtomicSwap.InitiateTxHash = txHash
+			order.FollowerAtomicSwap.InitiateTxHash = strings.Join(txHash, ",")
 			if err := w.store.UpdateOrder(&order); err != nil {
 				return err
 			}
@@ -87,6 +88,7 @@ func (w *watcher) watch(order model.Order) error {
 	}
 
 	if order.Status == model.FollowerAtomicSwapInitiated {
+		fmt.Println("ckeckpoint one")
 		expired, err := fW.Expired()
 		if err != nil {
 			return err
@@ -118,6 +120,9 @@ func (w *watcher) watch(order model.Order) error {
 	}
 
 	if order.Status == model.FollowerAtomicSwapRedeemed {
+		fmt.Println("")
+		fmt.Println("are we here")
+		fmt.Println("")
 		expired, err := iW.Expired()
 		if err != nil {
 			return err
@@ -153,7 +158,7 @@ func (w *watcher) watch(order model.Order) error {
 		}
 	}
 
-	if order.InitiatorAtomicSwap.RefundTxHash != "" && order.FollowerAtomicSwap.InitiateTxHash == nil {
+	if order.InitiatorAtomicSwap.RefundTxHash != "" && order.FollowerAtomicSwap.InitiateTxHash != "" {
 		order.Status = model.OrderFailedSoft
 		if err := w.store.UpdateOrder(&order); err != nil {
 			return err

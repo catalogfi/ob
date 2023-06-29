@@ -19,7 +19,6 @@ import (
 )
 
 func LoadClient(chain model.Chain, urls map[model.Chain]string) (interface{}, error) {
-	fmt.Println(chain, urls)
 	if chain.IsBTC() {
 		return bitcoin.NewClient(urls[chain], getParams(chain)), nil
 	}

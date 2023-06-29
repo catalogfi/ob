@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func Run() error {
+func Run(config model.Config) error {
 	var cmd = &cobra.Command{
 		Use: "COBI - Catalog Order Book clI",
 		Run: func(c *cobra.Command, args []string) {
@@ -26,26 +26,17 @@ func Run() error {
 		return err
 	}
 
-	config := model.Config{
-		RPC: map[model.Chain]string{
-			model.BitcoinRegtest:   "http://localhost:30000",
-			model.EthereumLocalnet: "http://localhost:8545",
-		},
-		DEPLOYERS: map[model.Chain]string{
-			model.EthereumLocalnet: "0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2",
-		},
-	}
-
 	store, err := NewStore(sqlite.Open("test.db"), &gorm.Config{})
 	if err != nil {
 		return err
 	}
 
-	cmd.AddCommand(Accounts(entropy))
+	// cmd.AddCommand(Accounts(entropy))
 	cmd.AddCommand(Create(entropy, store))
 	cmd.AddCommand(Fill(entropy))
 	cmd.AddCommand(Execute(entropy, store, config))
-	// cmd.AddCommand(List())
+	cmd.AddCommand(Accounts(entropy, config))
+	cmd.AddCommand(List())
 
 	if err := cmd.Execute(); err != nil {
 		return err
