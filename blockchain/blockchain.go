@@ -18,6 +18,7 @@ import (
 	"github.com/susruth/wbtc-garden/swapper/ethereum"
 )
 
+// The function `LoadClient` returns a client for a given blockchain chain and its corresponding URLs(set during config).
 func LoadClient(chain model.Chain, urls map[model.Chain]string) (interface{}, error) {
 	if chain.IsBTC() {
 		return bitcoin.NewClient(urls[chain], getParams(chain)), nil
@@ -28,6 +29,8 @@ func LoadClient(chain model.Chain, urls map[model.Chain]string) (interface{}, er
 	return nil, fmt.Errorf("invalid chain: %s", chain)
 }
 
+// The function `LoadInitiatorSwap` loads an initiator swap based on the given atomic swap details, private key, secret hash, URLs, and deployers.
+// initiateSwap can be used to construct a Swap Object with methods required to handle Atomicswap on initiator side.
 func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interface{}, secretHash string, urls, deployers map[model.Chain]string) (swapper.InitiatorSwap, error) {
 	client, err := LoadClient(atomicSwap.Chain, urls)
 	if err != nil {

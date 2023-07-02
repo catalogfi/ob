@@ -52,13 +52,7 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		Amount:          recieveAmount,
 	}
 
-	if tx := s.db.Create(&initiatorAtomicSwap); tx.Error != nil {
-		return 0, tx.Error
-	}
-
-	if tx := s.db.Create(&followerAtomicSwap); tx.Error != nil {
-		return 0, tx.Error
-	}
+	
 
 	sendAmt, ok := new(big.Int).SetString(sendAmount, 10)
 	if !ok {
@@ -98,7 +92,14 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		SecretHash:            secretHash,
 		Status:                model.OrderCreated,
 	}
+	
+	if tx := s.db.Create(&initiatorAtomicSwap); tx.Error != nil {
+		return 0, tx.Error
+	}
 
+	if tx := s.db.Create(&followerAtomicSwap); tx.Error != nil {
+		return 0, tx.Error
+	}
 	if tx := s.db.Create(&order); tx.Error != nil {
 		return 0, tx.Error
 	}
