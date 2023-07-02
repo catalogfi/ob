@@ -246,8 +246,7 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}
 
-	data1, err1 := io.ReadAll(resp.Body)
-	fmt.Println(string(data1), err1)
+	
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to send transaction: %s", resp.Status)

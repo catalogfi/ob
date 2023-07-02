@@ -66,7 +66,7 @@ func GetAmount(client Client, deployerAddr, tokenAddr, redeemerAddr, initiatorAd
 	return balance.Uint64(), nil
 }
 
-// var deployerAddr = common.HexToAddress("0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2")
+// var deployerAddr = common.HexToAddress("0xf8fC386f964a380007a54D04Ce74E13A2033f26B")
 
 func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, deployerAddr, tokenAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.InitiatorSwap, error) {
 
@@ -219,6 +219,7 @@ type watcher struct {
 }
 
 func NewWatcher(initiator, redeemerAddr, deployerAddr, tokenAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.Watcher, error) {
+	// fmt.Println("tokenAddr: ", tokenAddr.Hex())
 	contractAddr, err := GetAddress(client, deployerAddr, redeemerAddr, initiator, tokenAddr, secretHash, expiryBlock, amount)
 	if err != nil {
 		return &watcher{}, err

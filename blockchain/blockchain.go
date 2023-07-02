@@ -31,17 +31,17 @@ func LoadClient(chain model.Chain, urls map[model.Chain]string) (interface{}, er
 func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interface{}, secretHash string, urls, deployers map[model.Chain]string) (swapper.InitiatorSwap, error) {
 	client, err := LoadClient(atomicSwap.Chain, urls)
 	if err != nil {
-		fmt.Println(err)
+		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
 
 	redeemerAddress, err := ParseAddress(client, atomicSwap.RedeemerAddress)
 	if err != nil {
-		fmt.Println(err)
+		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
 
 	secHash, err := hex.DecodeString(secretHash)
 	if err != nil {
-		fmt.Println(err)
+		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
 
 	amt, ok := new(big.Int).SetString(atomicSwap.Amount, 10)
@@ -103,6 +103,7 @@ func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, urls, deployers
 	case ethereum.Client:
 		deployerAddress := common.HexToAddress(deployers[atomicSwap.Chain])
 		tokenAddress := common.HexToAddress(atomicSwap.Asset.SecondaryID())
+		// fmt.Println("tokenaddr" , tokenAddress , atomicSwap.Asset.SecondaryID())
 		return ethereum.NewWatcher(initiatorAddress.(common.Address), redeemerAddress.(common.Address), deployerAddress, tokenAddress, secHash, expiry, amt, client)
 	default:
 		return nil, fmt.Errorf("unknown chain: %T", client)
@@ -116,6 +117,7 @@ func CalculateExpiry(chain model.Chain, goingFirst bool, urls map[model.Chain]st
 	}
 	client, err := LoadClient(chain, urls)
 	if err != nil {
+		
 		return "", err
 	}
 	expiry, err := ethereum.GetExpiry(client.(ethereum.Client), goingFirst)
@@ -128,17 +130,17 @@ func CalculateExpiry(chain model.Chain, goingFirst bool, urls map[model.Chain]st
 func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerPrivateKey interface{}, secretHash string, urls, deployers map[model.Chain]string) (swapper.RedeemerSwap, error) {
 	client, err := LoadClient(atomicSwap.Chain, urls)
 	if err != nil {
-		fmt.Println(err)
+		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
 
 	initiatorAddress, err := ParseAddress(client, atomicSwap.InitiatorAddress)
 	if err != nil {
-		fmt.Println(err)
+		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
 
 	secHash, err := hex.DecodeString(secretHash)
 	if err != nil {
-		fmt.Println(err)
+		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
 
 	amt, ok := new(big.Int).SetString(atomicSwap.Amount, 10)

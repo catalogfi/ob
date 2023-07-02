@@ -78,7 +78,6 @@ func (c *client) CreateOrder(sendAddress, recieveAddress, orderPair, sendAmount,
 		return 0, err
 	}
 
-	fmt.Println("URL: ", fmt.Sprintf("%s/orders", c.url))
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/orders", c.url), &buf)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create request: %v", err)

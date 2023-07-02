@@ -1,7 +1,6 @@
 package rest_test
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -50,7 +49,6 @@ var _ = Describe("Rest", func() {
 		verified, err := c.Login()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(verified).ToNot(BeNil())
-		fmt.Println("verified: ", verified)
 		c.SetJwt(verified)
 	})
 
@@ -116,7 +114,7 @@ func StartServer() {
 				model.EthereumLocalnet: "http://localhost:8545",
 			},
 			DEPLOYERS: map[model.Chain]string{
-				model.EthereumLocalnet: "0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2",
+				model.EthereumLocalnet: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
 			},
 		}
 		s := rest.NewServer(store, config, "PANTHER")

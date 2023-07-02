@@ -25,7 +25,7 @@ func main() {
 			model.EthereumLocalnet: "http://localhost:8545",
 		},
 		DEPLOYERS: map[model.Chain]string{
-			model.EthereumLocalnet: "0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2",
+			model.EthereumLocalnet: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
 		},
 	}
 
@@ -45,7 +45,7 @@ func main() {
 // 		WBTCAddress:     os.Getenv("SEPOLIA_WBTC"),
 // 		BitcoinURL:      os.Getenv("BTC_TESTNET_RPC"),
 // 		EthereumURL:     os.Getenv("SEPOLIA_RPC"),
-// 		DeployerAddress: "0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2",
+// 		DeployerAddress: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
 // 	}
 // }
 
@@ -57,7 +57,7 @@ func main() {
 // 		WBTCAddress:     os.Getenv("ETHEREUM_WBTC"),
 // 		BitcoinURL:      os.Getenv("BTC_RPC"),
 // 		EthereumURL:     os.Getenv("ETHEREUM_RPC"),
-// 		DeployerAddress: "0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2",
+// 		DeployerAddress: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
 // 	}
 // }
 
@@ -69,7 +69,7 @@ func main() {
 // 		WBTCAddress:     os.Getenv("OPTIMISM_WBTC"),
 // 		BitcoinURL:      os.Getenv("BTC_RPC"),
 // 		EthereumURL:     os.Getenv("OPTIMISM_RPC"),
-// 		DeployerAddress: "0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2",
+// 		DeployerAddress: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
 // 	}
 // }
 
@@ -81,6 +81,6 @@ func main() {
 // 		WBTCAddress:     os.Getenv("ARBITRUM_WBTC"),
 // 		BitcoinURL:      os.Getenv("BTC_RPC"),
 // 		EthereumURL:     os.Getenv("ARBITRUM_RPC"),
-// 		DeployerAddress: "0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2",
+// 		DeployerAddress: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
 // 	}
 // }
