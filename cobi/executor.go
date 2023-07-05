@@ -129,7 +129,7 @@ func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32
 	if status == InitiatorInitiated {
 		return nil
 	}
-	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC, config.DEPLOYERS)
+	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC)
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func handleInitiatorRedeemOrder(order model.Order, entropy []byte, user uint32, 
 		return nil
 	}
 
-	redeemerSwap, err := blockchain.LoadRedeemerSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC, config.DEPLOYERS)
+	redeemerSwap, err := blockchain.LoadRedeemerSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC)
 	if err != nil {
 		return err
 	}
@@ -190,7 +190,7 @@ func handleFollowerInitiateOrder(order model.Order, entropy []byte, user uint32,
 		return nil
 	}
 
-	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC, config.DEPLOYERS)
+	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC)
 	if err != nil {
 		return err
 	}
@@ -220,7 +220,7 @@ func handleFollowerRedeemOrder(order model.Order, entropy []byte, user uint32, c
 		return nil
 	}
 
-	redeemerSwap, err := blockchain.LoadRedeemerSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC, config.DEPLOYERS)
+	redeemerSwap, err := blockchain.LoadRedeemerSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC)
 	if err != nil {
 		return err
 	}

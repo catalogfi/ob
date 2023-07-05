@@ -32,7 +32,7 @@ var _ = Describe("Bitcoin", func() {
 		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" //0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" //0x70997970C51812dc3A010C7d01b50e0d17dc79C8
 		atomicSwapAdrr := common.HexToAddress("0x9CC8B5379C40E24F374cd55973c138fff83ed214")
-		TOKEN := common.HexToAddress("0x87c470437282174b3f8368c7CF1Ac03bcAe57954")
+		// TOKEN := common.HexToAddress("0x87c470437282174b3f8368c7CF1Ac03bcAe57954")
 		// instantClientConfig := ethereum.InstantClientConfig{
 		// 	Url:              "http://localhost:8282",
 		// 	Entrypoint:       "0xC6c5Ab5039373b0CBa7d0116d9ba7fb9831C3f42",
@@ -54,8 +54,8 @@ var _ = Describe("Bitcoin", func() {
 		client, err := ethereum.NewClient("http://localhost:8545")
 		Expect(err).To(BeNil())
 
-		client.ApproveERC20(privKey1, big.NewInt(100000), TOKEN, atomicSwapAdrr)
-		client.ApproveERC20(privKey2, big.NewInt(100000), TOKEN, atomicSwapAdrr)
+		// client.ApproveERC20(privKey1, big.NewInt(100000), TOKEN, atomicSwapAdrr)
+		// client.ApproveERC20(privKey2, big.NewInt(100000), TOKEN, atomicSwapAdrr)
 		time.Sleep(2 * time.Second)
 		// instClient := ethereum.InstantWalletWrapper(instantClientConfig, client)
 		secret1, _ := randomHex(32)
@@ -69,14 +69,14 @@ var _ = Describe("Bitcoin", func() {
 		bExpiry, err := ethereum.GetExpiry(client, false)
 		Expect(err).To(BeNil())
 
-		iSwapA, err := ethereum.NewInitiatorSwap(privKey1, pkAddr2, atomicSwapAdrr, TOKEN, secret_hash1[:], aExpiry, big.NewInt(100000), client)
+		iSwapA, err := ethereum.NewInitiatorSwap(privKey1, pkAddr2, atomicSwapAdrr, secret_hash1[:], aExpiry, big.NewInt(100000), client)
 		Expect(err).To(BeNil())
-		rSwapA, err := ethereum.NewRedeemerSwap(privKey1, pkAddr2, atomicSwapAdrr, TOKEN, secret_hash2[:], bExpiry, big.NewInt(100000), client)
+		rSwapA, err := ethereum.NewRedeemerSwap(privKey1, pkAddr2, atomicSwapAdrr, secret_hash2[:], bExpiry, big.NewInt(100000), client)
 		Expect(err).To(BeNil())
 
-		iSwapB, err := ethereum.NewInitiatorSwap(privKey2, pkAddr1, atomicSwapAdrr, TOKEN, secret_hash2[:], bExpiry, big.NewInt(100000), client)
+		iSwapB, err := ethereum.NewInitiatorSwap(privKey2, pkAddr1, atomicSwapAdrr, secret_hash2[:], bExpiry, big.NewInt(100000), client)
 		Expect(err).To(BeNil())
-		rSwapB, err := ethereum.NewRedeemerSwap(privKey2, pkAddr1, atomicSwapAdrr, TOKEN, secret_hash1[:], aExpiry, big.NewInt(100000), client)
+		rSwapB, err := ethereum.NewRedeemerSwap(privKey2, pkAddr1, atomicSwapAdrr, secret_hash1[:], aExpiry, big.NewInt(100000), client)
 		Expect(err).To(BeNil())
 
 		go func() {

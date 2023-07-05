@@ -47,14 +47,14 @@ func (w *watcher) Run() {
 
 func (w *watcher) watch(order model.Order) error {
 	fmt.Println("Inside Watch")
-	fmt.Println(order, order.SecretHash, w.config.RPC, w.config.DEPLOYERS)
+	fmt.Println(order, order.SecretHash, w.config.RPC)
 
-	iW, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config.RPC, w.config.DEPLOYERS)
+	iW, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config.RPC)
 	if err != nil {
 		return err
 	}
 
-	fW, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config.RPC, w.config.DEPLOYERS)
+	fW, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config.RPC)
 	if err != nil {
 		return err
 	}

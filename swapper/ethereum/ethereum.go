@@ -51,7 +51,7 @@ func GetExpiry(client Client, goingFirst bool) (*big.Int, error) {
 
 // var deployerAddr = common.HexToAddress("0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2")
 
-func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr, tokenAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.InitiatorSwap, error) {
+func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.InitiatorSwap, error) {
 
 	initiatorAddr := client.GetPublicAddress(initiator)
 
@@ -64,7 +64,20 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr,
 	if err != nil {
 		return &initiatorSwap{}, err
 	}
-	return &initiatorSwap{initiator: initiator, watcher: watcher, initiatorAddr: initiatorAddr, expiryBlock: expiryBlock, atomicSwapAddr: atomicSwapAddr, client: client, amount: amount, tokenAddr: tokenAddr, redeemerAddr: redeemerAddr, lastCheckedBlock: latestCheckedBlock, secretHash: secretHash}, nil
+	tokenAddr, err := client.GetTokenAddress(atomicSwapAddr)
+	if err != nil {
+		return &initiatorSwap{}, err
+	}
+	return &initiatorSwap{
+		initiator: initiator, watcher: watcher,
+		initiatorAddr:  initiatorAddr,
+		expiryBlock:    expiryBlock,
+		atomicSwapAddr: atomicSwapAddr,
+		client:         client, amount: amount,
+		tokenAddr:        tokenAddr,
+		redeemerAddr:     redeemerAddr,
+		lastCheckedBlock: latestCheckedBlock,
+		secretHash:       secretHash}, nil
 }
 
 func (initiatorSwap *initiatorSwap) Initiate() (string, error) {
@@ -115,8 +128,13 @@ func (initiatorSwap *initiatorSwap) Refund() (string, error) {
 	return tx, nil
 }
 
-func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr, tokenAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.RedeemerSwap, error) {
+func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.RedeemerSwap, error) {
 	watcher, err := NewWatcher(atomicSwapAddr, secretHash, expiryBlock, amount, client)
+	if err != nil {
+		return &redeemerSwap{}, err
+	}
+
+	tokenAddr, err := client.GetTokenAddress(atomicSwapAddr)
 	if err != nil {
 		return &redeemerSwap{}, err
 	}

@@ -9,8 +9,7 @@ import (
 )
 
 type Config struct {
-	RPC       map[Chain]string `json:"rpc"`
-	DEPLOYERS map[Chain]string `json:"url"`
+	RPC map[Chain]string `json:"rpc"`
 }
 
 type Chain string
