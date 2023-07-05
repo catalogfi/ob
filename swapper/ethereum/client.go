@@ -29,6 +29,7 @@ type Client interface {
 	TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
 	GetCurrentBlock() (uint64, error)
 	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
+	GetTokenAddress(contractAddr common.Address) (common.Address, error)
 	IsFinal(txHash string) (bool, error)
 }
 type client struct {
@@ -78,6 +79,17 @@ func (client *client) GetCallOpts() *bind.CallOpts {
 	var auth *bind.CallOpts = &bind.CallOpts{}
 	auth.Pending = true
 	return auth
+}
+func (client *client) GetTokenAddress(contractAddr common.Address) (common.Address, error) {
+	instance, err := AtomicSwap.NewAtomicSwap(contractAddr, client.provider)
+	if err != nil {
+		return common.Address{}, err
+	}
+	tokenAddr, err := instance.Token(client.GetCallOpts())
+	if err != nil {
+		return common.Address{}, err
+	}
+	return tokenAddr, nil
 }
 func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secret []byte) (string, error) {
 	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
