@@ -115,9 +115,6 @@ func StartServer() {
 				model.BitcoinRegtest:   "http://localhost:30000",
 				model.EthereumLocalnet: "http://localhost:8545",
 			},
-			DEPLOYERS: map[model.Chain]string{
-				model.EthereumLocalnet: "0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2",
-			},
 		}
 		s := rest.NewServer(store, config, "PANTHER")
 		s.Run(":8080")

@@ -97,14 +97,14 @@ var _ = Describe("Ethereum to Bitcoin", func() {
 		_, btcBalanceOfPK1, _ := btcClient.GetUTXOs(btcPkAddr1, 0)
 		_, btcBalanceOfPK2, _ := btcClient.GetUTXOs(btcPkAddr2, 0)
 
-		iSwapA, err := ethereum.NewInitiatorSwap(ethPrivKey1, ethPkAddr2, ETH_ATOMICSWAP, TOKEN, secret_hash[:], ethExpiry, big.NewInt(100000), ethClient)
+		iSwapA, err := ethereum.NewInitiatorSwap(ethPrivKey1, ethPkAddr2, ETH_ATOMICSWAP, secret_hash[:], ethExpiry, big.NewInt(100000), ethClient)
 		Expect(err).To(BeNil())
 		rSwapA, err := bitcoin.NewRedeemerSwap(btcPrivKey1, btcPkAddr2, secret_hash[:], btcExpiry, 10000, btcClient)
 		Expect(err).To(BeNil())
 
 		iSwapB, err := bitcoin.NewInitiatorSwap(btcPrivKey2, btcPkAddr1, secret_hash[:], btcExpiry, 10000, btcClient)
 		Expect(err).To(BeNil())
-		rSwapB, err := ethereum.NewRedeemerSwap(ethPrivKey2, ethPkAddr1, ETH_ATOMICSWAP, TOKEN, secret_hash[:], ethExpiry, big.NewInt(100000), ethClient)
+		rSwapB, err := ethereum.NewRedeemerSwap(ethPrivKey2, ethPkAddr1, ETH_ATOMICSWAP, secret_hash[:], ethExpiry, big.NewInt(100000), ethClient)
 		Expect(err).To(BeNil())
 
 		go func() {

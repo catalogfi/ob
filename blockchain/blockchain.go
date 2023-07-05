@@ -28,7 +28,7 @@ func LoadClient(chain model.Chain, urls map[model.Chain]string) (interface{}, er
 	return nil, fmt.Errorf("invalid chain: %s", chain)
 }
 
-func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interface{}, secretHash string, urls, deployers map[model.Chain]string) (swapper.InitiatorSwap, error) {
+func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interface{}, secretHash string, urls map[model.Chain]string) (swapper.InitiatorSwap, error) {
 	client, err := LoadClient(atomicSwap.Chain, urls)
 	if err != nil {
 		fmt.Println(err)
@@ -58,15 +58,14 @@ func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interfac
 	case bitcoin.Client:
 		return bitcoin.NewInitiatorSwap(initiatorPrivateKey.(*btcec.PrivateKey), redeemerAddress.(btcutil.Address), secHash, expiry.Int64(), amt.Uint64(), client)
 	case ethereum.Client:
-		deployerAddress := common.HexToAddress(deployers[atomicSwap.Chain])
-		tokenAddress := common.HexToAddress(atomicSwap.Asset.SecondaryID())
-		return ethereum.NewInitiatorSwap(initiatorPrivateKey.(*ecdsa.PrivateKey), redeemerAddress.(common.Address), deployerAddress, tokenAddress, secHash, expiry, amt, client)
+		contractAddr := common.HexToAddress(atomicSwap.Asset.SecondaryID())
+		return ethereum.NewInitiatorSwap(initiatorPrivateKey.(*ecdsa.PrivateKey), redeemerAddress.(common.Address), contractAddr, secHash, expiry, amt, client)
 	default:
 		return nil, fmt.Errorf("unknown chain: %T", client)
 	}
 }
 
-func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, urls, deployers map[model.Chain]string) (swapper.Watcher, error) {
+func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, urls map[model.Chain]string) (swapper.Watcher, error) {
 	client, err := LoadClient(atomicSwap.Chain, urls)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
@@ -101,9 +100,8 @@ func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, urls, deployers
 	case bitcoin.Client:
 		return bitcoin.NewWatcher(initiatorAddress.(btcutil.Address), redeemerAddress.(btcutil.Address), secHash, expiry.Int64(), amt.Uint64(), client)
 	case ethereum.Client:
-		deployerAddress := common.HexToAddress(deployers[atomicSwap.Chain])
-		tokenAddress := common.HexToAddress(atomicSwap.Asset.SecondaryID())
-		return ethereum.NewWatcher(initiatorAddress.(common.Address), redeemerAddress.(common.Address), deployerAddress, tokenAddress, secHash, expiry, amt, client)
+		contractAddr := common.HexToAddress(atomicSwap.Asset.SecondaryID())
+		return ethereum.NewWatcher(contractAddr, secHash, expiry, amt, client)
 	default:
 		return nil, fmt.Errorf("unknown chain: %T", client)
 	}
@@ -125,7 +123,7 @@ func CalculateExpiry(chain model.Chain, goingFirst bool, urls map[model.Chain]st
 	return expiry.String(), nil
 }
 
-func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerPrivateKey interface{}, secretHash string, urls, deployers map[model.Chain]string) (swapper.RedeemerSwap, error) {
+func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerPrivateKey interface{}, secretHash string, urls map[model.Chain]string) (swapper.RedeemerSwap, error) {
 	client, err := LoadClient(atomicSwap.Chain, urls)
 	if err != nil {
 		fmt.Println(err)
@@ -155,9 +153,8 @@ func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerPrivateKey interface{
 	case bitcoin.Client:
 		return bitcoin.NewRedeemerSwap(redeemerPrivateKey.(*btcec.PrivateKey), initiatorAddress.(btcutil.Address), secHash, expiry.Int64(), amt.Uint64(), client)
 	case ethereum.Client:
-		deployerAddress := common.HexToAddress(deployers[atomicSwap.Chain])
-		tokenAddress := common.HexToAddress(atomicSwap.Asset.SecondaryID())
-		return ethereum.NewRedeemerSwap(redeemerPrivateKey.(*ecdsa.PrivateKey), initiatorAddress.(common.Address), deployerAddress, tokenAddress, secHash, expiry, amt, client)
+		contractAddr := common.HexToAddress(atomicSwap.Asset.SecondaryID())
+		return ethereum.NewRedeemerSwap(redeemerPrivateKey.(*ecdsa.PrivateKey), initiatorAddress.(common.Address), contractAddr, secHash, expiry, amt, client)
 	default:
 		return nil, fmt.Errorf("unknown chain: %T", client)
 	}
