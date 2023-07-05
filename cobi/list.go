@@ -15,7 +15,6 @@ func List() *cobra.Command {
 	var (
 		url        string
 		maker      string
-		taker      string
 		orderPair  string
 		secretHash string
 		orderBy    string
@@ -36,7 +35,6 @@ func List() *cobra.Command {
 			}
 			orders, err := rest.NewClient(url, privKey.D.Text(16)).GetOrders(rest.GetOrdersFilter{
 				Maker:      maker,
-				Taker:      taker,
 				OrderPair:  orderPair,
 				SecretHash: secretHash,
 				OrderBy:    orderBy,
@@ -54,7 +52,7 @@ func List() *cobra.Command {
 
 			t := table.NewWriter()
 			t.SetOutputMirror(os.Stdout)
-			t.AppendHeader(table.Row{"Order ID", "From Asset", "To Asset", "Price", "Amount"})
+			t.AppendHeader(table.Row{"Order ID", "From Asset", "To Asset", "Price", "Receive Amount"})
 			rows := make([]table.Row, len(orders))
 			for i, order := range orders {
 				assets := strings.Split(order.OrderPair, "-")
@@ -69,7 +67,6 @@ func List() *cobra.Command {
 	cmd.Flags().StringVar(&url, "url", "", "config file (default is ./config.json)")
 	cmd.MarkFlagRequired("url")
 	cmd.Flags().StringVar(&maker, "maker", "", "maker address to filter with (default: any)")
-	cmd.Flags().StringVar(&taker, "taker", "", "taker address to filter with (default: any)")
 	cmd.Flags().StringVar(&orderPair, "order-pair", "", "order pair to filter with (default: any)")
 	cmd.Flags().StringVar(&secretHash, "secret-hash", "", "secret-hash to filter with (default: any)")
 	cmd.Flags().StringVar(&orderBy, "order-by", "", "order by (default: creation time)")
