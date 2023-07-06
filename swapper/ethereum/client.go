@@ -20,7 +20,7 @@ import (
 type Client interface {
 	GetTransactOpts(privKey *ecdsa.PrivateKey) *bind.TransactOpts
 	GetCallOpts() *bind.CallOpts
-	InitiateAtomicSwap(contract common.Address, auth *bind.TransactOpts, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error)
+	InitiateAtomicSwap(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error)
 	RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secret []byte) (string, error)
 	RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secretHash []byte) (string, error)
 	GetPublicAddress(privKey *ecdsa.PrivateKey) common.Address
@@ -102,19 +102,28 @@ func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.Trans
 	}
 	return tx.Hash().Hex(), nil
 }
-func (client *client) InitiateAtomicSwap(contract common.Address, auth *bind.TransactOpts, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error) {
+func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error) {
 	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
 	if err != nil {
 		return "", err
 	}
 	var hash [32]byte
 	copy(hash[:], secretHash)
-	tx, err := instance.Initiate(auth, redeemerAddr, expiry, amount, hash)
+	// TODO : Batch approve and init
+	// consider infinite allowance
+	_, err = client.ApproveERC20(initiator, amount, token, contract)
 	if err != nil {
 		return "", err
 	}
-	fmt.Println("hash", tx.Hash().Hex())
-	return tx.Hash().Hex(), nil
+
+	auth := client.GetTransactOpts(initiator)
+	initTx, err := instance.Initiate(auth, redeemerAddr, expiry, amount, hash)
+
+	if err != nil {
+		return "", err
+	}
+	fmt.Println("hash", initTx.Hash().Hex())
+	return initTx.Hash().Hex(), nil
 }
 
 func (client *client) RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secretHash []byte) (string, error) {
