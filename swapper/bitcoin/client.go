@@ -74,7 +74,7 @@ func (c *client) CalculateFee(nInputs, nOutputs int, txType TxType) (uint64, err
 
 	switch txType {
 	case Legacy:
-		// inputs + 1 to aaccount for input that might be used for fee 
+		// inputs + 1 to account for input that might be used for fee 
 		// but if fee is already accounted in the selected utxos it will just lead to a slighty speedy transaction
 		return uint64((nInputs+1)*148+nOutputs*34+10) * (uint64(feeRates.HalfHourFee)), nil
 	case SigWit:
