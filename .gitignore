@@ -1,2 +1,6 @@
 *.db
 *.json
+.env
+.env.*
+cob
+thinkfile

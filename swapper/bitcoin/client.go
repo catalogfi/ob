@@ -18,8 +18,8 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-const FEE = uint64(6000)
 const BTC_VERSION = 2
+
 
 type UTXO struct {
 	Amount uint64 `json:"value"`
@@ -36,12 +36,52 @@ type Client interface {
 	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
 	Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error)
 	Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error)
+	IsFinal(txHash string) (bool, error)
 	Net() *chaincfg.Params
 }
 
 type client struct {
 	url string
 	net *chaincfg.Params
+}
+type FeeRates struct {
+	FastestFee  int `json:"fastestFee"`
+	HalfHourFee int `json:"halfHourFee"`
+	HourFee     int `json:"hourFee"`
+	MinimumFee  int `json:"minimumFee"`
+	EconomyFee  int `json:"economyFee"`
+}
+
+type TxType int
+
+const (
+	Legacy TxType = iota
+	SegWit
+	Taproot
+)
+
+//function to calculate fee on bitcoin chain for a transaction
+func (c *client) CalculateFee(nInputs, nOutputs int, txType TxType) (uint64, error) {
+	var feeRates FeeRates
+	resp, err := http.Get("https://mempool.space/api/v1/fees/recommended")
+	if err != nil {
+		return 0, fmt.Errorf("failed to get fee rates: %w", err)
+	}
+	err = json.NewDecoder(resp.Body).Decode(&feeRates)
+	if err != nil {
+		return 0, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+
+	switch txType {
+	case Legacy:
+		// inputs + 1 to account for input that might be used for fee 
+		// but if fee is already accounted in the selected utxos it will just lead to a slighty speedy transaction
+		return uint64((nInputs+1)*148+nOutputs*34+10) * (uint64(feeRates.HalfHourFee)), nil
+	case SegWit:
+		return uint64(nInputs*68+nOutputs*31+10) * uint64(feeRates.HalfHourFee), nil
+	}
+	return 0, fmt.Errorf("tx type not supported")
+
 }
 
 func NewClient(url string, net *chaincfg.Params) Client {
@@ -149,11 +189,19 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 		return "", fmt.Errorf("failed to create address from private key: %w", err)
 	}
 
-	utxos, selectedAmount, err := client.GetUTXOs(fromAddr, amount+FEE)
+	utxosWithoutFee, _, err := client.GetUTXOs(fromAddr, amount)
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
-	for _, utxo := range utxos {
+	FEE, err := client.CalculateFee(len(utxosWithoutFee), 2, Legacy)
+	if err != nil {
+		return "", fmt.Errorf("failed to calculate fee: %w", err)
+	}
+	utxosWihFee, selectedAmount, err := client.GetUTXOs(fromAddr, amount+FEE)
+	if err != nil {
+		return "", fmt.Errorf("failed to get UTXOs: %w", err)
+	}
+	for _, utxo := range utxosWihFee {
 		txid, err := chainhash.NewHashFromStr(utxo.TxID)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse txid in the utxo: %w", err)
@@ -216,6 +264,10 @@ func (client *client) Spend(script []byte, redeemScript wire.TxWitness, spender 
 	if err != nil {
 		return "", fmt.Errorf("failed to create script for address: %w", err)
 	}
+	FEE, err := client.CalculateFee(len(tx.TxIn), len(tx.TxOut), SegWit)
+	if err != nil {
+		return "", fmt.Errorf("failed to calculate fee: %w", err)
+	}
 	tx.AddTxOut(wire.NewTxOut(int64(balance-FEE), spenderToScript))
 
 	for i := range tx.TxIn {
@@ -245,8 +297,7 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}
 
-	data1, err1 := io.ReadAll(resp.Body)
-	fmt.Println(string(data1), err1)
+	
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to send transaction: %s", resp.Status)
@@ -257,6 +308,11 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 		return "", fmt.Errorf("failed to read transaction id: %w", err)
 	}
 	return string(data), nil
+}
+
+func (client *client) IsFinal(txHash string) (bool, error) {
+	// TODO: add confirmation checks
+	return true, nil
 }
 
 type Transaction struct {
