@@ -49,7 +49,21 @@ func GetExpiry(client Client, goingFirst bool) (*big.Int, error) {
 	return new(big.Int).Add(new(big.Int).SetUint64(blockNumber), big.NewInt(5760)), nil
 }
 
-// var deployerAddr = common.HexToAddress("0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2")
+func GetAmount(client Client, atomicSwapAddr common.Address, secretHash []byte) (uint64, error) {
+	atomicSwap, err := AtomicSwap.NewAtomicSwapCaller(atomicSwapAddr, client.GetProvider())
+	if err != nil {
+		return 0, err
+	}
+	secretHash32 := [32]byte{}
+	copy(secretHash32[:], secretHash)
+
+	swap, err := atomicSwap.AtomicSwapOrders(client.GetCallOpts(), secretHash32)
+	if err != nil {
+		return 0, err
+	}
+
+	return swap.Amount.Uint64(), nil
+}
 
 func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.InitiatorSwap, error) {
 

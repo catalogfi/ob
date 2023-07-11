@@ -1,7 +1,6 @@
 package rest_test
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -50,7 +49,6 @@ var _ = Describe("Rest", func() {
 		verified, err := c.Login()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(verified).ToNot(BeNil())
-		fmt.Println("verified: ", verified)
 		c.SetJwt(verified)
 	})
 

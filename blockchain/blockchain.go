@@ -18,6 +18,7 @@ import (
 	"github.com/susruth/wbtc-garden/swapper/ethereum"
 )
 
+// The function `LoadClient` returns a client for a given blockchain chain and its corresponding URLs(set during config).
 func LoadClient(chain model.Chain, urls map[model.Chain]string) (interface{}, error) {
 	if chain.IsBTC() {
 		return bitcoin.NewClient(urls[chain], getParams(chain)), nil
@@ -28,20 +29,22 @@ func LoadClient(chain model.Chain, urls map[model.Chain]string) (interface{}, er
 	return nil, fmt.Errorf("invalid chain: %s", chain)
 }
 
+// The function `LoadInitiatorSwap` loads an initiator swap based on the given atomic swap details, private key, secret hash, and URLs.
+// initiateSwap can be used to construct a Swap Object with methods required to handle Atomicswap on initiator side.
 func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interface{}, secretHash string, urls map[model.Chain]string) (swapper.InitiatorSwap, error) {
 	client, err := LoadClient(atomicSwap.Chain, urls)
 	if err != nil {
-		fmt.Println(err)
+		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
 
 	redeemerAddress, err := ParseAddress(client, atomicSwap.RedeemerAddress)
 	if err != nil {
-		fmt.Println(err)
+		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
 
 	secHash, err := hex.DecodeString(secretHash)
 	if err != nil {
-		fmt.Println(err)
+		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
 
 	amt, ok := new(big.Int).SetString(atomicSwap.Amount, 10)
@@ -114,6 +117,7 @@ func CalculateExpiry(chain model.Chain, goingFirst bool, urls map[model.Chain]st
 	}
 	client, err := LoadClient(chain, urls)
 	if err != nil {
+
 		return "", err
 	}
 	expiry, err := ethereum.GetExpiry(client.(ethereum.Client), goingFirst)
@@ -126,17 +130,17 @@ func CalculateExpiry(chain model.Chain, goingFirst bool, urls map[model.Chain]st
 func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerPrivateKey interface{}, secretHash string, urls map[model.Chain]string) (swapper.RedeemerSwap, error) {
 	client, err := LoadClient(atomicSwap.Chain, urls)
 	if err != nil {
-		fmt.Println(err)
+		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
 
 	initiatorAddress, err := ParseAddress(client, atomicSwap.InitiatorAddress)
 	if err != nil {
-		fmt.Println(err)
+		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
 
 	secHash, err := hex.DecodeString(secretHash)
 	if err != nil {
-		fmt.Println(err)
+		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
 
 	amt, ok := new(big.Int).SetString(atomicSwap.Amount, 10)

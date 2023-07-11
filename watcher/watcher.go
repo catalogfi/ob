@@ -46,8 +46,6 @@ func (w *watcher) Run() {
 }
 
 func (w *watcher) watch(order model.Order) error {
-	fmt.Println("Inside Watch")
-	fmt.Println(order, order.SecretHash, w.config.RPC)
 
 	iW, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config.RPC)
 	if err != nil {
@@ -120,9 +118,7 @@ func (w *watcher) watch(order model.Order) error {
 	}
 
 	if order.Status == model.FollowerAtomicSwapRedeemed {
-		fmt.Println("")
-		fmt.Println("are we here")
-		fmt.Println("")
+
 		expired, err := iW.Expired()
 		if err != nil {
 			return err

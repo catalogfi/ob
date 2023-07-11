@@ -138,7 +138,6 @@ func (s *Server) PostOrders() gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": errorMessage,
 			})
-			fmt.Println(errorMessage)
 			return
 		}
 

@@ -45,12 +45,12 @@ func Run(config model.Config) error {
 }
 
 func readMnemonic() ([]byte, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
+	// homeDir, err := os.UserHomeDir()
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	if data, err := os.ReadFile(homeDir + "/cob/MNEMONIC"); err == nil {
+	if data, err := os.ReadFile("./cob/MNEMONIC"); err == nil {
 		return bip39.EntropyFromMnemonic(string(data))
 	}
 	fmt.Println("Generating new mnemonic")
@@ -65,7 +65,7 @@ func readMnemonic() ([]byte, error) {
 	}
 	fmt.Println(mnemonic)
 
-	file, err := os.Create(homeDir + "/cob/MNEMONIC")
+	file, err := os.Create("./cob/MNEMONIC")
 	if err != nil {
 		fmt.Println("error above", err)
 		return nil, err

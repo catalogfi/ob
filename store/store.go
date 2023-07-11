@@ -52,13 +52,7 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		Amount:          recieveAmount,
 	}
 
-	if tx := s.db.Create(&initiatorAtomicSwap); tx.Error != nil {
-		return 0, tx.Error
-	}
-
-	if tx := s.db.Create(&followerAtomicSwap); tx.Error != nil {
-		return 0, tx.Error
-	}
+	
 
 	sendAmt, ok := new(big.Int).SetString(sendAmount, 10)
 	if !ok {
@@ -70,7 +64,7 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		return 0, fmt.Errorf("invalid recieve amount: %s", recieveAmount)
 	}
 
-	fmt.Println("Validating order pair")
+	
 	// validate orderpair
 	fromChain, toChain, _, _, err := model.ParseOrderPair(orderPair)
 	if err != nil {
@@ -83,7 +77,6 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		return 0, err
 	}
 
-	fmt.Println("Validated order pair")
 
 	// ignoring accuracy
 	price, _ := new(big.Float).Quo(new(big.Float).SetInt(sendAmt), new(big.Float).SetInt(recieveAmt)).Float64()
@@ -99,7 +92,14 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		SecretHash:            secretHash,
 		Status:                model.OrderCreated,
 	}
+	
+	if tx := s.db.Create(&initiatorAtomicSwap); tx.Error != nil {
+		return 0, tx.Error
+	}
 
+	if tx := s.db.Create(&followerAtomicSwap); tx.Error != nil {
+		return 0, tx.Error
+	}
 	if tx := s.db.Create(&order); tx.Error != nil {
 		return 0, tx.Error
 	}
@@ -261,10 +261,7 @@ func (s *store) GetOrder(orderID uint) (*model.Order, error) {
 }
 
 func (s *store) UpdateOrder(order *model.Order) error {
-	fmt.Println("")
-	fmt.Println("order" , order)
-	fmt.Println("_InitiatorAtomicSwap" , order.InitiatorAtomicSwap.InitiateTxHash)
-	fmt.Println("")
+	
 	
 	if tx := s.db.Save(order.FollowerAtomicSwap); tx.Error != nil {
 		return tx.Error
