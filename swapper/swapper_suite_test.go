@@ -1,18 +1,25 @@
-package tests
+package swapper_test
 
 import (
 	"fmt"
 	"log"
 	"math/big"
+	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
 	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/TestERC20"
 )
+
+func TestSwapper(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Swapper Suite")
+}
 
 func Setup(PRIV_KEY_1, PRIV_KEY_2 string) (common.Address, common.Address) {
 	// PRIV_KEY_1 := os.Getenv("PRIV_KEY_1")

@@ -1,4 +1,4 @@
-package tests_test
+package swapper_test
 
 import (
 	"crypto/rand"
@@ -50,7 +50,7 @@ var _ = Describe("Ethereum to Bitcoin", func() {
 		//eth:0x70997970C51812dc3A010C7d01b50e0d17dc79C8 btc:myS2zesC4Va7ofV5MtnqZDct8iZdaBzULE
 		ETH_ATOMICSWAP := common.HexToAddress("0x9CC8B5379C40E24F374cd55973c138fff83ed214")
 		TOKEN := common.HexToAddress("0x87c470437282174b3f8368c7CF1Ac03bcAe57954")
-		// ETH_ATOMICSWAP, TOKEN := tests.Setup(PRIV_KEY_1, PRIV_KEY_2) //fails with Method eth_maxPriorityFeePerGas not found (hardhat issue)
+		// ETH_ATOMICSWAP, TOKEN := Setup(PRIV_KEY_1, PRIV_KEY_2) //fails with Method eth_maxPriorityFeePerGas not found (hardhat issue)
 
 		btcPrivKeyBytes1, _ := hex.DecodeString(PRIV_KEY_1)
 		btcPrivKey1, _ := btcec.PrivKeyFromBytes(btcPrivKeyBytes1)
