@@ -24,9 +24,6 @@ func main() {
 			model.BitcoinRegtest:   "http://localhost:30000",
 			model.EthereumLocalnet: "http://localhost:8545",
 		},
-		DEPLOYERS: map[model.Chain]string{
-			model.EthereumLocalnet: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
-		},
 	}
 
 	watcher := watcher.NewWatcher(store, config)

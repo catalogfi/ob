@@ -47,12 +47,12 @@ func (w *watcher) Run() {
 
 func (w *watcher) watch(order model.Order) error {
 
-	iW, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config.RPC, w.config.DEPLOYERS)
+	iW, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config.RPC)
 	if err != nil {
 		return err
 	}
 
-	fW, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config.RPC, w.config.DEPLOYERS)
+	fW, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config.RPC)
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func (w *watcher) watch(order model.Order) error {
 	}
 
 	if order.Status == model.FollowerAtomicSwapRedeemed {
-	
+
 		expired, err := iW.Expired()
 		if err != nil {
 			return err
