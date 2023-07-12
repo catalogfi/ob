@@ -10,10 +10,10 @@ import (
 )
 
 type Config struct {
-	PORT    string
-	PSQL_DB string
-	BTC_RPC string
-	ETH_RPC string
+	BTC_RPC         string
+	ETH_RPC         string
+	BTC_TESTNET_RPC string
+	ETH_SEPOLIA_RPC string
 }
 
 func LoadConfiguration(file string) Config {
@@ -29,11 +29,13 @@ func LoadConfiguration(file string) Config {
 }
 
 func main() {
-	envConfig := LoadConfiguration("./config.json")
+	envConfig := LoadConfiguration("../../config.json")
 	if err := cobi.Run(model.Config{
 		RPC: map[model.Chain]string{
-			model.BitcoinTestnet:  envConfig.BTC_RPC,
-			model.EthereumSepolia: envConfig.ETH_RPC,
+			model.Bitcoin:         envConfig.BTC_RPC,
+			model.BitcoinTestnet:  envConfig.BTC_TESTNET_RPC,
+			model.EthereumSepolia: envConfig.ETH_SEPOLIA_RPC,
+			model.Ethereum:        envConfig.ETH_RPC,
 		},
 	}); err != nil {
 		fmt.Println(err)
