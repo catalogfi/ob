@@ -8,21 +8,21 @@ import (
 	"github.com/susruth/wbtc-garden/rest"
 	"github.com/susruth/wbtc-garden/store"
 	"github.com/susruth/wbtc-garden/watcher"
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 func main() {
 	// psql db
-	store, err := store.New(sqlite.Open("wbtc_garden.db"), &gorm.Config{})
+	store, err := store.New(postgres.Open(os.Getenv("PSQL_DB")), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
 
 	config := model.Config{
 		RPC: map[model.Chain]string{
-			model.BitcoinTestnet:   os.Getenv("BTC_RPC"),
-			model.EthereumLocalnet: os.Getenv("ETH_RPC"),
+			model.BitcoinRegtest:   "http://localhost:30000",
+			model.EthereumLocalnet: "http://localhost:8545",
 		},
 	}
 
