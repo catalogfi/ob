@@ -54,9 +54,13 @@ func NewServer(store Store, config model.Config, secret string) *Server {
 }
 
 func (s *Server) Run(addr string) error {
-	config := cors.DefaultConfig()
-	config.AllowAllOrigins = true
-	s.router.Use(cors.New(config))
+	s.router.Use(cors.New(cors.Config{
+		AllowAllOrigins:  true,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
 
 	authRoutes := s.router.Group("/")
 	authRoutes.Use(s.authenticateJWT)
