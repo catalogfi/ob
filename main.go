@@ -14,15 +14,15 @@ import (
 
 func main() {
 	// psql db
-	store, err := store.New(sqlite.Open("test.db"), &gorm.Config{})
+	store, err := store.New(sqlite.Open("wbtc_garden.db"), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
 
 	config := model.Config{
 		RPC: map[model.Chain]string{
-			model.BitcoinRegtest:   "http://localhost:30000",
-			model.EthereumLocalnet: "http://localhost:8545",
+			model.BitcoinTestnet:   os.Getenv("BTC_RPC"),
+			model.EthereumLocalnet: os.Getenv("ETH_RPC"),
 		},
 	}
 
