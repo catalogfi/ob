@@ -54,6 +54,8 @@ func NewServer(store Store, config model.Config, secret string) *Server {
 }
 
 func (s *Server) Run(addr string) error {
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true
 	s.router.Use(cors.Default())
 
 	authRoutes := s.router.Group("/")

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -12,24 +13,44 @@ import (
 	"gorm.io/gorm"
 )
 
+type Config struct {
+	PORT    string
+	PSQL_DB string
+	BTC_RPC string
+	ETH_RPC string
+}
+
+func LoadConfiguration(file string) Config {
+	var config Config
+	configFile, err := os.Open(file)
+	if err != nil {
+		panic(err)
+	}
+	defer configFile.Close()
+	jsonParser := json.NewDecoder(configFile)
+	jsonParser.Decode(&config)
+	return config
+}
 func main() {
 	// psql db
-	store, err := store.New(postgres.Open(os.Getenv("PSQL_DB")), &gorm.Config{})
+	envConfig := LoadConfiguration("./config.json")
+	fmt.Println(envConfig.PSQL_DB)
+	store, err := store.New(postgres.Open(envConfig.PSQL_DB), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
 
 	config := model.Config{
 		RPC: map[model.Chain]string{
-			model.BitcoinTestnet:  os.Getenv("BTC_RPC"),
-			model.EthereumSepolia: os.Getenv("ETH_RPC"),
+			model.BitcoinTestnet:  envConfig.BTC_RPC,
+			model.EthereumSepolia: envConfig.ETH_RPC,
 		},
 	}
 
 	watcher := watcher.NewWatcher(store, config)
 	go watcher.Run()
 	server := rest.NewServer(store, config, "SECRET")
-	if err := server.Run(fmt.Sprintf(":%s", os.Getenv("PORT"))); err != nil {
+	if err := server.Run(fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}
 }
