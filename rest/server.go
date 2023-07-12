@@ -4,13 +4,23 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"github.com/spruceid/siwe-go"
 	"github.com/susruth/wbtc-garden/model"
 )
+
+var upgrader = websocket.Upgrader{
+	//check origin will check the cross region source (note : please not using in production)
+	CheckOrigin: func(r *http.Request) bool {
+		// TODO: add better origin checks
+		return true
+	},
+}
 
 type Server struct {
 	router *gin.Engine
@@ -54,6 +64,7 @@ func (s *Server) Run(addr string) error {
 			"status": "ok",
 		})
 	})
+	s.router.GET("/ws", s.Socket())
 	s.router.GET("/orders/:id", s.GetOrder())
 	s.router.GET("/orders", s.GetOrders())
 	s.router.GET("/nonce", s.Nonce())
@@ -119,6 +130,69 @@ func (s *Server) authenticateJWT(ctx *gin.Context) {
 	ctx.Next()
 }
 
+func (s *Server) Socket() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		//upgrade get request to websocket protocol
+		ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer ws.Close()
+		for {
+			//Read Message from client
+			mt, message, err := ws.ReadMessage()
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+
+			// json.Unmarshal(data []byte, v any)
+			vals := strings.Split(string(message), ":")
+			if vals[0] == "subscribe" {
+				val, err := strconv.ParseUint(vals[1], 10, 64)
+				if err != nil {
+					ws.WriteMessage(mt, []byte(err.Error()))
+					break
+				}
+				order, err := s.store.GetOrder(uint(val))
+				if err != nil {
+					fmt.Println(err)
+					break
+				}
+				if err := ws.WriteJSON(*order); err != nil {
+					fmt.Println(err)
+					break
+				}
+
+				for {
+					if order.Status >= model.OrderExecuted {
+						break
+					}
+					order2, err := s.store.GetOrder(uint(val))
+					if err != nil {
+						fmt.Println(err)
+						break
+					}
+					if order2.Status != order.Status {
+						if err := ws.WriteJSON(*order2); err != nil {
+							fmt.Println(err)
+							break
+						}
+						order = order2
+					}
+				}
+			}
+
+			//Response message to client
+			err = ws.WriteMessage(mt, message)
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+		}
+	}
+}
 func (s *Server) PostOrders() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		creator, exists := c.Get("userWallet")
