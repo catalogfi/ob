@@ -101,10 +101,11 @@ type Order struct {
 	InitiatorAtomicSwap   *AtomicSwap `json:"initiatorAtomicSwap" gorm:"foreignKey:InitiatorAtomicSwapID"`
 	FollowerAtomicSwap    *AtomicSwap `json:"followerAtomicSwap" gorm:"foreignKey:FollowerAtomicSwapID"`
 
-	SecretHash string  `json:"secretHash"`
-	Secret     string  `json:"secret"`
-	Price      float64 `json:"price"`
-	Status     Status  `json:"status"`
+	SecretHash  string  `json:"secretHash"`
+	Secret      string  `json:"secret"`
+	Price       float64 `json:"price"`
+	Status      Status  `json:"status"`
+	SecretNonce uint64  `json:"secretNonce"`
 }
 
 type AtomicSwap struct {

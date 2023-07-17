@@ -52,7 +52,12 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		Amount:          recieveAmount,
 	}
 
-	
+	fmt.Println(creator, "address")
+
+	orders, err := s.FilterOrders(creator, "", "", "", "", 0, 0, 0, 0, 0, false)
+	if err != nil {
+		return 0, err
+	}
 
 	sendAmt, ok := new(big.Int).SetString(sendAmount, 10)
 	if !ok {
@@ -64,7 +69,6 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		return 0, fmt.Errorf("invalid recieve amount: %s", recieveAmount)
 	}
 
-	
 	// validate orderpair
 	fromChain, toChain, _, _, err := model.ParseOrderPair(orderPair)
 	if err != nil {
@@ -76,7 +80,6 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 	if _, err := blockchain.CalculateExpiry(toChain, false, urls); err != nil {
 		return 0, err
 	}
-
 
 	// ignoring accuracy
 	price, _ := new(big.Float).Quo(new(big.Float).SetInt(sendAmt), new(big.Float).SetInt(recieveAmt)).Float64()
@@ -91,8 +94,9 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		Price:                 price,
 		SecretHash:            secretHash,
 		Status:                model.OrderCreated,
+		SecretNonce:           uint64(len(orders)) + 1,
 	}
-	
+
 	if tx := s.db.Create(&initiatorAtomicSwap); tx.Error != nil {
 		return 0, tx.Error
 	}
@@ -261,8 +265,7 @@ func (s *store) GetOrder(orderID uint) (*model.Order, error) {
 }
 
 func (s *store) UpdateOrder(order *model.Order) error {
-	
-	
+
 	if tx := s.db.Save(order.FollowerAtomicSwap); tx.Error != nil {
 		return tx.Error
 	}
