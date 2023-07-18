@@ -54,7 +54,7 @@ func GetAmount(client Client, redeemerAddr, initiatorAddr btcutil.Address, secre
 	return balance, nil
 }
 
-func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerAddr btcutil.Address, secretHash []byte, waitBlocks int64, amount uint64, client Client) (swapper.InitiatorSwap, error) {
+func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerAddr btcutil.Address, secretHash []byte, waitBlocks int64, minConfirmations, amount uint64, client Client) (swapper.InitiatorSwap, error) {
 	initiatorAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(initiator.PubKey().SerializeCompressed()), client.Net())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create initiator address: %w", err)
@@ -72,7 +72,7 @@ func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerAddr btcutil.Address,
 
 	fmt.Println("script address:", scriptAddr.EncodeAddress())
 
-	watcher, err := NewWatcher(initiatorAddr, redeemerAddr, secretHash, waitBlocks, amount, client)
+	watcher, err := NewWatcher(initiatorAddr, redeemerAddr, secretHash, waitBlocks, amount, minConfirmations, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create watcher: %w", err)
 	}
@@ -131,13 +131,13 @@ type redeemerSwap struct {
 	client     Client
 }
 
-func NewRedeemerSwap(redeemer *btcec.PrivateKey, initiator btcutil.Address, secretHash []byte, waitTime int64, amount uint64, client Client) (swapper.RedeemerSwap, error) {
+func NewRedeemerSwap(redeemer *btcec.PrivateKey, initiator btcutil.Address, secretHash []byte, waitBlocks int64, minConfirmations, amount uint64, client Client) (swapper.RedeemerSwap, error) {
 	redeemerAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(redeemer.PubKey().SerializeCompressed()), client.Net())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create redeemer address: %w", err)
 	}
 
-	htlcScript, err := NewHTLCScript(initiator, redeemerAddr, secretHash, waitTime)
+	htlcScript, err := NewHTLCScript(initiator, redeemerAddr, secretHash, waitBlocks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTLC script: %w", err)
 	}
@@ -148,7 +148,7 @@ func NewRedeemerSwap(redeemer *btcec.PrivateKey, initiator btcutil.Address, secr
 	}
 
 	fmt.Println("script address:", scriptAddr.EncodeAddress())
-	watcher, err := NewWatcher(initiator, redeemerAddr, secretHash, waitTime, amount, client)
+	watcher, err := NewWatcher(initiator, redeemerAddr, secretHash, waitBlocks, amount, minConfirmations, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create watcher: %w", err)
 	}
@@ -183,13 +183,14 @@ func (s *redeemerSwap) IsInitiated() (bool, []string, error) {
 }
 
 type watcher struct {
-	client     Client
-	scriptAddr btcutil.Address
-	amount     uint64
-	waitBlocks int64
+	client           Client
+	scriptAddr       btcutil.Address
+	amount           uint64
+	waitBlocks       int64
+	minConfirmations uint64
 }
 
-func NewWatcher(initiator, redeemerAddr btcutil.Address, secretHash []byte, waitBlocks int64, amount uint64, client Client) (swapper.Watcher, error) {
+func NewWatcher(initiator, redeemerAddr btcutil.Address, secretHash []byte, waitBlocks int64, minConfirmations, amount uint64, client Client) (swapper.Watcher, error) {
 	htlcScript, err := NewHTLCScript(initiator, redeemerAddr, secretHash, waitBlocks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTLC script: %w", err)
@@ -201,7 +202,7 @@ func NewWatcher(initiator, redeemerAddr btcutil.Address, secretHash []byte, wait
 	}
 
 	fmt.Println("script address:", scriptAddr.EncodeAddress())
-	return &watcher{scriptAddr: scriptAddr, amount: amount, waitBlocks: waitBlocks, client: client}, nil
+	return &watcher{scriptAddr: scriptAddr, amount: amount, waitBlocks: waitBlocks, minConfirmations: minConfirmations, client: client}, nil
 }
 
 func (w *watcher) Expired() (bool, error) {
@@ -231,7 +232,7 @@ func (w *watcher) IsInitiated() (bool, []string, error) {
 	if bal >= w.amount && len(utxos) > 0 {
 		txHashes := make([]string, len(utxos))
 		for i, utxo := range utxos {
-			final, err := w.client.IsFinal(utxo.TxID)
+			final, err := w.client.IsFinal(utxo.TxID, w.minConfirmations)
 			if err != nil {
 				return false, nil, fmt.Errorf("failed to check if final: %w", err)
 			}

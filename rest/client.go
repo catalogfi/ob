@@ -25,6 +25,7 @@ type Client interface {
 	GetFollowerRedeemOrders() ([]model.Order, error)
 	GetInitiatorInitiateOrders() ([]model.Order, error)
 	GetInitiatorRedeemOrders() ([]model.Order, error)
+	GetLockedValue(user string, chain string) (int64, error)
 	SetJwt(token string) error
 	Health() (string, error)
 	GetNonce() (string, error)
@@ -255,7 +256,21 @@ func (c *client) GetInitiatorRedeemOrders() ([]model.Order, error) {
 	}
 	return orders, nil
 }
+func (c *client) GetLockedValue(user string, chain string) (int64, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/getValueLocked?userWallet=%s&chainSelector=%s", c.url, user, chain))
+	if err != nil {
+		return 0, fmt.Errorf("failed to get valueLocked: %v", err)
+	}
+	defer resp.Body.Close()
 
+	var payload struct {
+		Value int64 `json:"value"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return 0, fmt.Errorf("failed to decode value: %v", err)
+	}
+	return payload.Value, nil
+}
 func (c *client) Health() (string, error) {
 	resp, err := http.Get(fmt.Sprintf("%s/health", c.url))
 	if err != nil {

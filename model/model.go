@@ -1,6 +1,7 @@
 package model
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"strings"
@@ -120,6 +121,47 @@ type AtomicSwap struct {
 	InitiateTxHash   string `json:"initiateTxHash"`
 	RedeemTxHash     string `json:"redeemTxHash"`
 	RefundTxHash     string `json:"refundTxHash"`
+}
+
+type LockedAmount struct {
+	Asset  string
+	Amount sql.NullInt64
+}
+
+func CombineAndAddAmount(arr1, arr2 []LockedAmount) []LockedAmount {
+	combinedMap := make(map[string]sql.NullInt64)
+
+	for _, item := range arr1 {
+		if _, ok := combinedMap[item.Asset]; ok {
+			combinedMap[item.Asset] = sql.NullInt64{
+				Int64: combinedMap[item.Asset].Int64 + item.Amount.Int64,
+				Valid: true,
+			}
+		} else {
+			combinedMap[item.Asset] = item.Amount
+		}
+	}
+
+	for _, item := range arr2 {
+		if _, ok := combinedMap[item.Asset]; ok {
+			combinedMap[item.Asset] = sql.NullInt64{
+				Int64: combinedMap[item.Asset].Int64 + item.Amount.Int64,
+				Valid: true,
+			}
+		} else {
+			combinedMap[item.Asset] = item.Amount
+		}
+	}
+
+	var combinedArray []LockedAmount
+	for asset, amount := range combinedMap {
+		combinedArray = append(combinedArray, LockedAmount{
+			Asset:  asset,
+			Amount: amount,
+		})
+	}
+
+	return combinedArray
 }
 
 type StringArray []string

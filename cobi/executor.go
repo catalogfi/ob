@@ -51,7 +51,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 
 				for _, order := range orders {
 					fmt.Println(order, entropy, account, config, store)
-					if err := handleInitiatorInitiateOrder(order, entropy, account, config, store); err != nil {
+					if err := handleInitiatorInitiateOrder(order, entropy, account, config, store, client); err != nil {
 						fmt.Println(err)
 						continue
 					}
@@ -63,7 +63,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 					continue
 				}
 				for _, order := range orders {
-					if err := handleFollowerInitiateOrder(order, entropy, account, config, store); err != nil {
+					if err := handleFollowerInitiateOrder(order, entropy, account, config, store, client); err != nil {
 						fmt.Println(err)
 						continue
 					}
@@ -86,7 +86,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 						fmt.Println(err)
 						continue
 					}
-					if err := handleInitiatorRedeemOrder(order, entropy, account, config, store, secretBytes); err != nil {
+					if err := handleInitiatorRedeemOrder(order, entropy, account, config, store, secretBytes, client); err != nil {
 						fmt.Println(err)
 						continue
 					}
@@ -98,7 +98,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 					continue
 				}
 				for _, order := range orders {
-					if err := handleFollowerRedeemOrder(order, entropy, account, config, store); err != nil {
+					if err := handleFollowerRedeemOrder(order, entropy, account, config, store, client); err != nil {
 						fmt.Println(err)
 						continue
 					}
@@ -115,7 +115,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 	return cmd
 }
 
-func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store) error {
+func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store, client rest.Client) error {
 	fromChain, _, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
 		return err
@@ -129,7 +129,14 @@ func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32
 	if status == InitiatorInitiated {
 		return nil
 	}
-	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC)
+	// value, err := client.GetLockedValue(order.Maker, string(order.InitiatorAtomicSwap.Chain))
+	// if err != nil {
+	// 	return err
+	// }
+	// minConfirmations := GetMinConfirmations(value, order.InitiatorAtomicSwap.Chain)
+	// fmt.Println("confirmations", minConfirmations)
+
+	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC, uint64(0))
 	if err != nil {
 		return err
 	}
@@ -144,7 +151,7 @@ func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32
 	return nil
 }
 
-func handleInitiatorRedeemOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store, secret []byte) error {
+func handleInitiatorRedeemOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store, secret []byte, client rest.Client) error {
 	_, toChain, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
 		return err
@@ -158,8 +165,14 @@ func handleInitiatorRedeemOrder(order model.Order, entropy []byte, user uint32, 
 	if status == InitiatorRedeemed {
 		return nil
 	}
+	// value, err := client.GetLockedValue(order.Maker, string(order.InitiatorAtomicSwap.Chain))
+	// if err != nil {
+	// 	return err
+	// }
+	// minConfirmations := GetMinConfirmations(value, order.InitiatorAtomicSwap.Chain)
+	// fmt.Println("confirmations", minConfirmations)
 
-	redeemerSwap, err := blockchain.LoadRedeemerSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC)
+	redeemerSwap, err := blockchain.LoadRedeemerSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC, uint64(0))
 	if err != nil {
 		return err
 	}
@@ -175,7 +188,7 @@ func handleInitiatorRedeemOrder(order model.Order, entropy []byte, user uint32, 
 	return nil
 }
 
-func handleFollowerInitiateOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store) error {
+func handleFollowerInitiateOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store, client rest.Client) error {
 	_, toChain, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
 		return err
@@ -189,8 +202,14 @@ func handleFollowerInitiateOrder(order model.Order, entropy []byte, user uint32,
 	if status == FollowerInitiated {
 		return nil
 	}
+	// value, err := client.GetLockedValue(order.Taker, string(order.FollowerAtomicSwap.Chain))
+	// if err != nil {
+	// 	return err
+	// }
+	// minConfirmations := GetMinConfirmations(value, order.InitiatorAtomicSwap.Chain)
+	// fmt.Println("confirmations", minConfirmations)
 
-	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC)
+	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC, uint64(0))
 	if err != nil {
 		return err
 	}
@@ -205,7 +224,7 @@ func handleFollowerInitiateOrder(order model.Order, entropy []byte, user uint32,
 	return nil
 }
 
-func handleFollowerRedeemOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store) error {
+func handleFollowerRedeemOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store, client rest.Client) error {
 	fromChain, _, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
 		return err
@@ -219,8 +238,15 @@ func handleFollowerRedeemOrder(order model.Order, entropy []byte, user uint32, c
 	if status == FollowerRedeemed {
 		return nil
 	}
+	// value, err := client.GetLockedValue(order.Taker, string(order.InitiatorAtomicSwap.Chain))
+	// if err != nil {
+	// 	return err
+	// }
 
-	redeemerSwap, err := blockchain.LoadRedeemerSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC)
+	// minConfirmations := GetMinConfirmations(value, order.FollowerAtomicSwap.Chain)
+	// fmt.Println("confirmations", minConfirmations)
+
+	redeemerSwap, err := blockchain.LoadRedeemerSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC, uint64(0))
 	if err != nil {
 		return err
 	}
@@ -240,3 +266,48 @@ func handleFollowerRedeemOrder(order model.Order, entropy []byte, user uint32, c
 	fmt.Println("Follower redeemed swap", txHash)
 	return nil
 }
+
+// func GetMinConfirmations(value int64, chain model.Chain) uint64 {
+// 	if chain.IsBTC() {
+// 		switch {
+// 		case value < 10000:
+// 			return 1
+
+// 		case value < 100000:
+// 			return 2
+
+// 		case value < 1000000:
+// 			return 4
+
+// 		case value < 10000000:
+// 			return 6
+
+// 		case value < 100000000:
+// 			return 8
+
+// 		default:
+// 			return 12
+// 		}
+// 	} else if chain.IsEVM() {
+// 		switch {
+// 		case value < 10000:
+// 			return 6
+
+// 		case value < 100000:
+// 			return 12
+
+// 		case value < 1000000:
+// 			return 18
+
+// 		case value < 10000000:
+// 			return 24
+
+// 		case value < 100000000:
+// 			return 30
+
+// 		default:
+// 			return 100
+// 		}
+// 	}
+// 	return 0
+// }

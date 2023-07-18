@@ -20,7 +20,6 @@ import (
 
 const BTC_VERSION = 2
 
-
 type UTXO struct {
 	Amount uint64 `json:"value"`
 	TxID   string `json:"txid"`
@@ -36,7 +35,7 @@ type Client interface {
 	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
 	Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error)
 	Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error)
-	IsFinal(txHash string) (bool, error)
+	IsFinal(txHash string, waitPeriod uint64) (bool, error)
 	Net() *chaincfg.Params
 }
 
@@ -60,7 +59,7 @@ const (
 	Taproot
 )
 
-//function to calculate fee on bitcoin chain for a transaction
+// function to calculate fee on bitcoin chain for a transaction
 func (c *client) CalculateFee(nInputs, nOutputs int, txType TxType) (uint64, error) {
 	var feeRates FeeRates
 	resp, err := http.Get("https://mempool.space/api/v1/fees/recommended")
@@ -74,7 +73,7 @@ func (c *client) CalculateFee(nInputs, nOutputs int, txType TxType) (uint64, err
 
 	switch txType {
 	case Legacy:
-		// inputs + 1 to account for input that might be used for fee 
+		// inputs + 1 to account for input that might be used for fee
 		// but if fee is already accounted in the selected utxos it will just lead to a slighty speedy transaction
 		return uint64((nInputs+1)*148+nOutputs*34+10) * (uint64(feeRates.HalfHourFee)), nil
 	case SegWit:
@@ -297,8 +296,6 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}
 
-	
-
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to send transaction: %s", resp.Status)
 	}
@@ -310,9 +307,19 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 	return string(data), nil
 }
 
-func (client *client) IsFinal(txHash string) (bool, error) {
-	// TODO: add confirmation checks
-	return true, nil
+func (client *client) IsFinal(txHash string, waitPeriod uint64) (bool, error) {
+	minedBlock, err := client.GetBlockHeight(txHash)
+	if err != nil {
+		return false, fmt.Errorf("failed to get block height: %w", err)
+	}
+	currentBlock, err := client.GetTipBlockHeight()
+	if err != nil {
+		return false, fmt.Errorf("failed to get block height: %w", err)
+	}
+	if currentBlock-minedBlock >= waitPeriod {
+		return true, nil
+	}
+	return false, nil
 }
 
 type Transaction struct {

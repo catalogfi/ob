@@ -44,9 +44,9 @@ func (client *instantClient) Spend(script []byte, scriptSig wire.TxWitness, spen
 	panic("not implemented")
 }
 
-func (client *instantClient) IsFinal(txHash string) (bool, error) {
+func (client *instantClient) IsFinal(txHash string, waitBlocks uint64) (bool, error) {
 	// TODO: check whether it is an instant wallet transaction, if it is return true, nil
 	panic("not implemented")
 
-	return client.indexerClient.IsFinal(txHash)
+	// return client.indexerClient.IsFinal(txHash,waitBlocks)
 }
