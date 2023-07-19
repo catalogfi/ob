@@ -20,8 +20,6 @@ func main() {
 		RPC: map[model.Chain]string{
 			model.BitcoinRegtest:   "http://localhost:30000",
 			model.EthereumLocalnet: "http://localhost:8545",
-			model.BitcoinTestnet:   "https://mempool.space/testnet/api",
-			model.EthereumSepolia:  "https://sepolia.infura.io/v3/015382ef33f947959eaead702b59eb6f",
 		},
 	}
 

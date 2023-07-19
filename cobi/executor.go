@@ -51,7 +51,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 
 				for _, order := range orders {
 					fmt.Println(order, entropy, account, config, store)
-					if err := handleInitiatorInitiateOrder(order, entropy, account, config, store, client); err != nil {
+					if err := handleInitiatorInitiateOrder(order, entropy, account, config, store); err != nil {
 						fmt.Println(err)
 						continue
 					}
@@ -63,7 +63,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 					continue
 				}
 				for _, order := range orders {
-					if err := handleFollowerInitiateOrder(order, entropy, account, config, store, client); err != nil {
+					if err := handleFollowerInitiateOrder(order, entropy, account, config, store); err != nil {
 						fmt.Println(err)
 						continue
 					}
@@ -86,7 +86,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 						fmt.Println(err)
 						continue
 					}
-					if err := handleInitiatorRedeemOrder(order, entropy, account, config, store, secretBytes, client); err != nil {
+					if err := handleInitiatorRedeemOrder(order, entropy, account, config, store, secretBytes); err != nil {
 						fmt.Println(err)
 						continue
 					}
@@ -98,7 +98,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 					continue
 				}
 				for _, order := range orders {
-					if err := handleFollowerRedeemOrder(order, entropy, account, config, store, client); err != nil {
+					if err := handleFollowerRedeemOrder(order, entropy, account, config, store); err != nil {
 						fmt.Println(err)
 						continue
 					}
@@ -115,7 +115,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 	return cmd
 }
 
-func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store, client rest.Client) error {
+func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store) error {
 	fromChain, _, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
 		return err
@@ -145,7 +145,7 @@ func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32
 	return nil
 }
 
-func handleInitiatorRedeemOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store, secret []byte, client rest.Client) error {
+func handleInitiatorRedeemOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store, secret []byte) error {
 	_, toChain, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
 		return err
@@ -176,7 +176,7 @@ func handleInitiatorRedeemOrder(order model.Order, entropy []byte, user uint32, 
 	return nil
 }
 
-func handleFollowerInitiateOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store, client rest.Client) error {
+func handleFollowerInitiateOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store) error {
 	_, toChain, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
 		return err
@@ -206,7 +206,7 @@ func handleFollowerInitiateOrder(order model.Order, entropy []byte, user uint32,
 	return nil
 }
 
-func handleFollowerRedeemOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store, client rest.Client) error {
+func handleFollowerRedeemOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store) error {
 	fromChain, _, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
 		return err
