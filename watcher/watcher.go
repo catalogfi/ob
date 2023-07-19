@@ -154,8 +154,15 @@ func (w *watcher) watch(order model.Order) error {
 		}
 	}
 
-	if order.InitiatorAtomicSwap.RefundTxHash != "" && order.FollowerAtomicSwap.InitiateTxHash != "" && order.InitiatorAtomicSwap.RedeemTxHash==""{
-		
+	if (order.InitiatorAtomicSwap.RedeemTxHash != "" || order.FollowerAtomicSwap.RedeemTxHash != "") && (order.FollowerAtomicSwap.RefundTxHash != "" || order.InitiatorAtomicSwap.RefundTxHash != "") {
+		order.Status = model.OrderFailedHard
+		if err := w.store.UpdateOrder(&order); err != nil {
+			return err
+		}
+	}
+
+	if order.InitiatorAtomicSwap.RefundTxHash != "" && order.FollowerAtomicSwap.InitiateTxHash != "" && order.InitiatorAtomicSwap.RedeemTxHash == "" {
+
 		order.Status = model.OrderFailedSoft
 		if err := w.store.UpdateOrder(&order); err != nil {
 			return err
@@ -164,13 +171,6 @@ func (w *watcher) watch(order model.Order) error {
 
 	if order.InitiatorAtomicSwap.RedeemTxHash == "" && order.FollowerAtomicSwap.RedeemTxHash == "" && order.FollowerAtomicSwap.RefundTxHash != "" && order.InitiatorAtomicSwap.RefundTxHash != "" {
 		order.Status = model.OrderFailedSoft
-		if err := w.store.UpdateOrder(&order); err != nil {
-			return err
-		}
-	}
-
-	if (order.InitiatorAtomicSwap.RedeemTxHash != "" || order.FollowerAtomicSwap.RedeemTxHash != "") && (order.FollowerAtomicSwap.RefundTxHash != "" || order.InitiatorAtomicSwap.RefundTxHash != "") {
-		order.Status = model.OrderFailedHard
 		if err := w.store.UpdateOrder(&order); err != nil {
 			return err
 		}
