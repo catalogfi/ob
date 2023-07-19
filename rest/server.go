@@ -32,7 +32,7 @@ type Server struct {
 
 type Store interface {
 	// create order
-	CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string, urls map[model.Chain]string) (uint, error)
+	CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string, userWalletBTCAddress string, urls map[model.Chain]string) (uint, error)
 	// fill order
 	FillOrder(orderID uint, filler, sendAddress, recieveAddress string, urls map[model.Chain]string) error
 	// get order by id
@@ -84,12 +84,13 @@ func (s *Server) Run(addr string) error {
 }
 
 type CreateOrder struct {
-	SendAddress    string `json:"sendAddress"`
-	RecieveAddress string `json:"recieveAddress"`
-	OrderPair      string `json:"orderPair"`
-	SendAmount     string `json:"sendAmount"`
-	RecieveAmount  string `json:"recieveAmount"`
-	SecretHash     string `json:"secretHash"`
+	SendAddress          string `json:"sendAddress"`
+	RecieveAddress       string `json:"recieveAddress"`
+	OrderPair            string `json:"orderPair"`
+	SendAmount           string `json:"sendAmount"`
+	RecieveAmount        string `json:"recieveAmount"`
+	SecretHash           string `json:"secretHash"`
+	UserWalletBTCAddress string `json:"userWalletBTCAddress"`
 }
 
 type Auth interface {
@@ -212,7 +213,7 @@ func (s *Server) PostOrders() gin.HandlerFunc {
 			return
 		}
 
-		oid, err := s.store.CreateOrder(creator.(string), req.SendAddress, req.RecieveAddress, req.OrderPair, req.SendAmount, req.RecieveAmount, req.SecretHash, s.config.RPC)
+		oid, err := s.store.CreateOrder(creator.(string), req.SendAddress, req.RecieveAddress, req.OrderPair, req.SendAmount, req.RecieveAmount, req.SecretHash, req.UserWalletBTCAddress, s.config.RPC)
 		if err != nil {
 			errorMessage := fmt.Sprintf("failed to create order: %v", err.Error())
 			c.JSON(http.StatusBadRequest, gin.H{

@@ -32,7 +32,7 @@ func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 	return &store{db: db}, nil
 }
 
-func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string, urls map[model.Chain]string) (uint, error) {
+func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string, userWalletBTCAddress string, urls map[model.Chain]string) (uint, error) {
 	sendChain, recieveChain, sendAsset, recieveAsset, err := model.ParseOrderPair(orderPair)
 	if err != nil {
 		return 0, err
@@ -95,6 +95,7 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		SecretHash:            secretHash,
 		Status:                model.OrderCreated,
 		SecretNonce:           uint64(len(orders)) + 1,
+		UserWalletBTCAddress:  userWalletBTCAddress,
 	}
 
 	if tx := s.db.Create(&initiatorAtomicSwap); tx.Error != nil {
