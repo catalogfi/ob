@@ -2,7 +2,6 @@ package price
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
 	"net/http"
 
@@ -27,8 +26,6 @@ func GetPriceInUSD(asset string, chain model.Chain) (float64, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		return 0, nil
 	}
-
-	fmt.Println(data[tokenId]["usd"], tokenId)
 	return data[tokenId]["usd"], nil
 
 }
