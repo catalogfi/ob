@@ -101,12 +101,11 @@ type Order struct {
 	InitiatorAtomicSwap   *AtomicSwap `json:"initiatorAtomicSwap" gorm:"foreignKey:InitiatorAtomicSwapID"`
 	FollowerAtomicSwap    *AtomicSwap `json:"followerAtomicSwap" gorm:"foreignKey:FollowerAtomicSwapID"`
 
-	SecretHash           string  `json:"secretHash"`
-	Secret               string  `json:"secret"`
-	Price                float64 `json:"price"`
-	Status               Status  `json:"status"`
-	SecretNonce          uint64  `json:"secretNonce"`
-	UserWalletBTCAddress string  `json:"userWalletBTCAddress"`
+	SecretHash  string  `json:"secretHash" gorm:"unique;not null"`
+	Secret      string  `json:"secret" gorm:"unique;not null"`
+	Price       float64 `json:"price"`
+	Status      Status  `json:"status"`
+	SecretNonce uint64  `json:"secretNonce"`
 }
 
 type AtomicSwap struct {
@@ -118,9 +117,9 @@ type AtomicSwap struct {
 	Chain            Chain  `json:"chain"`
 	Asset            Asset  `json:"asset"`
 	Amount           string `json:"amount"`
-	InitiateTxHash   string `json:"initiateTxHash"`
-	RedeemTxHash     string `json:"redeemTxHash"`
-	RefundTxHash     string `json:"refundTxHash"`
+	InitiateTxHash   string `json:"initiateTxHash" gorm:"unique;not null"`
+	RedeemTxHash     string `json:"redeemTxHash" gorm:"unique;not null"`
+	RefundTxHash     string `json:"refundTxHash" gorm:"unique;not null"`
 }
 
 type StringArray []string
