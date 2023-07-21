@@ -102,7 +102,7 @@ type Order struct {
 	FollowerAtomicSwap    *AtomicSwap `json:"followerAtomicSwap" gorm:"foreignKey:FollowerAtomicSwapID"`
 
 	SecretHash           string  `json:"secretHash" gorm:"unique;not null"`
-	Secret               string  `json:"secret" gorm:"unique;not null"`
+	Secret               string  `json:"secret"`
 	Price                float64 `json:"price"`
 	Status               Status  `json:"status"`
 	SecretNonce          uint64  `json:"secretNonce"`
@@ -118,9 +118,9 @@ type AtomicSwap struct {
 	Chain            Chain  `json:"chain"`
 	Asset            Asset  `json:"asset"`
 	Amount           string `json:"amount"`
-	InitiateTxHash   string `json:"initiateTxHash" gorm:"unique"`
-	RedeemTxHash     string `json:"redeemTxHash" gorm:"unique"`
-	RefundTxHash     string `json:"refundTxHash" gorm:"unique"`
+	InitiateTxHash   string `json:"initiateTxHash" `
+	RedeemTxHash     string `json:"redeemTxHash" `
+	RefundTxHash     string `json:"refundTxHash" `
 }
 
 type StringArray []string
