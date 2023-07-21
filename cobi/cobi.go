@@ -33,7 +33,7 @@ func Run(config model.Config) error {
 
 	// cmd.AddCommand(Accounts(entropy))
 	cmd.AddCommand(Create(entropy, store))
-	cmd.AddCommand(Fill(entropy))
+	cmd.AddCommand(Fill(entropy, store))
 	cmd.AddCommand(Execute(entropy, store, config))
 	cmd.AddCommand(Accounts(entropy, config))
 	cmd.AddCommand(List())

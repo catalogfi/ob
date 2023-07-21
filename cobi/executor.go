@@ -43,10 +43,17 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 				fmt.Println("")
 				fmt.Println("ORDER")
 				fmt.Println("")
-				orders, err := client.GetInitiatorInitiateOrders()
+				var orders []model.Order
+				pendingOrders, err := client.GetInitiatorInitiateOrders()
 				if err != nil {
 					fmt.Println(err)
 					continue
+				}
+				for _, order := range pendingOrders {
+					if isValid := store.CheckStatus(order.SecretHash); !isValid {
+						continue
+					}
+					orders = append(orders, order)
 				}
 
 				for _, order := range orders {
@@ -135,6 +142,7 @@ func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32
 	}
 	txHash, err := initiatorSwap.Initiate()
 	if err != nil {
+		store.PutError(order.SecretHash, err.Error(), InitiatorFailedToInitiate)
 		return err
 	}
 	if err := store.PutStatus(order.SecretHash, InitiatorInitiated); err != nil {
@@ -165,6 +173,7 @@ func handleInitiatorRedeemOrder(order model.Order, entropy []byte, user uint32, 
 	}
 	txHash, err := redeemerSwap.Redeem(secret)
 	if err != nil {
+		store.PutError(order.SecretHash, err.Error(), InitiatorFailedToRedeem)
 		return err
 	}
 
@@ -196,6 +205,7 @@ func handleFollowerInitiateOrder(order model.Order, entropy []byte, user uint32,
 	}
 	txHash, err := initiatorSwap.Initiate()
 	if err != nil {
+		store.PutError(order.SecretHash, err.Error(), FollowerFailedToInitiate)
 		return err
 	}
 	if err := store.PutStatus(order.SecretHash, FollowerInitiated); err != nil {
@@ -232,6 +242,7 @@ func handleFollowerRedeemOrder(order model.Order, entropy []byte, user uint32, c
 
 	txHash, err := redeemerSwap.Redeem(secret)
 	if err != nil {
+		store.PutError(order.SecretHash, err.Error(), FollowerFailedToRedeem)
 		return err
 	}
 	if err := store.PutStatus(order.SecretHash, FollowerRedeemed); err != nil {
