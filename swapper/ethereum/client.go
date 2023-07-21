@@ -17,6 +17,10 @@ import (
 	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/ERC20"
 )
 
+var (
+	maxApproval = new(big.Int).Sub(new(big.Int).Exp(big.NewInt(2), big.NewInt(256), nil), big.NewInt(1))
+)
+
 type Client interface {
 	GetTransactOpts(privKey *ecdsa.PrivateKey) *bind.TransactOpts
 	GetCallOpts() *bind.CallOpts
@@ -109,11 +113,17 @@ func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecd
 	}
 	var hash [32]byte
 	copy(hash[:], secretHash)
-	// TODO : Batch approve and init
-	// consider infinite allowance
-	_, err = client.ApproveERC20(initiator, amount, token, contract)
+
+	val, err := client.Allowance(token, contract, client.GetPublicAddress(initiator))
 	if err != nil {
 		return "", err
+	}
+	if val.Cmp(amount) <= 0 {
+		txHash, err := client.ApproveERC20(initiator, maxApproval, token, contract)
+		if err != nil {
+			return "", err
+		}
+		return txHash, nil
 	}
 
 	auth := client.GetTransactOpts(initiator)
@@ -176,6 +186,18 @@ func (client *client) ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, t
 	}
 	fmt.Printf("Approving %v %s to %s txhash : %s\n", amount, tokenAddr, toAddr, tx.Hash().Hex())
 	return tx.Hash().Hex(), err
+}
+func (client *client) Allowance(tokenAddr common.Address, spender common.Address, owner common.Address) (*big.Int, error) {
+	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
+	if err != nil {
+		return nil, err
+	}
+	allowance, err := instance.Allowance(client.GetCallOpts(), owner, spender)
+	if err != nil {
+		return nil, err
+	}
+	return allowance, nil
+
 }
 func (client *client) GetCurrentBlock() (uint64, error) {
 	bn, err := client.provider.BlockNumber(context.Background())
