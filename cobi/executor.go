@@ -173,6 +173,11 @@ func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32
 		return nil
 	}
 
+	status := store.Status(order.SecretHash)
+	if status == InitiatorInitiated {
+		return nil
+	}
+
 	fromChain, _, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
 		return err
@@ -182,10 +187,6 @@ func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32
 		return err
 	}
 
-	status := store.Status(order.SecretHash)
-	if status == InitiatorInitiated {
-		return nil
-	}
 	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC)
 	if err != nil {
 		return err
@@ -214,6 +215,12 @@ func handleInitiatorRedeemOrRefundOrder(order model.Order, entropy []byte, user 
 		fmt.Printf(err)
 		return nil
 	}
+
+	status := store.Status(order.SecretHash)
+	if status == InitiatorRedeemed {
+		return nil
+	}
+
 	_, toChain, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
 		return err
@@ -221,11 +228,6 @@ func handleInitiatorRedeemOrRefundOrder(order model.Order, entropy []byte, user 
 	keys, err := getKeys(entropy, toChain, user, []uint32{0})
 	if err != nil {
 		return err
-	}
-
-	status := store.Status(order.SecretHash)
-	if status == InitiatorRedeemed {
-		return nil
 	}
 
 	redeemerSwap, err := blockchain.LoadRedeemerSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC)
@@ -250,6 +252,12 @@ func handleFollowerInitiateOrder(order model.Order, entropy []byte, user uint32,
 		fmt.Printf("Skipping order %d failed earlier with %s", order.ID, err)
 		return nil
 	}
+
+	status := store.Status(order.SecretHash)
+	if status == FollowerInitiated {
+		return nil
+	}
+
 	_, toChain, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
 		return err
@@ -257,11 +265,6 @@ func handleFollowerInitiateOrder(order model.Order, entropy []byte, user uint32,
 	keys, err := getKeys(entropy, toChain, user, []uint32{0})
 	if err != nil {
 		return err
-	}
-
-	status := store.Status(order.SecretHash)
-	if status == FollowerInitiated {
-		return nil
 	}
 
 	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC)
@@ -285,6 +288,12 @@ func handleFollowerRedeemOrder(order model.Order, entropy []byte, user uint32, c
 		fmt.Printf("Skipping order %d failed earlier with %s", order.ID, err)
 		return nil
 	}
+
+	status := store.Status(order.SecretHash)
+	if status == FollowerRedeemed {
+		return nil
+	}
+
 	fromChain, _, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
 		return err
@@ -292,11 +301,6 @@ func handleFollowerRedeemOrder(order model.Order, entropy []byte, user uint32, c
 	keys, err := getKeys(entropy, fromChain, user, []uint32{0})
 	if err != nil {
 		return err
-	}
-
-	status := store.Status(order.SecretHash)
-	if status == FollowerRedeemed {
-		return nil
 	}
 
 	redeemerSwap, err := blockchain.LoadRedeemerSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC)
@@ -321,6 +325,11 @@ func handleFollowerRedeemOrder(order model.Order, entropy []byte, user uint32, c
 	return nil
 }
 func handleFollowerRefund(order model.Order, entropy []byte, user uint32, config model.Config, store Store) error {
+	status := store.Status(order.SecretHash)
+	if status == FollowerRefunded {
+		return nil
+	}
+
 	if isValid, err := store.CheckStatus(order.SecretHash); !isValid {
 		fmt.Printf("Skipping order %d failed earlier with %s", order.ID, err)
 		return nil
@@ -332,11 +341,6 @@ func handleFollowerRefund(order model.Order, entropy []byte, user uint32, config
 	keys, err := getKeys(entropy, fromChain, user, []uint32{0})
 	if err != nil {
 		return err
-	}
-
-	status := store.Status(order.SecretHash)
-	if status == FollowerRedeemed {
-		return nil
 	}
 
 	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC)
@@ -364,6 +368,11 @@ func handleFollowerRefund(order model.Order, entropy []byte, user uint32, config
 }
 func handleInitiatorRefund(order model.Order, entropy []byte, user uint32, config model.Config, store Store) error {
 
+	status := store.Status(order.SecretHash)
+	if status == InitiatorRefunded {
+		return nil
+	}
+
 	if isValid, err := store.CheckStatus(order.SecretHash); !isValid {
 		fmt.Printf("Skipping order %d failed earlier with %s", order.ID, err)
 		return nil
@@ -378,10 +387,6 @@ func handleInitiatorRefund(order model.Order, entropy []byte, user uint32, confi
 		return err
 	}
 
-	status := store.Status(order.SecretHash)
-	if status == InitiatorInitiated {
-		return nil
-	}
 	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC)
 	if err != nil {
 		return err
