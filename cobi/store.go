@@ -1,6 +1,10 @@
 package cobi
 
-import "gorm.io/gorm"
+import (
+	"fmt"
+
+	"gorm.io/gorm"
+)
 
 type Status uint
 
@@ -10,8 +14,10 @@ const (
 	Filled
 	InitiatorInitiated
 	FollowerInitiated
-	FollowerRedeemed
 	InitiatorRedeemed
+	FollowerRedeemed
+	InitiatorRefunded
+	FollowerRefunded
 	FollowerFailedToInitiate
 	FollowerFailedToRedeem
 	FollowerFailedToRefund
@@ -25,7 +31,7 @@ type Order struct {
 
 	OrderId    uint64 `gorm:"unique; not null"`
 	SecretHash string `gorm:"unique; not null"`
-	Secret     string `gorm:"unique"`
+	Secret     string
 	Status     Status
 	Error      string
 }
@@ -36,7 +42,7 @@ type Store interface {
 	Secret(secretHash string) (string, error)
 	PutStatus(secretHash string, status Status) error
 	PutError(secretHash, err string, status Status) error
-	CheckStatus(secretHash string) bool
+	CheckStatus(secretHash string) (bool, string)
 	Status(secretHash string) Status
 }
 
@@ -66,16 +72,16 @@ func (s *store) PutSecretHash(secretHash string, orderId uint64) error {
 	}
 	return nil
 }
-func (s *store) CheckStatus(secretHash string) bool {
+func (s *store) CheckStatus(secretHash string) (bool, string) {
 	var order Order
 	if tx := s.db.Where("secret_hash = ?", secretHash).First(&order); tx.Error != nil {
-		return false
+		return false, fmt.Sprintf("Order not found in local storage")
 	}
 	if order.Status >= FollowerFailedToInitiate {
-		return false
+		return false, order.Error
 	}
 
-	return true
+	return true, ""
 
 }
 func (s *store) PutSecret(secretHash, secret string, orderId uint64) error {
