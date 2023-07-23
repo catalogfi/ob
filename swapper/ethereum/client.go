@@ -119,11 +119,10 @@ func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecd
 		return "", err
 	}
 	if val.Cmp(amount) <= 0 {
-		txHash, err := client.ApproveERC20(initiator, maxApproval, token, contract)
+		_, err := client.ApproveERC20(initiator, maxApproval, token, contract)
 		if err != nil {
 			return "", err
 		}
-		return txHash, nil
 	}
 
 	auth := client.GetTransactOpts(initiator)
@@ -185,6 +184,7 @@ func (client *client) ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, t
 		return "", err
 	}
 	fmt.Printf("Approving %v %s to %s txhash : %s\n", amount, tokenAddr, toAddr, tx.Hash().Hex())
+	bind.WaitMined(context.Background(), client.provider, tx)
 	return tx.Hash().Hex(), err
 }
 func (client *client) Allowance(tokenAddr common.Address, spender common.Address, owner common.Address) (*big.Int, error) {
