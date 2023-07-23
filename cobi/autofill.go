@@ -41,31 +41,31 @@ func AutoFill(entropy []byte) *cobra.Command {
 			vals, err := getKeys(entropy, model.Ethereum, account, []uint32{0})
 			if err != nil {
 				cobra.CheckErr(fmt.Sprintf("Error while getting the signing key: %v", err))
-				return
+
 			}
 			privKey := vals[0].(*ecdsa.PrivateKey)
 			client := rest.NewClient(url, privKey.D.Text(16))
 			token, err := client.Login()
 			if err != nil {
 				cobra.CheckErr(fmt.Sprintf("Error while getting the signing key: %v", err))
-				return
+
 			}
 			if err := client.SetJwt(token); err != nil {
 				cobra.CheckErr(fmt.Sprintf("Error to parse signing key: %v", err))
-				return
+
 			}
 
 			data, err := ioutil.ReadFile(strategy)
 			if err != nil {
-				fmt.Println("Error reading strategy.json:", err)
-				return
+				cobra.CheckErr(fmt.Errorf("error while reading strategy.json: %v", err))
+
 			}
 
 			var strategy Strategy
 			err = json.Unmarshal(data, &strategy)
 			if err != nil {
-				fmt.Println("Error parsing strategy.json:", err)
-				return
+				cobra.CheckErr(fmt.Errorf("error while unmarshalling strategy.json: %v", err))
+
 			}
 
 			if strategy.MaxFillOrders == 0 {
@@ -84,8 +84,8 @@ func AutoFill(entropy []byte) *cobra.Command {
 			totalOrdersFilled := 0
 			for {
 				if time.Now().Unix() > int64(strategy.MaxFillDeadline) {
-					fmt.Println("MaxFillDeadline reached")
-					return
+					cobra.CheckErr("Max fill deadline reached")
+
 				}
 				if (len(strategy.FromAsset) == 1 && strategy.FromAsset[0] == "any") || (len(strategy.ToAsset) == 1 && strategy.ToAsset[0] == "any") {
 					orders, err = GetAllAssets(
@@ -101,8 +101,8 @@ func AutoFill(entropy []byte) *cobra.Command {
 						strategy.OrderBy,
 					)
 					if err != nil {
-						fmt.Println("Error while getting orders:", err)
-						return
+						cobra.CheckErr(fmt.Errorf("Error while fetching Order: %v", err))
+
 					}
 				} else {
 					orders = make([]model.Order, 0)
@@ -122,7 +122,7 @@ func AutoFill(entropy []byte) *cobra.Command {
 							})
 							if err != nil {
 								cobra.CheckErr(fmt.Sprintf("Error while fetching Order: %v", err))
-								return
+
 							}
 							orders = append(orders, order...)
 						}
@@ -152,7 +152,7 @@ func AutoFill(entropy []byte) *cobra.Command {
 					}
 					totalOrdersFilled++
 					if totalOrdersFilled >= int(strategy.MaxFillOrders) {
-						fmt.Println("MaxFillOrders reached")
+						cobra.CheckErr("MaxFillOrders reached")
 
 					}
 					cobra.CheckErr(fmt.Sprintf("Filled order %d ✅", order.ID))
@@ -206,7 +206,7 @@ func GetAllAssets(
 		orderPair := order.OrderPair
 		FromChain, ToChain, FromAsset, ToAsset, err := model.ParseOrderPair(orderPair)
 		if err != nil {
-			// fmt.Println("Error while parsing order pair:", err)
+			fmt.Println("Error while parsing order pair:", err)
 			return nil, err
 		}
 		if (contains(fromAsset, string(FromAsset)) || contains(toAsset, string(ToAsset))) && string(FromChain) == fromChain && string(ToChain) == toChain {
