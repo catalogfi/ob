@@ -14,30 +14,30 @@ import (
 )
 
 type Strategy struct {
-	MaxFillOrders     uint      `json:"maxFillOrders"`
-	MaxFillDeadline   uint    `json:"maxFillDeadline"`
-	FromMaker         string   `json:"fromMaker"`
-	FromChain         string   `json:"fromChain"`
-	ToChain           string   `json:"toChain"`
-	FromAsset         []string `json:"fromAsset"`
-	ToAsset           []string `json:"toAsset"`
-	MinFillAmount     float64   `json:"minFillAmount"`
-	MaxFillAmount     float64   `json:"maxFillAmount"`
-	OrderBy           string   `json:"orderBy"`
-	FilterByPage      int      `json:"filterByPage"`
+	MaxFillOrders   uint     `json:"maxFillOrders"`
+	MaxFillDeadline uint     `json:"maxFillDeadline"`
+	FromMaker       string   `json:"fromMaker"`
+	FromChain       string   `json:"fromChain"`
+	ToChain         string   `json:"toChain"`
+	FromAsset       []string `json:"fromAsset"`
+	ToAsset         []string `json:"toAsset"`
+	MinFillAmount   float64  `json:"minFillAmount"`
+	MaxFillAmount   float64  `json:"maxFillAmount"`
+	OrderBy         string   `json:"orderBy"`
+	FilterByPage    int      `json:"filterByPage"`
 }
 
 func AutoFill(entropy []byte) *cobra.Command {
 	var (
-		url     string
-		account uint32
+		url      string
+		account  uint32
 		strategy string
 	)
 	var cmd = &cobra.Command{
 		Use:   "autofill",
 		Short: "fills the Orders based on strategy provided",
 		Run: func(c *cobra.Command, args []string) {
-			
+
 			vals, err := getKeys(entropy, model.Ethereum, account, []uint32{0})
 			if err != nil {
 				cobra.CheckErr(fmt.Sprintf("Error while getting the signing key: %v", err))
@@ -80,7 +80,6 @@ func AutoFill(entropy []byte) *cobra.Command {
 				strategy.FilterByPage = 100
 			}
 
-
 			var orders []model.Order
 			totalOrdersFilled := 0
 			for {
@@ -88,8 +87,8 @@ func AutoFill(entropy []byte) *cobra.Command {
 					fmt.Println("MaxFillDeadline reached")
 					return
 				}
-				if (len(strategy.FromAsset) == 0 && strategy.FromAsset[0] == "any") || len(strategy.FromAsset) == 0 && strategy.FromAsset[0] == "any" {
-					orders , err = GetAllAssets(
+				if (len(strategy.FromAsset) == 1 && strategy.FromAsset[0] == "any") || (len(strategy.ToAsset) == 1 && strategy.ToAsset[0] == "any") {
+					orders, err = GetAllAssets(
 						client,
 						strategy.FromMaker,
 						strategy.FromChain,
@@ -105,24 +104,24 @@ func AutoFill(entropy []byte) *cobra.Command {
 						fmt.Println("Error while getting orders:", err)
 						return
 					}
-				}else {
+				} else {
 					orders = make([]model.Order, 0)
 					for _, fromasset := range strategy.FromAsset {
 						for _, toAsset := range strategy.ToAsset {
-							orderPair := fmt.Sprintf("%s:%s-%s:%s",strategy.FromChain , fromasset, strategy.ToChain , toAsset)
-							fmt.Println("OrderPair:", orderPair)
-							order , err := client.GetOrders(rest.GetOrdersFilter{
-								Maker:    strategy.FromMaker,
+							orderPair := fmt.Sprintf("%s:%s-%s:%s", strategy.FromChain, fromasset, strategy.ToChain, toAsset)
+							// fmt.Println("OrderPair:", orderPair)
+							order, err := client.GetOrders(rest.GetOrdersFilter{
+								Maker:     strategy.FromMaker,
 								OrderPair: orderPair,
-								OrderBy: strategy.OrderBy,
-								Verbose: false,
-								MinPrice: strategy.MinFillAmount,
-								MaxPrice: strategy.MaxFillAmount,
-								Status: int(model.OrderCreated),
-								PerPage: strategy.FilterByPage,
+								OrderBy:   strategy.OrderBy,
+								Verbose:   false,
+								MinPrice:  strategy.MinFillAmount,
+								MaxPrice:  strategy.MaxFillAmount,
+								Status:    int(model.OrderCreated),
+								PerPage:   strategy.FilterByPage,
 							})
 							if err != nil {
-								fmt.Println("Error while getting orders:", err)
+								cobra.CheckErr(fmt.Sprintf("Error while fetching Order: %v", err))
 								return
 							}
 							orders = append(orders, order...)
@@ -134,44 +133,43 @@ func AutoFill(entropy []byte) *cobra.Command {
 					fromChain, toChain, _, _, err := model.ParseOrderPair(order.OrderPair)
 					if err != nil {
 						cobra.CheckErr(fmt.Sprintf("Error while parsing order pair: %v", err))
-						return
+
 					}
 
 					toAddress, err := getAddressString(entropy, fromChain, account, 0)
 					if err != nil {
 						cobra.CheckErr(fmt.Sprintf("Error while getting address string: %v", err))
-						return
+
 					}
 
 					fromAddress, err := getAddressString(entropy, toChain, account, 0)
 					if err != nil {
 						cobra.CheckErr(fmt.Sprintf("Error while getting address string: %v", err))
-						return
 					}
 					if err := client.FillOrder(order.ID, fromAddress, toAddress); err != nil {
-						cobra.CheckErr(fmt.Sprintf("Error while Filling the Order: %v with OrderID %d cross ❌" , order.ID))
-						continue
+						cobra.CheckErr(fmt.Sprintf("Error while Filling the Order: %v with OrderID %d cross ❌", err, order.ID))
+
 					}
 					totalOrdersFilled++
 					if totalOrdersFilled >= int(strategy.MaxFillOrders) {
 						fmt.Println("MaxFillOrders reached")
-						return
+
 					}
-					fmt.Println(fmt.Sprintf("Filled order %d ✅", order.ID))
+					cobra.CheckErr(fmt.Sprintf("Filled order %d ✅", order.ID))
 				}
 
 				time.Sleep(15 * time.Second)
 			}
 
 		}}
-		
+
 	cmd.Flags().StringVar(&url, "url", "", "config file (default is ./config.json)")
 	cmd.MarkFlagRequired("url")
 	cmd.Flags().Uint32Var(&account, "account", 0, "config file (default: 0)")
 	cmd.Flags().StringVar(&strategy, "strategy", "./strategy.json", "config file (default: ./strategy.json)")
 	return cmd
 }
- 
+
 func GetAllAssets(
 	client rest.Client,
 	maker string,
@@ -186,12 +184,12 @@ func GetAllAssets(
 ) ([]model.Order, error) {
 	orders, err := client.GetOrders(rest.GetOrdersFilter{
 		Maker:    maker,
-		OrderBy: OrderBy,
-		Verbose: false,
-		Status: int(model.OrderCreated),
+		OrderBy:  OrderBy,
+		Verbose:  false,
+		Status:   int(model.OrderCreated),
 		MinPrice: minPrice,
 		MaxPrice: maxPrice,
-		PerPage: fetchPerPage,
+		PerPage:  fetchPerPage,
 	})
 	if err != nil {
 		fmt.Println("Error while getting orders:", err)
@@ -200,13 +198,18 @@ func GetAllAssets(
 
 	filteredOrders := make([]model.Order, 0)
 	for _, order := range orders {
+		if len(fromAsset) == 1 && len(toAsset) == 1 {
+			filteredOrders = append(filteredOrders, order)
+			continue
+		}
+
 		orderPair := order.OrderPair
-		FromChain , ToChain , FromAsset , ToAsset , err :=  model.ParseOrderPair(orderPair)
+		FromChain, ToChain, FromAsset, ToAsset, err := model.ParseOrderPair(orderPair)
 		if err != nil {
-			fmt.Println("Error while parsing order pair:", err)
+			// fmt.Println("Error while parsing order pair:", err)
 			return nil, err
 		}
-		if contains(fromAsset, string(FromAsset)) && contains(toAsset, string(ToAsset)) && string(FromChain) == fromChain && string(ToChain) == toChain {
+		if (contains(fromAsset, string(FromAsset)) || contains(toAsset, string(ToAsset))) && string(FromChain) == fromChain && string(ToChain) == toChain {
 			filteredOrders = append(filteredOrders, order)
 		}
 	}
