@@ -259,6 +259,7 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 				"error":   "failed to get account details",
 				"message": err.Error(),
 			})
+			return
 		}
 		c.JSON(http.StatusAccepted, gin.H{})
 	}

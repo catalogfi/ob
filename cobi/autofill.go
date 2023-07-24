@@ -27,7 +27,7 @@ type Strategy struct {
 	FilterByPage    int      `json:"filterByPage"`
 }
 
-func AutoFill(entropy []byte) *cobra.Command {
+func AutoFill(entropy []byte, store Store) *cobra.Command {
 	var (
 		url      string
 		account  uint32
@@ -110,7 +110,6 @@ func AutoFill(entropy []byte) *cobra.Command {
 					for _, fromasset := range strategy.FromAsset {
 						for _, toAsset := range strategy.ToAsset {
 							orderPair := fmt.Sprintf("%s:%s-%s:%s", strategy.FromChain, fromasset, strategy.ToChain, toAsset)
-							// fmt.Println("OrderPair:", orderPair)
 							order, err := client.GetOrders(rest.GetOrdersFilter{
 								Maker:     strategy.FromMaker,
 								OrderPair: orderPair,
@@ -149,7 +148,10 @@ func AutoFill(entropy []byte) *cobra.Command {
 					}
 					if err := client.FillOrder(order.ID, fromAddress, toAddress); err != nil {
 						cobra.CheckErr(fmt.Sprintf("Error while Filling the Order: %v with OrderID %d cross ❌", err, order.ID))
-
+					}
+					if err = store.PutSecretHash(order.SecretHash, uint64(order.ID)); err != nil {
+						cobra.CheckErr(fmt.Sprintf("Error while storing secret hash: %v", err))
+						return
 					}
 					totalOrdersFilled++
 					if totalOrdersFilled >= int(strategy.MaxFillOrders) {

@@ -25,6 +25,9 @@ type Client interface {
 	GetFollowerRedeemOrders() ([]model.Order, error)
 	GetInitiatorInitiateOrders() ([]model.Order, error)
 	GetInitiatorRedeemOrders() ([]model.Order, error)
+	GetFollowerRefundedOrders() ([]model.Order, error)
+	FollowerWaitForRedeemOrders() ([]model.Order, error)
+	InitiatorWaitForInitiateOrders() ([]model.Order, error)
 	SetJwt(token string) error
 	Health() (string, error)
 	GetNonce() (string, error)
@@ -241,6 +244,43 @@ func (c *client) GetInitiatorInitiateOrders() ([]model.Order, error) {
 		return nil, fmt.Errorf("failed to decode orders: %v", err)
 	}
 	return orders, nil
+}
+func (c *client) GetFollowerRefundedOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?maker=%s&status=7&verbose=true", c.url, c.id))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get orders: %v", err)
+	}
+	defer resp.Body.Close()
+	var orders []model.Order
+	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
+		return nil, fmt.Errorf("failed to decode orders: %v", err)
+	}
+	return orders, nil
+}
+func (c *client) FollowerWaitForRedeemOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?taker=%s&status=4&verbose=true", c.url, c.id))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get orders: %v", err)
+	}
+	defer resp.Body.Close()
+	var orders []model.Order
+	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
+		return nil, fmt.Errorf("failed to decode orders: %v", err)
+	}
+	return orders, nil
+}
+func (c *client) InitiatorWaitForInitiateOrders() ([]model.Order, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/orders?maker=%s&status=3&verbose=true", c.url, c.id))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get orders: %v", err)
+	}
+	defer resp.Body.Close()
+	var orders []model.Order
+	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
+		return nil, fmt.Errorf("failed to decode orders: %v", err)
+	}
+	return orders, nil
+
 }
 
 func (c *client) GetInitiatorRedeemOrders() ([]model.Order, error) {

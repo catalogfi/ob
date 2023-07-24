@@ -69,6 +69,15 @@ func (w *watcher) watch(order model.Order) error {
 				return err
 			}
 		}
+
+		expired := w.orderExpired(order)
+		if expired {
+			order.Status = model.OrderCancelled
+			if err := w.store.UpdateOrder(&order); err != nil {
+				return err
+			}
+		}
+
 	}
 
 	if order.Status == model.InitiatorAtomicSwapInitiated {
@@ -81,6 +90,21 @@ func (w *watcher) watch(order model.Order) error {
 			order.FollowerAtomicSwap.InitiateTxHash = strings.Join(txHash, ",")
 			if err := w.store.UpdateOrder(&order); err != nil {
 				return err
+			}
+		}
+		expired, err := iW.Expired()
+		if err != nil {
+			return err
+		}
+		if expired {
+			refunded, txHash, err := iW.IsRefunded()
+			if err != nil {
+				return err
+			}
+			if refunded {
+				order.Status = model.InitiatorAtomicSwapRefunded
+				order.FollowerAtomicSwap.RefundTxHash = txHash
+				return w.store.UpdateOrder(&order)
 			}
 		}
 	}
@@ -98,6 +122,21 @@ func (w *watcher) watch(order model.Order) error {
 			}
 			if refunded {
 				order.Status = model.FollowerAtomicSwapRefunded
+				order.FollowerAtomicSwap.RefundTxHash = txHash
+				return w.store.UpdateOrder(&order)
+			}
+		}
+		expired, err = iW.Expired()
+		if err != nil {
+			return err
+		}
+		if expired {
+			refunded, txHash, err := iW.IsRefunded()
+			if err != nil {
+				return err
+			}
+			if refunded {
+				order.Status = model.InitiatorAtomicSwapRefunded
 				order.FollowerAtomicSwap.RefundTxHash = txHash
 				return w.store.UpdateOrder(&order)
 			}
@@ -161,7 +200,7 @@ func (w *watcher) watch(order model.Order) error {
 		}
 	}
 
-	if order.InitiatorAtomicSwap.RefundTxHash != "" && order.FollowerAtomicSwap.InitiateTxHash != "" && order.InitiatorAtomicSwap.RedeemTxHash == "" {
+	if order.InitiatorAtomicSwap.RefundTxHash != "" && order.FollowerAtomicSwap.InitiateTxHash == "" && order.InitiatorAtomicSwap.RedeemTxHash == "" {
 
 		order.Status = model.OrderFailedSoft
 		if err := w.store.UpdateOrder(&order); err != nil {
@@ -177,4 +216,8 @@ func (w *watcher) watch(order model.Order) error {
 	}
 
 	return nil
+}
+
+func (w *watcher) orderExpired(order model.Order) bool {
+	return time.Since(order.CreatedAt) > time.Hour*12
 }

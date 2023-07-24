@@ -82,6 +82,7 @@ const (
 	OrderExecuted
 	OrderFailedSoft
 	OrderFailedHard
+	OrderCancelled
 )
 
 type VerifySiwe struct {
