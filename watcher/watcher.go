@@ -58,6 +58,13 @@ func (w *watcher) watch(order model.Order) error {
 	}
 
 	if order.Status == model.OrderFilled {
+		expired := w.orderExpired(order)
+		if expired {
+			order.Status = model.OrderCancelled
+			if err := w.store.UpdateOrder(&order); err != nil {
+				return err
+			}
+		}
 		initiated, txHash, err := iW.IsInitiated()
 		if err != nil {
 			return err
@@ -70,28 +77,9 @@ func (w *watcher) watch(order model.Order) error {
 			}
 		}
 
-		expired := w.orderExpired(order)
-		if expired {
-			order.Status = model.OrderCancelled
-			if err := w.store.UpdateOrder(&order); err != nil {
-				return err
-			}
-		}
-
 	}
 
 	if order.Status == model.InitiatorAtomicSwapInitiated {
-		initiated, txHash, err := fW.IsInitiated()
-		if err != nil {
-			return err
-		}
-		if initiated {
-			order.Status = model.FollowerAtomicSwapInitiated
-			order.FollowerAtomicSwap.InitiateTxHash = strings.Join(txHash, ",")
-			if err := w.store.UpdateOrder(&order); err != nil {
-				return err
-			}
-		}
 		expired, err := iW.Expired()
 		if err != nil {
 			return err
@@ -105,6 +93,17 @@ func (w *watcher) watch(order model.Order) error {
 				order.Status = model.InitiatorAtomicSwapRefunded
 				order.FollowerAtomicSwap.RefundTxHash = txHash
 				return w.store.UpdateOrder(&order)
+			}
+		}
+		initiated, txHash, err := fW.IsInitiated()
+		if err != nil {
+			return err
+		}
+		if initiated {
+			order.Status = model.FollowerAtomicSwapInitiated
+			order.FollowerAtomicSwap.InitiateTxHash = strings.Join(txHash, ",")
+			if err := w.store.UpdateOrder(&order); err != nil {
+				return err
 			}
 		}
 	}
