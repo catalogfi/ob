@@ -217,5 +217,3 @@ func (client *client) IsFinal(txHash string) (bool, error) {
 	// TODO: add confirmation checks
 	return true, nil
 }
-
-func (client *client) FetchOrder(secretHash []byte)
