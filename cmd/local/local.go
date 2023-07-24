@@ -18,8 +18,8 @@ func main() {
 
 	config := model.Config{
 		RPC: map[model.Chain]string{
-			model.BitcoinRegtest:   "http://localhost:30000",
-			model.EthereumLocalnet: "http://localhost:8545",
+			model.BitcoinTestnet:  "https://mempool.space/testnet/api",
+			model.EthereumSepolia: "http://localhost:8545",
 		},
 	}
 

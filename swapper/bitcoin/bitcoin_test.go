@@ -46,7 +46,7 @@ var _ = Describe("Bitcoin", func() {
 		Expect(err).To(BeNil())
 		fmt.Println("pkAddr2:", pkAddr2.EncodeAddress())
 
-		client := bitcoin.NewClient("http://localhost:30000", &chaincfg.RegressionNetParams)
+		client := bitcoin.NewClient("https://mempool.space/testnet/api", &chaincfg.RegressionNetParams)
 
 		secret, _ := randomHex(32)
 		secret_hash := sha256.Sum256(secret)
@@ -86,7 +86,7 @@ var _ = Describe("Bitcoin", func() {
 		Expect(err).To(BeNil())
 		fmt.Println("pkAddr2:", pkAddr2.EncodeAddress())
 
-		client := bitcoin.NewClient("http://localhost:30000", &chaincfg.RegressionNetParams)
+		client := bitcoin.NewClient("https://mempool.space/testnet/api", &chaincfg.RegressionNetParams)
 
 		secret, _ := randomHex(32)
 		secret_hash := sha256.Sum256(secret)

@@ -117,7 +117,6 @@ func CalculateExpiry(chain model.Chain, goingFirst bool, urls map[model.Chain]st
 	}
 	client, err := LoadClient(chain, urls)
 	if err != nil {
-
 		return "", err
 	}
 	expiry, err := ethereum.GetExpiry(client.(ethereum.Client), goingFirst)

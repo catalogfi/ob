@@ -75,9 +75,11 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		return 0, err
 	}
 	if _, err := blockchain.CalculateExpiry(fromChain, true, urls); err != nil {
+
 		return 0, err
 	}
 	if _, err := blockchain.CalculateExpiry(toChain, false, urls); err != nil {
+
 		return 0, err
 	}
 
@@ -289,4 +291,23 @@ func (s *store) fillSwapDetails(order *model.Order) error {
 		return tx.Error
 	}
 	return nil
+}
+
+func secretHashAlreadyExists(orderPair string, secretHash string) (bool, error) {
+	fromChain, toChain, fromAsset, ToAsset, err := model.ParseOrderPair(orderPair)
+	if err != nil {
+		return false, err
+	}
+	if model.Chain(fromChain).IsEVM() {
+		queryChainForsecretHash(string(fromAsset), secretHash)
+	} else if model.Chain(toChain).IsEVM() {
+		queryChainForsecretHash(string(ToAsset), secretHash)
+	}
+	// TODO:
+	return false, nil
+}
+
+func queryChainForsecretHash(asset string, secretHash string) (string, error) {
+	// TODO: need to do a change in smart contract to complete this function
+	return "", nil
 }

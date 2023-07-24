@@ -216,6 +216,7 @@ func (s *Server) PostOrders() gin.HandlerFunc {
 		oid, err := s.store.CreateOrder(creator.(string), req.SendAddress, req.RecieveAddress, req.OrderPair, req.SendAmount, req.RecieveAmount, req.SecretHash, req.UserWalletBTCAddress, s.config.RPC)
 		if err != nil {
 			errorMessage := fmt.Sprintf("failed to create order: %v", err.Error())
+			// fmt.Println(errorMessage, "error")
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": errorMessage,
 			})
