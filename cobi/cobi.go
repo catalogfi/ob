@@ -37,6 +37,7 @@ func Run(config model.Config) error {
 	cmd.AddCommand(Execute(entropy, store, config))
 	cmd.AddCommand(Accounts(entropy, config))
 	cmd.AddCommand(List())
+	cmd.AddCommand(AutoFill(entropy))
 
 	if err := cmd.Execute(); err != nil {
 		return err

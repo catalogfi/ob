@@ -75,9 +75,11 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		return 0, err
 	}
 	if _, err := blockchain.CalculateExpiry(fromChain, true, urls); err != nil {
+
 		return 0, err
 	}
 	if _, err := blockchain.CalculateExpiry(toChain, false, urls); err != nil {
+
 		return 0, err
 	}
 

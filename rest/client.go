@@ -157,7 +157,7 @@ func (c *client) GetOrders(filter GetOrdersFilter) ([]model.Order, error) {
 	}
 
 	if filter.OrderPair != "" {
-		filterString = appendFilterString(filterString, "orderPair", filter.OrderPair)
+		filterString = appendFilterString(filterString, "order_pair", filter.OrderPair)
 	}
 
 	if filter.SecretHash != "" {

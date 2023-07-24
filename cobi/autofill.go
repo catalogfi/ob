@@ -83,6 +83,7 @@ func AutoFill(entropy []byte) *cobra.Command {
 			var orders []model.Order
 			totalOrdersFilled := 0
 			for {
+				fmt.Println("Fetching Orders....")
 				if time.Now().Unix() > int64(strategy.MaxFillDeadline) {
 					cobra.CheckErr("Max fill deadline reached")
 
@@ -155,7 +156,7 @@ func AutoFill(entropy []byte) *cobra.Command {
 						cobra.CheckErr("MaxFillOrders reached")
 
 					}
-					cobra.CheckErr(fmt.Sprintf("Filled order %d ✅", order.ID))
+					fmt.Println(fmt.Sprintf("Filled order %d ✅", order.ID))
 				}
 
 				time.Sleep(15 * time.Second)
@@ -166,7 +167,7 @@ func AutoFill(entropy []byte) *cobra.Command {
 	cmd.Flags().StringVar(&url, "url", "", "config file (default is ./config.json)")
 	cmd.MarkFlagRequired("url")
 	cmd.Flags().Uint32Var(&account, "account", 0, "config file (default: 0)")
-	cmd.Flags().StringVar(&strategy, "strategy", "./strategy.json", "config file (default: ./strategy.json)")
+	cmd.Flags().StringVar(&strategy, "strategy", "../../strategy.json", "config file (default: ./strategy.json)")
 	return cmd
 }
 

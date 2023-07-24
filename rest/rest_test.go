@@ -110,7 +110,7 @@ func StartServer() {
 		Expect(err).NotTo(HaveOccurred())
 		config := model.Config{
 			RPC: map[model.Chain]string{
-				model.BitcoinRegtest:   "http://localhost:30000",
+				model.BitcoinRegtest:   "https://mempool.space/testnet/api",
 				model.EthereumLocalnet: "http://localhost:8545",
 			},
 		}
