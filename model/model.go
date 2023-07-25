@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
+
+	"github.com/susruth/wbtc-garden/config"
 )
 
 type Config struct {
@@ -108,6 +110,8 @@ type Order struct {
 	Status               Status  `json:"status"`
 	SecretNonce          uint64  `json:"secretNonce"`
 	UserBtcWalletAddress string  `json:"userBtcWalletAddress"`
+
+	Fee uint `json:"fee"`
 }
 
 type AtomicSwap struct {
@@ -161,6 +165,12 @@ func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {
 	if err != nil {
 		return "", "", "", "", err
 	}
+	if err := isWhitelisted(sendChain, strings.Replace(string(sendAsset), "secondary", "", 1)); err != nil {
+		return "", "", "", "", err
+	}
+	if err := isWhitelisted(recieveChain, strings.Replace(string(recieveAsset), "secondary", "", 1)); err != nil {
+		return "", "", "", "", err
+	}
 	return sendChain, recieveChain, sendAsset, recieveAsset, nil
 }
 
@@ -173,4 +183,16 @@ func ParseChainAsset(chainAsset string) (Chain, Asset, error) {
 		return Chain(chainAndAsset[0]), Primary, nil
 	}
 	return Chain(chainAndAsset[0]), NewSecondary(chainAndAsset[1]), nil
+}
+
+func isWhitelisted(chain Chain, asset string) error {
+	if chainMap, ok := config.ConfigMap[string(chain)]; ok {
+		if _, ok := chainMap[asset]; ok {
+			return nil
+		}
+		return fmt.Errorf("asset %v is not whitelisted for chain %v", asset, chain)
+	} else {
+		return fmt.Errorf("chain %v is not whitelisted", chain)
+	}
+
 }

@@ -15,7 +15,7 @@ import (
 
 type Strategy struct {
 	MaxFillOrders   uint     `json:"maxFillOrders"`
-	MaxFillDeadline uint     `json:"maxFillDeadline"`
+	MaxFillDeadline uint64   `json:"maxFillDeadline"`
 	FromMaker       string   `json:"fromMaker"`
 	FromChain       string   `json:"fromChain"`
 	ToChain         string   `json:"toChain"`
@@ -41,7 +41,6 @@ func AutoFill(entropy []byte, store Store) *cobra.Command {
 			vals, err := getKeys(entropy, model.Ethereum, account, []uint32{0})
 			if err != nil {
 				cobra.CheckErr(fmt.Sprintf("Error while getting the signing key: %v", err))
-
 			}
 			privKey := vals[0].(*ecdsa.PrivateKey)
 			client := rest.NewClient(url, privKey.D.Text(16))
@@ -69,11 +68,11 @@ func AutoFill(entropy []byte, store Store) *cobra.Command {
 			}
 
 			if strategy.MaxFillOrders == 0 {
-				strategy.MaxFillOrders = math.MaxUint64
+				strategy.MaxFillOrders = math.MaxUint
 			}
 
 			if strategy.MaxFillDeadline == 0 {
-				strategy.MaxFillDeadline = math.MaxUint64
+				strategy.MaxFillDeadline = math.MaxUint64 - 1
 			}
 
 			if strategy.FilterByPage == 0 {
@@ -81,12 +80,11 @@ func AutoFill(entropy []byte, store Store) *cobra.Command {
 			}
 
 			var orders []model.Order
-			totalOrdersFilled := 0
+			totalOrdersFilled := uint(0)
 			for {
 				fmt.Println("Fetching Orders....")
-				if time.Now().Unix() > int64(strategy.MaxFillDeadline) {
+				if uint64(time.Now().Unix()) > (strategy.MaxFillDeadline) {
 					cobra.CheckErr("Max fill deadline reached")
-
 				}
 				if (len(strategy.FromAsset) == 1 && strategy.FromAsset[0] == "any") || (len(strategy.ToAsset) == 1 && strategy.ToAsset[0] == "any") {
 					orders, err = GetAllAssets(
@@ -122,7 +120,6 @@ func AutoFill(entropy []byte, store Store) *cobra.Command {
 							})
 							if err != nil {
 								cobra.CheckErr(fmt.Sprintf("Error while fetching Order: %v", err))
-
 							}
 							orders = append(orders, order...)
 						}
@@ -154,11 +151,11 @@ func AutoFill(entropy []byte, store Store) *cobra.Command {
 						return
 					}
 					totalOrdersFilled++
-					if totalOrdersFilled >= int(strategy.MaxFillOrders) {
+					if totalOrdersFilled >= strategy.MaxFillOrders {
 						cobra.CheckErr("MaxFillOrders reached")
 
 					}
-					fmt.Println(fmt.Sprintf("Filled order %d ✅", order.ID))
+					fmt.Printf("Filled order %d ✅", order.ID)
 				}
 
 				time.Sleep(15 * time.Second)
