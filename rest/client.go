@@ -28,6 +28,7 @@ type Client interface {
 	GetFollowerRefundedOrders() ([]model.Order, error)
 	FollowerWaitForRedeemOrders() ([]model.Order, error)
 	InitiatorWaitForInitiateOrders() ([]model.Order, error)
+	GetInitiatorRedeemOrders() ([]model.Order, error)
 	GetLockedValue(user string, chain string) (int64, error)
 	SetJwt(token string) error
 	Health() (string, error)
