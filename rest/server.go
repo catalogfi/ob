@@ -256,8 +256,7 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 
 		if err := s.store.FillOrder(uint(orderID), filler.(string), req.SendAddress, req.RecieveAddress, s.config.RPC); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "failed to get account details",
-				"message": err.Error(),
+				"error": fmt.Sprintf("failed to get account details %v", err.Error()),
 			})
 			return
 		}

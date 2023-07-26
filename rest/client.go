@@ -70,7 +70,11 @@ func (c *client) FillOrder(orderID uint, sendAddress, recieveAddress string) err
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("failed to fill order: %v", resp.Status)
+		var errorResponse map[string]string
+		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
+			return fmt.Errorf("failed to decode error response: %v", err)
+		}
+		return fmt.Errorf("failed to create order: %v", errorResponse["error"])
 	}
 	return nil
 }
