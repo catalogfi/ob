@@ -31,6 +31,8 @@ type Server struct {
 }
 
 type Store interface {
+	// get value locked in the given chain for the given user
+	GetValueLocked(user string, chain model.Chain) (int64, error)
 	// create order
 	CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string, userWalletBTCAddress string, urls map[model.Chain]string) (uint, error)
 	// fill order
@@ -74,6 +76,7 @@ func (s *Server) Run(addr string) error {
 	s.router.GET("/orders/:id", s.GetOrder())
 	s.router.GET("/orders", s.GetOrders())
 	s.router.GET("/nonce", s.Nonce())
+	s.router.GET("/getValueLocked", s.GetValueLockedByChain())
 	s.router.POST("/verify", s.Verify())
 	{
 		authRoutes.POST("/orders", s.PostOrders())
@@ -198,6 +201,36 @@ func (s *Server) Socket() gin.HandlerFunc {
 				break
 			}
 		}
+	}
+}
+
+func (s *Server) GetValueLockedByChain() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, exists := c.GetQuery("userWallet")
+		if !exists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "userWallet not provided"})
+			return
+		}
+		asset, exists := c.GetQuery("chainSelector")
+		if !exists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "chain not provided"})
+			return
+		}
+		chain, err := model.ParseChain(asset)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "chain not supported"})
+			return
+		}
+
+		valueLocked, err := s.store.GetValueLocked(user, chain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error})
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{
+			"value": valueLocked,
+		})
+
 	}
 }
 func (s *Server) PostOrders() gin.HandlerFunc {

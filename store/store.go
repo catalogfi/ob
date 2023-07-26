@@ -37,6 +37,72 @@ func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 	}
 	return &store{mu: new(sync.RWMutex), cache: make(map[string]float64), db: db}, nil
 }
+func (s *store) GetValueLocked(user string, chain model.Chain) (int64, error) {
+	var initAmounts, followAmounts []model.LockedAmount
+	if err := s.db.Table("atomic_swaps").
+		Select("asset as asset,SUM(amount) as amount").
+		Joins("JOIN orders ON orders.initiator_atomic_swap_id = atomic_swaps.id").
+		Where("orders.maker = ? AND (orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapInitiated, model.FollowerAtomicSwapInitiated, chain).
+		Group("asset").
+		Find(&initAmounts).Error; err != nil {
+		return 0, err
+	}
+	if err := s.db.Table("atomic_swaps").
+		Select("asset as asset,SUM(amount) as amount").
+		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
+		Where("orders.taker = ? AND (orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapRedeemed, model.FollowerAtomicSwapInitiated, chain).
+		Group("asset").
+		Find(&followAmounts).Error; err != nil {
+		return 0, err
+	}
+	combinedArray := model.CombineAndAddAmount(initAmounts, followAmounts)
+
+	var sum float64 = 0
+	for _, tokenAmount := range combinedArray {
+		if tokenAmount.Amount.Valid {
+			priceInUSD, err := price.GetPriceInUSD(tokenAmount.Asset, chain)
+			if err != nil {
+				return 0, err
+			}
+			sum += price.GetPrice(tokenAmount.Asset, chain, float64(tokenAmount.Amount.Int64), priceInUSD)
+		}
+	}
+	//flooring the sum
+	return int64(sum), nil
+}
+func (s *store) GetValueLocked(user string, chain model.Chain) (int64, error) {
+	var initAmounts, followAmounts []model.LockedAmount
+	if err := s.db.Table("atomic_swaps").
+		Select("asset as asset,SUM(amount) as amount").
+		Joins("JOIN orders ON orders.initiator_atomic_swap_id = atomic_swaps.id").
+		Where("orders.maker = ? AND (orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapInitiated, model.FollowerAtomicSwapInitiated, chain).
+		Group("asset").
+		Find(&initAmounts).Error; err != nil {
+		return 0, err
+	}
+	if err := s.db.Table("atomic_swaps").
+		Select("asset as asset,SUM(amount) as amount").
+		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
+		Where("orders.taker = ? AND (orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapRedeemed, model.FollowerAtomicSwapInitiated, chain).
+		Group("asset").
+		Find(&followAmounts).Error; err != nil {
+		return 0, err
+	}
+	combinedArray := model.CombineAndAddAmount(initAmounts, followAmounts)
+
+	var sum float64 = 0
+	for _, tokenAmount := range combinedArray {
+		if tokenAmount.Amount.Valid {
+			priceInUSD, err := price.GetPriceInUSD(tokenAmount.Asset, chain)
+			if err != nil {
+				return 0, err
+			}
+			sum += price.GetPrice(tokenAmount.Asset, chain, float64(tokenAmount.Amount.Int64), priceInUSD)
+		}
+	}
+	//flooring the sum
+	return int64(sum), nil
+}
 
 func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string, userBtcWalletAddress string, urls map[model.Chain]string) (uint, error) {
 
@@ -292,7 +358,6 @@ func (s *store) GetOrder(orderID uint) (*model.Order, error) {
 }
 
 func (s *store) UpdateOrder(order *model.Order) error {
-
 	if tx := s.db.Save(order.FollowerAtomicSwap); tx.Error != nil {
 		return tx.Error
 	}

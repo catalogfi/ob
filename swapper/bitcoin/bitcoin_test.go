@@ -51,14 +51,14 @@ var _ = Describe("Bitcoin", func() {
 		secret, _ := randomHex(32)
 		secret_hash := sha256.Sum256(secret)
 
-		iSwapA, err := bitcoin.NewInitiatorSwap(privKey1, pkAddr2, secret_hash[:], 1000, 10000, client)
+		iSwapA, err := bitcoin.NewInitiatorSwap(privKey1, pkAddr2, secret_hash[:], 1000, 0, 10000, client)
 		Expect(err).To(BeNil())
-		rSwapA, err := bitcoin.NewRedeemerSwap(privKey1, pkAddr2, secret_hash[:], 1000, 10000, client)
+		rSwapA, err := bitcoin.NewRedeemerSwap(privKey1, pkAddr2, secret_hash[:], 1000, 0, 10000, client)
 		Expect(err).To(BeNil())
 
-		iSwapB, err := bitcoin.NewInitiatorSwap(privKey2, pkAddr1, secret_hash[:], 1000, 10000, client)
+		iSwapB, err := bitcoin.NewInitiatorSwap(privKey2, pkAddr1, secret_hash[:], 1000, 0, 10000, client)
 		Expect(err).To(BeNil())
-		rSwapB, err := bitcoin.NewRedeemerSwap(privKey2, pkAddr1, secret_hash[:], 1000, 10000, client)
+		rSwapB, err := bitcoin.NewRedeemerSwap(privKey2, pkAddr1, secret_hash[:], 1000, 0, 10000, client)
 		Expect(err).To(BeNil())
 
 		go func() {
@@ -91,7 +91,7 @@ var _ = Describe("Bitcoin", func() {
 		secret, _ := randomHex(32)
 		secret_hash := sha256.Sum256(secret)
 
-		iSwapA, err := bitcoin.NewInitiatorSwap(privKey1, pkAddr2, secret_hash[:], 5, 10000, client)
+		iSwapA, err := bitcoin.NewInitiatorSwap(privKey1, pkAddr2, secret_hash[:], 5, 0, 10000, client)
 		Expect(err).To(BeNil())
 
 		_, err = iSwapA.Initiate()

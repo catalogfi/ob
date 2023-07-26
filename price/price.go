@@ -3,8 +3,11 @@ package price
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"time"
+
+	"github.com/susruth/wbtc-garden/model"
 )
 
 type Store interface {
@@ -44,4 +47,16 @@ func (p *PriceChecker) Run() error {
 		}
 		time.Sleep(10 * time.Second)
 	}
+}
+
+func GetPrice(asset string, chain model.Chain, amount float64, PriceInUSD float64) float64 {
+
+	var decimals float64
+	if chain.IsEVM() {
+		decimals = float64(ConfigMap[string(chain)][asset].Decimals)
+	} else if chain.IsBTC() {
+		decimals = 8
+	}
+
+	return (amount * PriceInUSD) / math.Pow(10, decimals)
 }
