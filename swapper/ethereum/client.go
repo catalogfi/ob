@@ -218,6 +218,7 @@ func (client *client) IsFinal(txHash string) (bool, error) {
 	return true, nil
 }
 
+
 func (client *client) FetchOrder(secretHash []byte) {
 	// TODO:
 }
