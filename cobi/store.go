@@ -30,7 +30,7 @@ type Order struct {
 	gorm.Model
 
 	OrderId    uint64 `gorm:"unique; not null"`
-	SecretHash string `gorm:"unique; not null"`
+	SecretHash string `gorm:"not null"`
 	Secret     string
 	Status     Status
 	Error      string

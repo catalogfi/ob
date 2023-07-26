@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/susruth/wbtc-garden/config"
 	"github.com/susruth/wbtc-garden/model"
 )
 
@@ -53,7 +54,7 @@ func GetPrice(asset string, chain model.Chain, amount float64, PriceInUSD float6
 
 	var decimals float64
 	if chain.IsEVM() {
-		decimals = float64(ConfigMap[string(chain)][asset].Decimals)
+		decimals = float64(config.ConfigMap[string(chain)][asset].Decimals)
 	} else if chain.IsBTC() {
 		decimals = 8
 	}
