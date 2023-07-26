@@ -117,15 +117,16 @@ type Order struct {
 type AtomicSwap struct {
 	gorm.Model
 
-	InitiatorAddress string `json:"initiatorAddress"`
-	RedeemerAddress  string `json:"redeemerAddress"`
-	Timelock         string `json:"timelock"`
-	Chain            Chain  `json:"chain"`
-	Asset            Asset  `json:"asset"`
-	Amount           string `json:"amount"`
-	InitiateTxHash   string `json:"initiateTxHash" `
-	RedeemTxHash     string `json:"redeemTxHash" `
-	RefundTxHash     string `json:"refundTxHash" `
+	InitiatorAddress string  `json:"initiatorAddress"`
+	RedeemerAddress  string  `json:"redeemerAddress"`
+	Timelock         string  `json:"timelock"`
+	Chain            Chain   `json:"chain"`
+	Asset            Asset   `json:"asset"`
+	Amount           string  `json:"amount"`
+	InitiateTxHash   string  `json:"initiateTxHash" `
+	RedeemTxHash     string  `json:"redeemTxHash" `
+	RefundTxHash     string  `json:"refundTxHash" `
+	PriceByOracle    float64 `json:"priceByOracle"`
 }
 
 type StringArray []string

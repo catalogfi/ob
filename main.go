@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/susruth/wbtc-garden/model"
+	"github.com/susruth/wbtc-garden/price"
 	"github.com/susruth/wbtc-garden/rest"
 	"github.com/susruth/wbtc-garden/store"
 	"github.com/susruth/wbtc-garden/watcher"
@@ -16,6 +17,7 @@ import (
 type Config struct {
 	PORT            string `binding:"required"`
 	PSQL_DB         string `binding:"required"`
+	PRICE_FEED_URL  string `binding:"required"`
 	BTC_RPC         string
 	ETH_RPC         string
 	BTC_TESTNET_RPC string
@@ -52,6 +54,8 @@ func main() {
 	}
 
 	watcher := watcher.NewWatcher(store, config)
+	price := price.NewPriceChecker(store, envConfig.PRICE_FEED_URL)
+	go price.Run()
 	go watcher.Run()
 	server := rest.NewServer(store, config, "SECRET")
 	if err := server.Run(fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
