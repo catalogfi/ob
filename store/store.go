@@ -45,6 +45,10 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		return 0, err
 	}
 
+	if err := verifyHexString(secretHash); err != nil {
+		return 0, err
+	}
+
 	priceByOracle, err := s.Price("bitcoin", "ethereum")
 	if err != nil {
 		return 0, err
