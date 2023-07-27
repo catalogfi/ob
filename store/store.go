@@ -371,8 +371,8 @@ func (s *store) SetPrice(fromChain string, toChain string, price float64) error 
 	return nil
 }
 func (s *store) Price(fromChain string, toChain string) (float64, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	// s.mu.RLock()
+	// defer s.mu.RUnlock()
 
 	price, ok := s.cache[fromChain+toChain]
 	if !ok {
