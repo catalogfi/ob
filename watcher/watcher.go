@@ -49,27 +49,14 @@ func (w *watcher) Run() {
 
 func (w *watcher) watch(order model.Order) error {
 
-	initiatorLockValue, err := w.store.GetValueLocked(order.Maker, order.InitiatorAtomicSwap.Chain)
-	if err != nil {
-		return nil
-	}
-
-	initiatorMinConfirmations := GetMinConfirmations(initiatorLockValue, order.InitiatorAtomicSwap.Chain)
-
 	//to check isFinal when changing status from 2 -> 3
-	iW, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config.RPC, initiatorMinConfirmations)
+	iW, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config.RPC, order.InitiatorAtomicSwap.MinimumConfirmations)
 	if err != nil {
 		return err
 	}
 
-	followerLockValue, err := w.store.GetValueLocked(order.Taker, order.InitiatorAtomicSwap.Chain)
-	if err != nil {
-		return nil
-	}
-	followerMinConfirmations := GetMinConfirmations(followerLockValue, order.InitiatorAtomicSwap.Chain)
-
 	//to check isFinal when changing status from 3 -> 4
-	fW, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config.RPC, followerMinConfirmations)
+	fW, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config.RPC, order.FollowerAtomicSwap.MinimumConfirmations)
 	if err != nil {
 		return err
 	}
@@ -236,49 +223,4 @@ func (w *watcher) watch(order model.Order) error {
 
 func (w *watcher) orderExpired(order model.Order) bool {
 	return time.Since(order.CreatedAt) > time.Hour*12
-}
-
-func GetMinConfirmations(value int64, chain model.Chain) uint64 {
-	if chain.IsBTC() {
-		switch {
-		case value < 10000:
-			return 1
-
-		case value < 100000:
-			return 2
-
-		case value < 1000000:
-			return 4
-
-		case value < 10000000:
-			return 6
-
-		case value < 100000000:
-			return 8
-
-		default:
-			return 12
-		}
-	} else if chain.IsEVM() {
-		switch {
-		case value < 10000:
-			return 6
-
-		case value < 100000:
-			return 12
-
-		case value < 1000000:
-			return 18
-
-		case value < 10000000:
-			return 24
-
-		case value < 100000000:
-			return 30
-
-		default:
-			return 100
-		}
-	}
-	return 0
 }

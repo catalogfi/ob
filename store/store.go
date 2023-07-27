@@ -43,7 +43,7 @@ func (s *store) GetValueLocked(user string, chain model.Chain) (int64, error) {
 	if err := s.db.Table("atomic_swaps").
 		Select("asset as asset,SUM(amount) as amount").
 		Joins("JOIN orders ON orders.initiator_atomic_swap_id = atomic_swaps.id").
-		Where("orders.maker = ? AND (orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapInitiated, model.FollowerAtomicSwapInitiated, chain).
+		Where("orders.maker = ? AND (orders.status = ? OR orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapInitiated, model.FollowerAtomicSwapInitiated, model.FollowerAtomicSwapRefunded, chain).
 		Group("asset").
 		Find(&initAmounts).Error; err != nil {
 		return 0, err
@@ -51,7 +51,7 @@ func (s *store) GetValueLocked(user string, chain model.Chain) (int64, error) {
 	if err := s.db.Table("atomic_swaps").
 		Select("asset as asset,SUM(amount) as amount").
 		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
-		Where("orders.taker = ? AND (orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapRedeemed, model.FollowerAtomicSwapInitiated, chain).
+		Where("orders.taker = ? AND (orders.status = ? OR orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapRedeemed, model.FollowerAtomicSwapInitiated, model.InitiatorAtomicSwapRefunded, chain).
 		Group("asset").
 		Find(&followAmounts).Error; err != nil {
 		return 0, err
@@ -88,12 +88,20 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		return 0, err
 	}
 
+	initiatorLockValue, err := s.GetValueLocked(creator, sendChain)
+	if err != nil {
+		return 0, err
+	}
+
+	initiatorMinConfirmations := GetMinConfirmations(initiatorLockValue, sendChain)
+
 	initiatorAtomicSwap := model.AtomicSwap{
-		InitiatorAddress: sendAddress,
-		Chain:            sendChain,
-		Asset:            sendAsset,
-		Amount:           sendAmount,
-		PriceByOracle:    priceByOracle,
+		InitiatorAddress:     sendAddress,
+		Chain:                sendChain,
+		Asset:                sendAsset,
+		Amount:               sendAmount,
+		PriceByOracle:        priceByOracle,
+		MinimumConfirmations: initiatorMinConfirmations, // TODO: add custom confirmation by users
 	}
 
 	followerAtomicSwap := model.AtomicSwap{
@@ -198,12 +206,19 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, recieveAddress stri
 	if err != nil {
 		return err
 	}
+	followerLockedValue, err := s.GetValueLocked(filler, toChain)
+	if err != nil {
+		return err
+	}
+
+	initiatorMinConfirmations := GetMinConfirmations(followerLockedValue, toChain)
 
 	initiateAtomicSwap.RedeemerAddress = recieveAddress
 	followerAtomicSwap.InitiatorAddress = sendAddress
 	initiateAtomicSwap.Timelock = initiateAtomicSwapTimelock
 	followerAtomicSwap.Timelock = followerAtomicSwapTimelock
 	followerAtomicSwap.PriceByOracle = priceByOracle
+	followerAtomicSwap.MinimumConfirmations = initiatorMinConfirmations
 	order.Taker = filler
 	order.Status = model.OrderFilled
 	if tx := s.db.Save(order); tx.Error != nil {
@@ -364,6 +379,51 @@ func (s *store) Price(fromChain string, toChain string) (float64, error) {
 		return 0, fmt.Errorf("price not found, please try later")
 	}
 	return price, nil
+}
+
+func GetMinConfirmations(value int64, chain model.Chain) uint64 {
+	if chain.IsBTC() {
+		switch {
+		case value < 10000:
+			return 1
+
+		case value < 100000:
+			return 2
+
+		case value < 1000000:
+			return 4
+
+		case value < 10000000:
+			return 6
+
+		case value < 100000000:
+			return 8
+
+		default:
+			return 12
+		}
+	} else if chain.IsEVM() {
+		switch {
+		case value < 10000:
+			return 6
+
+		case value < 100000:
+			return 12
+
+		case value < 1000000:
+			return 18
+
+		case value < 10000000:
+			return 24
+
+		case value < 100000000:
+			return 30
+
+		default:
+			return 100
+		}
+	}
+	return 0
 }
 
 // func secretHashAlreadyExists(orderPair string, secretHash string) (bool, error) {
