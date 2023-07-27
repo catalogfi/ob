@@ -200,6 +200,7 @@ func (s *Server) Socket() gin.HandlerFunc {
 		}
 	}
 }
+
 func (s *Server) PostOrders() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		creator, exists := c.Get("userWallet")
@@ -256,8 +257,7 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 
 		if err := s.store.FillOrder(uint(orderID), filler.(string), req.SendAddress, req.RecieveAddress, s.config.RPC); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "failed to get account details",
-				"message": err.Error(),
+				"error": fmt.Sprintf("failed to Fillthe Order %v", err.Error()),
 			})
 			return
 		}
@@ -275,8 +275,7 @@ func (s *Server) GetOrder() gin.HandlerFunc {
 		order, err := s.store.GetOrder(uint(orderID))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "failed to get account details",
-				"message": err.Error(),
+				"error": fmt.Errorf("failed to get order %s", err.Error()),
 			})
 		}
 		c.JSON(http.StatusOK, order)
@@ -350,8 +349,7 @@ func (s *Server) GetOrders() gin.HandlerFunc {
 		orders, err := s.store.FilterOrders(maker, taker, orderPair, secretHash, orderBy, model.Status(status), minPrice, maxPrice, page, perPage, verbose)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "failed to get account details",
-				"message": err.Error(),
+				"error": fmt.Errorf("failed to get orders %s", err.Error()),
 			})
 			return
 		}
