@@ -42,7 +42,7 @@ func (p *PriceChecker) Run() error {
 			continue
 		}
 
-		fmt.Println(data["bitcoin"]["usd"])
+		// fmt.Println(data["bitcoin"]["usd"])
 		if err := p.store.SetPrice("bitcoin", "ethereum", float64(data["bitcoin"]["usd"])); err != nil {
 			return err
 		}

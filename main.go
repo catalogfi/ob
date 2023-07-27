@@ -38,7 +38,7 @@ func LoadConfiguration(file string) Config {
 func main() {
 	// psql db
 	envConfig := LoadConfiguration("./config.json")
-	fmt.Println(envConfig.PSQL_DB)
+	// fmt.Println(envConfig.PSQL_DB)
 	store, err := store.New(postgres.Open(envConfig.PSQL_DB), &gorm.Config{})
 	if err != nil {
 		panic(err)

@@ -20,7 +20,7 @@ func main() {
 	config := model.Config{
 		RPC: map[model.Chain]string{
 			model.BitcoinTestnet:  "https://mempool.space/testnet/api",
-			model.EthereumSepolia: "http://localhost:8545",
+			model.EthereumSepolia: "https://gateway.tenderly.co/public/sepolia",
 		},
 	}
 

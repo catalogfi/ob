@@ -51,7 +51,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 				}
 
 				for _, order := range orders {
-					fmt.Println(order, entropy, account, config, store)
+					// fmt.Println(order, entropy, account, config, store)
 					if err := handleInitiatorInitiateOrder(order, entropy, account, config, store); err != nil {
 						fmt.Println(err)
 						continue

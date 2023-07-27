@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 
@@ -115,7 +116,7 @@ func (client *client) GetBlockHeight(txhash string) (uint64, error) {
 	}
 
 	if !tx.Status.Confirmed {
-		return 0, nil
+		return math.MaxUint32, nil
 	}
 	return tx.Status.BlockHeight, nil
 }

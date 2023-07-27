@@ -103,8 +103,6 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		Amount:          recieveAmount,
 	}
 
-	fmt.Println(creator, "address")
-
 	orders, err := s.FilterOrders(creator, "", "", "", "", 0, 0, 0, 0, 0, false)
 	if err != nil {
 		return 0, err
