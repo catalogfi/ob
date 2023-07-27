@@ -14,6 +14,10 @@ import (
 
 var rpcs = map[int]string{
 	1:        os.Getenv("ETHEREUM_RPC"),
+	10:       os.Getenv("OPTIMISM_RPC"),
+	43114:    os.Getenv("AVALANCHE_RPC"),
+	137:      os.Getenv("POLYGON_RPC"),
+	42161:    os.Getenv("ARBITRUM_RPC"),
 	11155111: os.Getenv("SEPOLIA_RPC"),
 }
 
