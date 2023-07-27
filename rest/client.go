@@ -124,9 +124,21 @@ func (c *client) GetOrder(id uint) (model.Order, error) {
 		return model.Order{}, fmt.Errorf("failed to get orders: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errorResponse map[string]string
+		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
+			return model.Order{}, fmt.Errorf("failed to decode error response: %v", err)
+		}
+		return model.Order{}, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+	}
+
 	var order model.Order
 	if err := json.NewDecoder(resp.Body).Decode(&order); err != nil {
-		return model.Order{}, fmt.Errorf("failed to decode orders: %v", err)
+		if resp.ContentLength == 0 {
+			return model.Order{}, fmt.Errorf("failed to get order: response body is empty")
+		}
+		return model.Order{}, fmt.Errorf("failed to decode order: %v", err)
 	}
 	return order, nil
 }
@@ -206,6 +218,15 @@ func (c *client) GetOrders(filter GetOrdersFilter) ([]model.Order, error) {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errorResponse map[string]string
+		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
+			return nil, fmt.Errorf("failed to decode error response: %v", err)
+		}
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+	}
+
 	var orders []model.Order
 	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
 		return nil, fmt.Errorf("failed to decode orders: %v", err)
@@ -219,6 +240,15 @@ func (c *client) GetFollowerInitiateOrders() ([]model.Order, error) {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errorResponse map[string]string
+		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
+			return nil, fmt.Errorf("failed to decode error response: %v", err)
+		}
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+	}
+
 	var orders []model.Order
 	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
 		return nil, fmt.Errorf("failed to decode orders: %v", err)
@@ -232,6 +262,15 @@ func (c *client) GetFollowerRedeemOrders() ([]model.Order, error) {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errorResponse map[string]string
+		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
+			return nil, fmt.Errorf("failed to decode error response: %v", err)
+		}
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+	}
+
 	var orders []model.Order
 	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
 		return nil, fmt.Errorf("failed to decode orders: %v", err)
@@ -245,6 +284,15 @@ func (c *client) GetInitiatorInitiateOrders() ([]model.Order, error) {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errorResponse map[string]string
+		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
+			return nil, fmt.Errorf("failed to decode error response: %v", err)
+		}
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+	}
+
 	var orders []model.Order
 	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
 		return nil, fmt.Errorf("failed to decode orders: %v", err)
@@ -257,6 +305,15 @@ func (c *client) GetFollowerRefundedOrders() ([]model.Order, error) {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errorResponse map[string]string
+		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
+			return nil, fmt.Errorf("failed to decode error response: %v", err)
+		}
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+	}
+
 	var orders []model.Order
 	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
 		return nil, fmt.Errorf("failed to decode orders: %v", err)
@@ -269,6 +326,15 @@ func (c *client) FollowerWaitForRedeemOrders() ([]model.Order, error) {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errorResponse map[string]string
+		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
+			return nil, fmt.Errorf("failed to decode error response: %v", err)
+		}
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+	}
+
 	var orders []model.Order
 	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
 		return nil, fmt.Errorf("failed to decode orders: %v", err)
@@ -281,6 +347,15 @@ func (c *client) InitiatorWaitForInitiateOrders() ([]model.Order, error) {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errorResponse map[string]string
+		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
+			return nil, fmt.Errorf("failed to decode error response: %v", err)
+		}
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+	}
+
 	var orders []model.Order
 	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
 		return nil, fmt.Errorf("failed to decode orders: %v", err)
@@ -295,6 +370,15 @@ func (c *client) GetInitiatorRedeemOrders() ([]model.Order, error) {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errorResponse map[string]string
+		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
+			return nil, fmt.Errorf("failed to decode error response: %v", err)
+		}
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+	}
+
 	var orders []model.Order
 	if err := json.NewDecoder(resp.Body).Decode(&orders); err != nil {
 		return nil, fmt.Errorf("failed to decode orders: %v", err)
