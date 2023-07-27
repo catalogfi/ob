@@ -69,14 +69,14 @@ var _ = Describe("Bitcoin", func() {
 		bExpiry, err := ethereum.GetExpiry(client, false)
 		Expect(err).To(BeNil())
 
-		iSwapA, err := ethereum.NewInitiatorSwap(privKey1, pkAddr2, atomicSwapAdrr, secret_hash1[:], aExpiry, big.NewInt(100000), client)
+		iSwapA, err := ethereum.NewInitiatorSwap(privKey1, pkAddr2, atomicSwapAdrr, secret_hash1[:], aExpiry, big.NewInt(0), big.NewInt(100000), client)
 		Expect(err).To(BeNil())
-		rSwapA, err := ethereum.NewRedeemerSwap(privKey1, pkAddr2, atomicSwapAdrr, secret_hash2[:], bExpiry, big.NewInt(100000), client)
+		rSwapA, err := ethereum.NewRedeemerSwap(privKey1, pkAddr2, atomicSwapAdrr, secret_hash2[:], bExpiry, big.NewInt(0), big.NewInt(100000), client)
 		Expect(err).To(BeNil())
 
-		iSwapB, err := ethereum.NewInitiatorSwap(privKey2, pkAddr1, atomicSwapAdrr, secret_hash2[:], bExpiry, big.NewInt(100000), client)
+		iSwapB, err := ethereum.NewInitiatorSwap(privKey2, pkAddr1, atomicSwapAdrr, secret_hash2[:], bExpiry, big.NewInt(0), big.NewInt(100000), client)
 		Expect(err).To(BeNil())
-		rSwapB, err := ethereum.NewRedeemerSwap(privKey2, pkAddr1, atomicSwapAdrr, secret_hash1[:], aExpiry, big.NewInt(100000), client)
+		rSwapB, err := ethereum.NewRedeemerSwap(privKey2, pkAddr1, atomicSwapAdrr, secret_hash1[:], aExpiry, big.NewInt(0), big.NewInt(100000), client)
 		Expect(err).To(BeNil())
 
 		go func() {

@@ -51,7 +51,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 				}
 
 				for _, order := range orders {
-					fmt.Println(order, entropy, account, config, store)
+					// fmt.Println(order, entropy, account, config, store)
 					if err := handleInitiatorInitiateOrder(order, entropy, account, config, store); err != nil {
 						fmt.Println(err)
 						continue
@@ -187,7 +187,8 @@ func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32
 		return err
 	}
 
-	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC)
+	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC, uint64(0))
+
 	if err != nil {
 		return err
 	}
@@ -230,7 +231,8 @@ func handleInitiatorRedeemOrRefundOrder(order model.Order, entropy []byte, user 
 		return err
 	}
 
-	redeemerSwap, err := blockchain.LoadRedeemerSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC)
+	redeemerSwap, err := blockchain.LoadRedeemerSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC, uint64(0))
+
 	if err != nil {
 		return err
 	}
@@ -267,7 +269,8 @@ func handleFollowerInitiateOrder(order model.Order, entropy []byte, user uint32,
 		return err
 	}
 
-	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC)
+	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC, uint64(0))
+
 	if err != nil {
 		return err
 	}
@@ -303,7 +306,8 @@ func handleFollowerRedeemOrder(order model.Order, entropy []byte, user uint32, c
 		return err
 	}
 
-	redeemerSwap, err := blockchain.LoadRedeemerSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC)
+	redeemerSwap, err := blockchain.LoadRedeemerSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC, uint64(0))
+
 	if err != nil {
 		return err
 	}
@@ -343,7 +347,7 @@ func handleFollowerRefund(order model.Order, entropy []byte, user uint32, config
 		return err
 	}
 
-	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC)
+	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC, uint64(0))
 	if err != nil {
 		return err
 	}
@@ -387,7 +391,7 @@ func handleInitiatorRefund(order model.Order, entropy []byte, user uint32, confi
 		return err
 	}
 
-	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC)
+	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC, uint64(0))
 	if err != nil {
 		return err
 	}

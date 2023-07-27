@@ -34,7 +34,7 @@ type Client interface {
 	GetCurrentBlock() (uint64, error)
 	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
 	GetTokenAddress(contractAddr common.Address) (common.Address, error)
-	IsFinal(txHash string) (bool, error)
+	IsFinal(txHash string, waitBlocks uint64) (bool, error)
 }
 type client struct {
 	url      string
@@ -213,9 +213,22 @@ func (client *client) GetERC20Balance(tokenAddr common.Address, ofAddr common.Ad
 	return balance, err
 }
 
-func (client *client) IsFinal(txHash string) (bool, error) {
-	// TODO: add confirmation checks
-	return true, nil
+func (client *client) IsFinal(txHash string, waitBlocks uint64) (bool, error) {
+	tx, err := client.provider.TransactionReceipt(context.Background(), common.HexToHash(txHash))
+	if err != nil {
+		return false, err
+	}
+	if tx.Status == 0 {
+		return false, nil
+	}
+	currentBlock, err := client.GetCurrentBlock()
+	if err != nil {
+		return false, fmt.Errorf("error getting current block %v", err)
+	}
+	if int64(currentBlock-tx.BlockNumber.Uint64()) > int64(waitBlocks) {
+		return true, nil
+	}
+	return false, nil
 }
 
 

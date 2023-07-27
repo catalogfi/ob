@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 
 	"github.com/susruth/wbtc-garden/blockchain"
 	"github.com/susruth/wbtc-garden/model"
+	"github.com/susruth/wbtc-garden/price"
 	"github.com/susruth/wbtc-garden/rest"
 	"github.com/susruth/wbtc-garden/watcher"
 	"gorm.io/gorm"
@@ -15,9 +17,13 @@ import (
 type Store interface {
 	rest.Store
 	watcher.Store
+	price.Store
 }
 
 type store struct {
+	mu    *sync.RWMutex
+	cache map[string]float64
+
 	db *gorm.DB
 }
 
@@ -29,20 +35,73 @@ func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 	if err := db.AutoMigrate(&model.Order{}, &model.AtomicSwap{}); err != nil {
 		return nil, err
 	}
-	return &store{db: db}, nil
+	return &store{mu: new(sync.RWMutex), cache: make(map[string]float64), db: db}, nil
+}
+
+func (s *store) GetValueLocked(user string, chain model.Chain) (int64, error) {
+	var initAmounts, followAmounts []model.LockedAmount
+	if err := s.db.Table("atomic_swaps").
+		Select("asset as asset,SUM(amount) as amount").
+		Joins("JOIN orders ON orders.initiator_atomic_swap_id = atomic_swaps.id").
+		Where("orders.maker = ? AND (orders.status = ? OR orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapInitiated, model.FollowerAtomicSwapInitiated, model.FollowerAtomicSwapRefunded, chain).
+		Group("asset").
+		Find(&initAmounts).Error; err != nil {
+		return 0, err
+	}
+	if err := s.db.Table("atomic_swaps").
+		Select("asset as asset,SUM(amount) as amount").
+		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
+		Where("orders.taker = ? AND (orders.status = ? OR orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapRedeemed, model.FollowerAtomicSwapInitiated, model.InitiatorAtomicSwapRefunded, chain).
+		Group("asset").
+		Find(&followAmounts).Error; err != nil {
+		return 0, err
+	}
+	combinedArray := model.CombineAndAddAmount(initAmounts, followAmounts)
+
+	var sum float64 = 0
+	for _, tokenAmount := range combinedArray {
+		if tokenAmount.Amount.Valid {
+			priceInUSD, err := s.Price("bitcoin", "ethereum")
+			if err != nil {
+				return 0, err
+			}
+			sum += price.GetPrice(tokenAmount.Asset, chain, float64(tokenAmount.Amount.Int64), priceInUSD)
+		}
+	}
+	//flooring the sum
+	return int64(sum), nil
 }
 
 func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string, userBtcWalletAddress string, urls map[model.Chain]string) (uint, error) {
+
 	sendChain, recieveChain, sendAsset, recieveAsset, err := model.ParseOrderPair(orderPair)
 	if err != nil {
 		return 0, err
 	}
 
+	if err := verifyHexString(secretHash); err != nil {
+		return 0, err
+	}
+
+	priceByOracle, err := s.Price("bitcoin", "ethereum")
+	if err != nil {
+		return 0, err
+	}
+
+	initiatorLockValue, err := s.GetValueLocked(creator, sendChain)
+	if err != nil {
+		return 0, err
+	}
+
+	initiatorMinConfirmations := GetMinConfirmations(initiatorLockValue, sendChain)
+
 	initiatorAtomicSwap := model.AtomicSwap{
-		InitiatorAddress: sendAddress,
-		Chain:            sendChain,
-		Asset:            sendAsset,
-		Amount:           sendAmount,
+		InitiatorAddress:     sendAddress,
+		Chain:                sendChain,
+		Asset:                sendAsset,
+		Amount:               sendAmount,
+		PriceByOracle:        priceByOracle,
+		MinimumConfirmations: initiatorMinConfirmations, // TODO: add custom confirmation by users
 	}
 
 	followerAtomicSwap := model.AtomicSwap{
@@ -51,8 +110,6 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		Asset:           recieveAsset,
 		Amount:          recieveAmount,
 	}
-
-	fmt.Println(creator, "address")
 
 	orders, err := s.FilterOrders(creator, "", "", "", "", 0, 0, 0, 0, 0, false)
 	if err != nil {
@@ -144,10 +201,24 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, recieveAddress stri
 	if tx := s.db.First(followerAtomicSwap, order.FollowerAtomicSwapID); tx.Error != nil {
 		return tx.Error
 	}
+
+	priceByOracle, err := s.Price("bitcoin", "ethereum")
+	if err != nil {
+		return err
+	}
+	followerLockedValue, err := s.GetValueLocked(filler, toChain)
+	if err != nil {
+		return err
+	}
+
+	initiatorMinConfirmations := GetMinConfirmations(followerLockedValue, toChain)
+
 	initiateAtomicSwap.RedeemerAddress = recieveAddress
 	followerAtomicSwap.InitiatorAddress = sendAddress
 	initiateAtomicSwap.Timelock = initiateAtomicSwapTimelock
 	followerAtomicSwap.Timelock = followerAtomicSwapTimelock
+	followerAtomicSwap.PriceByOracle = priceByOracle
+	followerAtomicSwap.MinimumConfirmations = initiatorMinConfirmations
 	order.Taker = filler
 	order.Status = model.OrderFilled
 	if tx := s.db.Save(order); tx.Error != nil {
@@ -268,7 +339,6 @@ func (s *store) GetOrder(orderID uint) (*model.Order, error) {
 }
 
 func (s *store) UpdateOrder(order *model.Order) error {
-
 	if tx := s.db.Save(order.FollowerAtomicSwap); tx.Error != nil {
 		return tx.Error
 	}
@@ -293,21 +363,84 @@ func (s *store) fillSwapDetails(order *model.Order) error {
 	return nil
 }
 
-func secretHashAlreadyExists(orderPair string, secretHash string) (bool, error) {
-	fromChain, toChain, fromAsset, ToAsset, err := model.ParseOrderPair(orderPair)
-	if err != nil {
-		return false, err
+func (s *store) SetPrice(fromChain string, toChain string, price float64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.cache[fromChain+toChain] = price
+	return nil
+}
+func (s *store) Price(fromChain string, toChain string) (float64, error) {
+	// s.mu.RLock()
+	// defer s.mu.RUnlock()
+
+	price, ok := s.cache[fromChain+toChain]
+	if !ok {
+		return 0, fmt.Errorf("price not found, please try later")
 	}
-	if model.Chain(fromChain).IsEVM() {
-		queryChainForsecretHash(string(fromAsset), secretHash)
-	} else if model.Chain(toChain).IsEVM() {
-		queryChainForsecretHash(string(ToAsset), secretHash)
-	}
-	// TODO:
-	return false, nil
+	return price, nil
 }
 
-func queryChainForsecretHash(asset string, secretHash string) (string, error) {
-	// TODO: need to do a change in smart contract to complete this function
-	return "", nil
+func GetMinConfirmations(value int64, chain model.Chain) uint64 {
+	if chain.IsBTC() {
+		switch {
+		case value < 10000:
+			return 1
+
+		case value < 100000:
+			return 2
+
+		case value < 1000000:
+			return 4
+
+		case value < 10000000:
+			return 6
+
+		case value < 100000000:
+			return 8
+
+		default:
+			return 12
+		}
+	} else if chain.IsEVM() {
+		switch {
+		case value < 10000:
+			return 6
+
+		case value < 100000:
+			return 12
+
+		case value < 1000000:
+			return 18
+
+		case value < 10000000:
+			return 24
+
+		case value < 100000000:
+			return 30
+
+		default:
+			return 100
+		}
+	}
+	return 0
 }
+
+// func secretHashAlreadyExists(orderPair string, secretHash string) (bool, error) {
+// 	fromChain, toChain, fromAsset, ToAsset, err := model.ParseOrderPair(orderPair)
+// 	if err != nil {
+// 		return false, err
+// 	}
+// 	if model.Chain(fromChain).IsEVM() {
+// 		queryChainForsecretHash(string(fromAsset), secretHash)
+// 	} else if model.Chain(toChain).IsEVM() {
+// 		queryChainForsecretHash(string(ToAsset), secretHash)
+// 	}
+// 	// TODO:
+// 	return false, nil
+// }
+
+// func queryChainForsecretHash(asset string, secretHash string) (string, error) {
+// 	// TODO: need to do a change in smart contract to complete this function
+// 	return "", nil
+// }

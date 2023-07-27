@@ -15,6 +15,8 @@ type Store interface {
 	UpdateOrder(order *model.Order) error
 	// get all active orders
 	GetActiveOrders() ([]model.Order, error)
+	// get locked value for a user on a chain
+	GetValueLocked(user string, chain model.Chain) (int64, error)
 }
 
 type watcher struct {
@@ -47,12 +49,14 @@ func (w *watcher) Run() {
 
 func (w *watcher) watch(order model.Order) error {
 
-	iW, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config.RPC)
+	//to check isFinal when changing status from 2 -> 3
+	iW, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config.RPC, order.InitiatorAtomicSwap.MinimumConfirmations)
 	if err != nil {
 		return err
 	}
 
-	fW, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config.RPC)
+	//to check isFinal when changing status from 3 -> 4
+	fW, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config.RPC, order.FollowerAtomicSwap.MinimumConfirmations)
 	if err != nil {
 		return err
 	}
