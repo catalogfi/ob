@@ -14,6 +14,7 @@ import (
 )
 
 type auth struct {
+	config model.Config
 }
 
 type Claims struct {
@@ -21,8 +22,10 @@ type Claims struct {
 	jwt.StandardClaims
 }
 
-func NewAuth() Auth {
-	return &auth{}
+func NewAuth(config model.Config) Auth {
+	return &auth{
+		config: config,
+	}
 }
 
 func (a *auth) Verfiy(req model.VerifySiwe) (*jwt.Token, error) {
@@ -82,7 +85,7 @@ func (a *auth) verifySignature(msg string, signature string, owner common.Addres
 	addr := crypto.PubkeyToAddress(*pubkey)
 	if addr != owner {
 		sigBytes[64] += 27
-		return utils.CheckERC1271Sig(sigHash, sigBytes, owner, chainId)
+		return utils.CheckERC1271Sig(sigHash, sigBytes, owner, chainId, a.config)
 	}
 	return &addr, nil
 

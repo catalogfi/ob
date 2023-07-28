@@ -48,7 +48,7 @@ func NewServer(store Store, config model.Config, secret string) *Server {
 		router: gin.Default(),
 		store:  store,
 		secret: secret,
-		auth:   NewAuth(),
+		auth:   NewAuth(config),
 		config: config,
 	}
 }
@@ -375,7 +375,6 @@ func (s *Server) Verify() gin.HandlerFunc {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-
 		token, err := s.auth.Verfiy(req)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

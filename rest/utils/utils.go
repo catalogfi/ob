@@ -3,30 +3,25 @@ package utils
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/susruth/wbtc-garden/model"
 	ERC1271 "github.com/susruth/wbtc-garden/rest/types"
 )
 
-var rpcs = map[int]string{
-	1:        os.Getenv("ETHEREUM_RPC"),
-	10:       os.Getenv("OPTIMISM_RPC"),
-	43114:    os.Getenv("AVALANCHE_RPC"),
-	137:      os.Getenv("POLYGON_RPC"),
-	42161:    os.Getenv("ARBITRUM_RPC"),
-	11155111: os.Getenv("SEPOLIA_RPC"),
-}
-
-func GetEthClientByChainId(chainId int) (*ethclient.Client, error) {
-	rpc := rpcs[chainId]
-	if rpc == "" {
+func GetEthClientByChainId(chainId int, config model.Config) (*ethclient.Client, error) {
+	switch chainId {
+	case 1:
+		return ethclient.Dial(config.RPC[model.Ethereum])
+	case 11155111:
+		return ethclient.Dial(config.RPC[model.EthereumSepolia])
+	default:
 		return nil, fmt.Errorf("No RPC url found for chainId")
+
 	}
-	return ethclient.Dial(rpc)
 }
 
 /*
@@ -43,8 +38,8 @@ func GetEIP191SigHash(msg string) common.Hash {
 /*
 Checks if the given signature is valid or not according to ERC1271.
 */
-func CheckERC1271Sig(sigHash common.Hash, signature []byte, verifyingContract common.Address, chainId int) (*common.Address, error) {
-	conn, err := GetEthClientByChainId(chainId)
+func CheckERC1271Sig(sigHash common.Hash, signature []byte, verifyingContract common.Address, chainId int, config model.Config) (*common.Address, error) {
+	conn, err := GetEthClientByChainId(chainId, config)
 	if err != nil {
 		return nil, err
 	}
