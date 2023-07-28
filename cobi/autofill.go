@@ -100,7 +100,7 @@ func AutoFill(entropy []byte, store Store) *cobra.Command {
 						strategy.OrderBy,
 					)
 					if err != nil {
-						cobra.CheckErr(fmt.Errorf("Error while fetching Order: %v", err))
+						fmt.Println(fmt.Errorf("Error while fetching Order: %v", err))
 
 					}
 				} else {
@@ -119,7 +119,7 @@ func AutoFill(entropy []byte, store Store) *cobra.Command {
 								PerPage:   strategy.FilterByPage,
 							})
 							if err != nil {
-								cobra.CheckErr(fmt.Sprintf("Error while fetching Order: %v", err))
+								fmt.Println(fmt.Sprintf("Error while fetching Order: %v", err))
 							}
 							orders = append(orders, order...)
 						}
@@ -129,26 +129,28 @@ func AutoFill(entropy []byte, store Store) *cobra.Command {
 				for _, order := range orders {
 					fromChain, toChain, _, _, err := model.ParseOrderPair(order.OrderPair)
 					if err != nil {
-						cobra.CheckErr(fmt.Sprintf("Error while parsing order pair: %v", err))
-
+						fmt.Println(fmt.Sprintf("Error while parsing order pair: %v", err))
+						continue
 					}
 
 					toAddress, err := getAddressString(entropy, fromChain, account, 0)
 					if err != nil {
-						cobra.CheckErr(fmt.Sprintf("Error while getting address string: %v", err))
-
+						fmt.Println(fmt.Sprintf("Error while getting address string: %v", err))
+						continue
 					}
 
 					fromAddress, err := getAddressString(entropy, toChain, account, 0)
 					if err != nil {
-						cobra.CheckErr(fmt.Sprintf("Error while getting address string: %v", err))
+						fmt.Println(fmt.Sprintf("Error while getting address string: %v", err))
+						continue
 					}
 					if err := client.FillOrder(order.ID, fromAddress, toAddress); err != nil {
-						cobra.CheckErr(fmt.Sprintf("Error while Filling the Order: %v with OrderID %d cross ❌", err, order.ID))
+						fmt.Println(fmt.Sprintf("Error while Filling the Order: %v with OrderID %d cross ❌", err, order.ID))
+						continue
 					}
 					if err = store.PutSecretHash(order.SecretHash, uint64(order.ID)); err != nil {
-						cobra.CheckErr(fmt.Sprintf("Error while storing secret hash: %v", err))
-						return
+						fmt.Println(fmt.Sprintf("Error while storing secret hash: %v", err))
+						continue
 					}
 					totalOrdersFilled++
 					if totalOrdersFilled >= strategy.MaxFillOrders {
