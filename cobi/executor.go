@@ -347,7 +347,7 @@ func handleFollowerRefund(order model.Order, entropy []byte, user uint32, config
 		return err
 	}
 
-	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.InitiatorAtomicSwap, keys[0], order.SecretHash, config.RPC, uint64(0))
+	initiatorSwap, err := blockchain.LoadInitiatorSwap(*order.FollowerAtomicSwap, keys[0], order.SecretHash, config.RPC, uint64(0))
 	if err != nil {
 		return err
 	}
