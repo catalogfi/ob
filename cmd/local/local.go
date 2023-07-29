@@ -25,7 +25,7 @@ func main() {
 	}
 
 	watcher := watcher.NewWatcher(store, config)
-	price := price.NewPriceChecker(store, "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd")
+	price := price.NewPriceChecker(store, "https://api.coincap.io/v2/assets/bitcoin")
 	go price.Run()
 	go watcher.Run()
 	server := rest.NewServer(store, config, "SECRET")
