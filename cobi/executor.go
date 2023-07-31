@@ -338,11 +338,11 @@ func handleFollowerRefund(order model.Order, entropy []byte, user uint32, config
 		fmt.Printf("Skipping order %d failed earlier with %s", order.ID, err)
 		return nil
 	}
-	fromChain, _, _, _, err := model.ParseOrderPair(order.OrderPair)
+	_, toChain, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
 		return err
 	}
-	keys, err := getKeys(entropy, fromChain, user, []uint32{0})
+	keys, err := getKeys(entropy, toChain, user, []uint32{0})
 	if err != nil {
 		return err
 	}
