@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
@@ -32,7 +33,7 @@ type Server struct {
 
 type Store interface {
 	// get value locked in the given chain for the given user
-	GetValueLocked(user string, chain model.Chain) (int64, error)
+	GetValueLocked(user string, chain model.Chain) (*big.Int, error)
 	// create order
 	CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string, userWalletBTCAddress string, urls map[model.Chain]string) (uint, error)
 	// fill order

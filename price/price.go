@@ -3,7 +3,7 @@ package price
 import (
 	"encoding/json"
 	"fmt"
-	"math"
+	"math/big"
 	"net/http"
 	"strconv"
 	"time"
@@ -74,14 +74,20 @@ func (p *PriceChecker) Run() error {
 	// return p.store.SetPrice("bitcoin", "ethereum", float64(30000))
 }
 
-func GetPrice(asset string, chain model.Chain, amount float64, PriceInUSD float64) float64 {
+func GetPrice(asset model.Asset, chain model.Chain, amount *big.Int, PriceInUSD *big.Int) *big.Int {
 
-	var decimals float64
+	var decimals int64
+	var assetId string
+	if asset == model.Primary {
+		assetId = "primary"
+	} else {
+		assetId = asset.SecondaryID()
+	}
 	if chain.IsEVM() {
-		decimals = float64(config.ConfigMap[string(chain)][asset].Decimals)
+		decimals = int64(config.ConfigMap[string(chain)][assetId].Decimals)
 	} else if chain.IsBTC() {
 		decimals = 8
 	}
 
-	return (amount * PriceInUSD) / math.Pow(10, decimals)
+	return new(big.Int).Div(new(big.Int).Mul(PriceInUSD, amount), new(big.Int).Exp(big.NewInt(10), big.NewInt(decimals), nil))
 }

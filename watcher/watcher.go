@@ -3,6 +3,7 @@ package watcher
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -16,7 +17,7 @@ type Store interface {
 	// get all active orders
 	GetActiveOrders() ([]model.Order, error)
 	// get locked value for a user on a chain
-	GetValueLocked(user string, chain model.Chain) (int64, error)
+	GetValueLocked(user string, chain model.Chain) (*big.Int, error)
 }
 
 type watcher struct {

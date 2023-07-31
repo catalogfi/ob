@@ -140,6 +140,13 @@ type LockedAmount struct {
 func CombineAndAddAmount(arr1, arr2 []LockedAmount) []LockedAmount {
 	combinedMap := make(map[string]sql.NullInt64)
 
+	if len(arr1) == 0 {
+		return arr2
+	} else if len(arr2) == 0 {
+		return arr1
+	} else if len(arr1) == 0 && len(arr2) == 0 {
+		return nil
+	}
 	for _, item := range arr1 {
 		if _, ok := combinedMap[item.Asset]; ok {
 			combinedMap[item.Asset] = sql.NullInt64{

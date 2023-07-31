@@ -38,38 +38,43 @@ func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 	return &store{mu: new(sync.RWMutex), cache: make(map[string]float64), db: db}, nil
 }
 
-func (s *store) GetValueLocked(user string, chain model.Chain) (int64, error) {
+func (s *store) GetValueLocked(user string, chain model.Chain) (*big.Int, error) {
 	var initAmounts, followAmounts []model.LockedAmount
 	if err := s.db.Table("atomic_swaps").
-		Select("asset as asset,SUM(amount::int) as amount").
+		Select("asset as asset,SUM(amount) as amount").
 		Joins("JOIN orders ON orders.initiator_atomic_swap_id = atomic_swaps.id").
 		Where("orders.maker = ? AND (orders.status = ? OR orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapInitiated, model.FollowerAtomicSwapInitiated, model.FollowerAtomicSwapRefunded, chain).
 		Group("asset").
 		Find(&initAmounts).Error; err != nil {
-		return 0, err
+		return big.NewInt(0), err
 	}
 	if err := s.db.Table("atomic_swaps").
-		Select("asset as asset,SUM(amount::int) as amount").
+		Select("asset as asset,SUM(amount) as amount").
 		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
 		Where("orders.taker = ? AND (orders.status = ? OR orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapRedeemed, model.FollowerAtomicSwapInitiated, model.InitiatorAtomicSwapRefunded, chain).
 		Group("asset").
 		Find(&followAmounts).Error; err != nil {
-		return 0, err
+		return big.NewInt(0), err
 	}
 	combinedArray := model.CombineAndAddAmount(initAmounts, followAmounts)
 
-	var sum float64 = 0
+	if len(combinedArray) == 0 {
+		return big.NewInt(0), nil
+	}
+	sum := big.NewInt(0)
 	for _, tokenAmount := range combinedArray {
+
 		if tokenAmount.Amount.Valid {
 			priceInUSD, err := s.Price("bitcoin", "ethereum")
 			if err != nil {
-				return 0, err
+				return big.NewInt(0), err
 			}
-			sum += price.GetPrice(tokenAmount.Asset, chain, float64(tokenAmount.Amount.Int64), priceInUSD)
+			sum = new(big.Int).Add(price.GetPrice(model.Asset(tokenAmount.Asset), chain, big.NewInt(tokenAmount.Amount.Int64), big.NewInt(int64(priceInUSD))), sum)
+			fmt.Println(sum)
 		}
 	}
 	//flooring the sum
-	return int64(sum), nil
+	return sum, nil
 }
 
 func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string, userBtcWalletAddress string, urls map[model.Chain]string) (uint, error) {
@@ -381,22 +386,22 @@ func (s *store) Price(fromChain string, toChain string) (float64, error) {
 	return price, nil
 }
 
-func GetMinConfirmations(value int64, chain model.Chain) uint64 {
+func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
 	if chain.IsBTC() {
 		switch {
-		case value < 10000:
+		case value.Cmp(big.NewInt(10000)) < 1:
 			return 1
 
-		case value < 100000:
+		case value.Cmp(big.NewInt(100000)) < 1:
 			return 2
 
-		case value < 1000000:
+		case value.Cmp(big.NewInt(1000000)) < 1:
 			return 4
 
-		case value < 10000000:
+		case value.Cmp(big.NewInt(10000000)) < 1:
 			return 6
 
-		case value < 100000000:
+		case value.Cmp(big.NewInt(100000000)) < 1:
 			return 8
 
 		default:
@@ -404,19 +409,19 @@ func GetMinConfirmations(value int64, chain model.Chain) uint64 {
 		}
 	} else if chain.IsEVM() {
 		switch {
-		case value < 10000:
+		case value.Cmp(big.NewInt(10000)) < 1:
 			return 6
 
-		case value < 100000:
+		case value.Cmp(big.NewInt(100000)) < 1:
 			return 12
 
-		case value < 1000000:
+		case value.Cmp(big.NewInt(1000000)) < 1:
 			return 18
 
-		case value < 10000000:
+		case value.Cmp(big.NewInt(10000000)) < 1:
 			return 24
 
-		case value < 100000000:
+		case value.Cmp(big.NewInt(100000000)) < 1:
 			return 30
 
 		default:
