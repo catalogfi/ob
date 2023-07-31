@@ -41,7 +41,7 @@ func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 func (s *store) GetValueLocked(user string, chain model.Chain) (*big.Int, error) {
 	var initAmounts, followAmounts []model.LockedAmount
 	if err := s.db.Table("atomic_swaps").
-		Select("asset as asset,SUM(amount) as amount").
+		Select("asset as asset,SUM(amount::int) as amount").
 		Joins("JOIN orders ON orders.initiator_atomic_swap_id = atomic_swaps.id").
 		Where("orders.maker = ? AND (orders.status = ? OR orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapInitiated, model.FollowerAtomicSwapInitiated, model.FollowerAtomicSwapRefunded, chain).
 		Group("asset").
@@ -49,7 +49,7 @@ func (s *store) GetValueLocked(user string, chain model.Chain) (*big.Int, error)
 		return big.NewInt(0), err
 	}
 	if err := s.db.Table("atomic_swaps").
-		Select("asset as asset,SUM(amount) as amount").
+		Select("asset as asset,SUM(amount::int) as amount").
 		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
 		Where("orders.taker = ? AND (orders.status = ? OR orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapRedeemed, model.FollowerAtomicSwapInitiated, model.InitiatorAtomicSwapRefunded, chain).
 		Group("asset").
