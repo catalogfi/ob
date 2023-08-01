@@ -70,7 +70,7 @@ func (s *Server) Run(addr string) error {
 
 	s.router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"status": "ok",
+			"status": "online",
 		})
 	})
 	s.router.GET("/ws", s.Socket())
