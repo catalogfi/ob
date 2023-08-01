@@ -36,7 +36,7 @@ var _ = Describe("Rest", func() {
 		Expect(c).NotTo(BeNil())
 		Expect(jwtToken).To(Equal(""))
 		Expect(CurrentOrderID).To(Equal(uint(0)))
-		Expect(c.Health()).To(Equal("ok"))
+		Expect(c.Health()).To(Equal("online"))
 	})
 
 	It("check nonce", func() {
