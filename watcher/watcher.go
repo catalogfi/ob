@@ -96,7 +96,7 @@ func (w *watcher) watch(order model.Order) error {
 			}
 			if refunded {
 				order.Status = model.InitiatorAtomicSwapRefunded
-				order.FollowerAtomicSwap.RefundTxHash = txHash
+				order.InitiatorAtomicSwap.RefundTxHash = txHash
 				return w.store.UpdateOrder(&order)
 			}
 		}
@@ -141,7 +141,7 @@ func (w *watcher) watch(order model.Order) error {
 			}
 			if refunded {
 				order.Status = model.InitiatorAtomicSwapRefunded
-				order.FollowerAtomicSwap.RefundTxHash = txHash
+				order.InitiatorAtomicSwap.RefundTxHash = txHash
 				return w.store.UpdateOrder(&order)
 			}
 		}

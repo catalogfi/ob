@@ -304,7 +304,7 @@ func (c *client) GetInitiatorInitiateOrders() ([]model.Order, error) {
 	return orders, nil
 }
 func (c *client) GetFollowerRefundedOrders() ([]model.Order, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/orders?maker=%s&status=7&verbose=true", c.url, c.id))
+	resp, err := http.Get(fmt.Sprintf("%s/orders?maker=%s&status=8&verbose=true", c.url, c.id))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orders: %v", err)
 	}
