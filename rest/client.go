@@ -72,6 +72,10 @@ func (c *client) FillOrder(orderID uint, sendAddress, recieveAddress string) err
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusAccepted {
+		if resp.StatusCode == http.StatusUnauthorized {
+			c.ReLogin()
+			return c.FillOrder(orderID, sendAddress, recieveAddress)
+		}
 		var errorResponse map[string]string
 		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
 			return fmt.Errorf("failed to decode error response: %v", err)
@@ -494,6 +498,15 @@ func (c *client) Login() (string, error) {
 	}
 
 	return VerifyPayload.Token, nil
+}
+
+func (c *client) ReLogin() error {
+	token, err := c.Login()
+	if err != nil {
+		return fmt.Errorf("failed to login: %v", err)
+	}
+	c.SetJwt(token)
+	return nil
 }
 
 func GetUserWalletFromJWT(jwtString string) (string, error) {

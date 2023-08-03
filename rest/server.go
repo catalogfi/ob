@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-contrib/cors"
@@ -73,7 +74,8 @@ func (s *Server) Run(addr string) error {
 			"status": "online",
 		})
 	})
-	s.router.GET("/ws", s.Socket())
+	s.router.GET("/ws/order", s.GetOrderBySocket())
+	s.router.GET("/ws/orders", s.GetOrdersSocket())
 	s.router.GET("/orders/:id", s.GetOrder())
 	s.router.GET("/orders", s.GetOrders())
 	s.router.GET("/nonce", s.Nonce())
@@ -141,7 +143,7 @@ func (s *Server) authenticateJWT(ctx *gin.Context) {
 	ctx.Next()
 }
 
-func (s *Server) Socket() gin.HandlerFunc {
+func (s *Server) GetOrderBySocket() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		//upgrade get request to websocket protocol
 		ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
@@ -201,6 +203,62 @@ func (s *Server) Socket() gin.HandlerFunc {
 				fmt.Println(err)
 				break
 			}
+		}
+	}
+}
+
+func (s *Server) GetOrdersSocket() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		//upgrade get request to websocket protocol
+		ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer ws.Close()
+		for {
+			//Read Message from client
+			mt, message, err := ws.ReadMessage()
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+			vals := strings.Split(string(message), ":")
+			if vals[0] == "subscribe" {
+				maker := string(vals[1])
+				orders, err := s.store.FilterOrders(maker, "", "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
+				if err != nil {
+					fmt.Println(err)
+					break
+				}
+
+				if err := ws.WriteJSON(orders); err != nil {
+					fmt.Println(err)
+					break
+				}
+
+				for {
+					orders, err := s.store.FilterOrders(maker, "", "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
+					if err != nil {
+						fmt.Println(err)
+						break
+					}
+
+					if err := ws.WriteJSON(orders); err != nil {
+						fmt.Println(err)
+						break
+					}
+					time.Sleep(3 * time.Second)
+				}
+			}
+
+			//Response message to client
+			err = ws.WriteMessage(mt, message)
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+
 		}
 	}
 }
