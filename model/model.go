@@ -24,6 +24,7 @@ const (
 	Ethereum         Chain = "ethereum"
 	EthereumSepolia  Chain = "ethereum_sepolia"
 	EthereumLocalnet Chain = "ethereum_localnet"
+	EthereumOptimism Chain = "ethereum_optimism"
 )
 
 func ParseChain(c string) (Chain, error) {
@@ -40,13 +41,15 @@ func ParseChain(c string) (Chain, error) {
 		return EthereumSepolia, nil
 	case "ethereum_localnet", "ethereum-localnet":
 		return EthereumLocalnet, nil
+	case "ethereum_optimism" , "optimism" , "ethereum-optimism":
+		return EthereumOptimism, nil
 	default:
 		return Chain(""), fmt.Errorf("unknown chain %v", c)
 	}
 }
 
 func (c Chain) IsEVM() bool {
-	return c == Ethereum || c == EthereumSepolia || c == EthereumLocalnet
+	return c == Ethereum || c == EthereumSepolia || c == EthereumLocalnet || c == EthereumOptimism
 }
 
 func (c Chain) IsBTC() bool {

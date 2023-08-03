@@ -41,4 +41,14 @@ var ConfigMap = map[string]map[string]Token{
 			Decimals: 8,
 		},
 	},
+	"ethereum_optimism": {
+		"primary": {
+			ID:       primary_eth,
+			Decimals: 18,
+		},
+		"0x1C2172d7BC6F299075fB8799081e21DC3e2CF019": {
+			ID:       wbtc,
+			Decimals: 8,
+		},
+	},
 }
