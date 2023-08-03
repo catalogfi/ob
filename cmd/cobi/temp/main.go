@@ -14,6 +14,7 @@ type Config struct {
 	ETH_RPC         string
 	BTC_TESTNET_RPC string
 	ETH_SEPOLIA_RPC string
+	ETH_OPTIMISM_RPC string
 }
 
 func LoadConfiguration(file string) Config {
@@ -36,6 +37,7 @@ func main() {
 			model.BitcoinTestnet:  envConfig.BTC_TESTNET_RPC,
 			model.EthereumSepolia: envConfig.ETH_SEPOLIA_RPC,
 			model.Ethereum:        envConfig.ETH_RPC,
+			model.EthereumOptimism: envConfig.ETH_OPTIMISM_RPC,
 		},
 	}); err != nil {
 		fmt.Println(err)

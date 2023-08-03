@@ -18,6 +18,8 @@ func GetEthClientByChainId(chainId int, config model.Config) (*ethclient.Client,
 		return ethclient.Dial(config.RPC[model.Ethereum])
 	case 11155111:
 		return ethclient.Dial(config.RPC[model.EthereumSepolia])
+	case 10:
+		return ethclient.Dial(config.RPC[model.EthereumOptimism])
 	default:
 		return nil, fmt.Errorf("No RPC url found for chainId")
 
