@@ -225,12 +225,11 @@ func (client *client) IsFinal(txHash string, waitBlocks uint64) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error getting current block %v", err)
 	}
-	if int64(currentBlock-tx.BlockNumber.Uint64()) > int64(waitBlocks) {
+	if int64(currentBlock-tx.BlockNumber.Uint64()) >= int64(waitBlocks) {
 		return true, nil
 	}
 	return false, nil
 }
-
 
 func (client *client) FetchOrder(secretHash []byte) {
 	// TODO:
