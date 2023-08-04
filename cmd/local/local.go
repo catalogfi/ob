@@ -21,7 +21,7 @@ func main() {
 		RPC: map[model.Chain]string{
 			model.BitcoinTestnet:  "https://mempool.space/testnet/api",
 			model.EthereumSepolia: "https://gateway.tenderly.co/public/sepolia",
-			model.EthereumOptimism: "https://mainnet.optimism.io",
+			model.EthereumOptimism: "https://opt-mainnet.g.alchemy.com/v2/lM_wORHU7fDVp_SSYJPCCO-erSffgpX9",
 		},
 	}
 
