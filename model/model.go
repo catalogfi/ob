@@ -3,6 +3,8 @@ package model
 import (
 	"database/sql"
 	"database/sql/driver"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -132,7 +134,7 @@ type AtomicSwap struct {
 	RefundTxHash         string  `json:"refundTxHash" `
 	PriceByOracle        float64 `json:"priceByOracle"`
 	MinimumConfirmations uint64  `json:"minimumConfirmations"`
-	IsInstantWallet      bool		`json:"isInstantWallet"`
+	IsInstantWallet      bool		`json:"-"`
 }
 
 type LockedAmount struct {
@@ -250,4 +252,29 @@ func isWhitelisted(chain Chain, asset string) error {
 		return fmt.Errorf("chain %v is not whitelisted", chain)
 	}
 
+}
+
+func CompareOrderSlices(a, b []Order) bool {
+    if len(a) != len(b) {
+        return false
+    }
+    for i, v := range a {
+        if v.Status != b[i].Status {
+            return false
+        }
+    }
+    return true
+
+}
+
+func VerifyHexString(input string) error {
+	decoded, err := hex.DecodeString(input)
+	if err != nil {
+		return errors.New("wrong secret hash: not a valid hexadecimal string")
+	}
+	if len(decoded) != 32 {
+		return errors.New("wrong secret hash: length should be 32 bytes (64 characters)")
+	}
+
+	return nil
 }

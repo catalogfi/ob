@@ -84,7 +84,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		return 0, err
 	}
 
-	if err := verifyHexString(secretHash); err != nil {
+	if err := model.VerifyHexString(secretHash); err != nil {
 		return 0, err
 	}
 

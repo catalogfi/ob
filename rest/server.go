@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-contrib/cors"
@@ -193,6 +194,7 @@ func (s *Server) GetOrderBySocket() gin.HandlerFunc {
 							break
 						}
 						order = order2
+						time.Sleep(2)
 					}
 				}
 			}
@@ -244,13 +246,14 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 						break
 					}
 
-					if compareSlices(orders2 , orders) == false {
+					if model.CompareOrderSlices(orders2 , orders) == false {
 							if err := ws.WriteJSON(orders); err != nil {
 								fmt.Println(err)
 								break
 							}
 					}
 					orders = orders2
+					time.Sleep(2)
 				}
 			}
 
@@ -483,15 +486,4 @@ func (s *Server) Verify() gin.HandlerFunc {
 	}
 }
 
-func compareSlices(a, b []model.Order) bool {
-    if len(a) != len(b) {
-        return false
-    }
-    for i, v := range a {
-        if v.Status != b[i].Status {
-            return false
-        }
-    }
-    return true
 
-}
