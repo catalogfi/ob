@@ -317,7 +317,7 @@ func (client *client) IsFinal(txHash string, waitPeriod uint64) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to get block height: %w", err)
 	}
-	if int64(currentBlock-minedBlock) >= int64(waitPeriod) {
+	if int64(currentBlock-minedBlock) >= int64(waitPeriod)-1 {
 		return true, nil
 	}
 	return false, nil
