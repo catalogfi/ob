@@ -200,17 +200,21 @@ func GetAllAssets(
 
 	filteredOrders := make([]model.Order, 0)
 	for _, order := range orders {
-		if len(fromAsset) == 1 && len(toAsset) == 1 {
+		
+
+		orderPair := order.OrderPair
+		FromChain, ToChain, FromAsset, ToAsset, err := model.ParseOrderPair(orderPair)
+
+		if len(fromAsset) == 1 && len(toAsset) == 1 && string(FromChain) == fromChain && string(ToChain) == toChain{
 			filteredOrders = append(filteredOrders, order)
 			continue
 		}
 
-		orderPair := order.OrderPair
-		FromChain, ToChain, FromAsset, ToAsset, err := model.ParseOrderPair(orderPair)
 		if err != nil {
 			fmt.Println("Error while parsing order pair:", err)
 			return nil, err
 		}
+		fmt.Println("OrderPair:", orderPair)
 		if (contains(fromAsset, string(FromAsset)) || contains(toAsset, string(ToAsset))) && string(FromChain) == fromChain && string(ToChain) == toChain {
 			filteredOrders = append(filteredOrders, order)
 		}
