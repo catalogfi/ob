@@ -214,7 +214,7 @@ func GetAllAssets(
 			fmt.Println("Error while parsing order pair:", err)
 			return nil, err
 		}
-		fmt.Println("OrderPair:", orderPair)
+		// fmt.Println("OrderPair:", orderPair)
 		if (contains(fromAsset, string(FromAsset)) || contains(toAsset, string(ToAsset))) && string(FromChain) == fromChain && string(ToChain) == toChain {
 			filteredOrders = append(filteredOrders, order)
 		}
