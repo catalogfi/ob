@@ -28,7 +28,7 @@ func NewAuth(config model.Config) Auth {
 	}
 }
 
-func (a *auth) Verfiy(req model.VerifySiwe) (*jwt.Token, error) {
+func (a *auth) Verify(req model.VerifySiwe) (*jwt.Token, error) {
 	parsedMessage, err := siwe.ParseMessage(req.Message)
 	if err != nil {
 		return nil, fmt.Errorf("Error parsing message: %w ", err)

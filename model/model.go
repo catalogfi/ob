@@ -67,7 +67,7 @@ func NewSecondary(address string) Asset {
 }
 
 func (a Asset) SecondaryID() string {
-	if string(a) == "primary" || string(a[:9]) != "secondary" {
+	if string(a) == "primary" || len(a) < 9 || string(a[:9]) != "secondary" {
 		return ""
 	}
 	return string(a[9:])
@@ -131,8 +131,8 @@ type AtomicSwap struct {
 	RedeemTxHash         string  `json:"redeemTxHash" `
 	RefundTxHash         string  `json:"refundTxHash" `
 	PriceByOracle        float64 `json:"priceByOracle"`
-	MinimumConfirmations uint64  `josn:"minimumConfirmations"`
-	IsInstantWallet      bool
+	MinimumConfirmations uint64  `json:"minimumConfirmations"`
+	IsInstantWallet      bool		`json:"isInstantWallet"`
 }
 
 type LockedAmount struct {
@@ -216,17 +216,17 @@ func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {
 	if err != nil {
 		return "", "", "", "", err
 	}
-	recieveChain, recieveAsset, err := ParseChainAsset(chainAssets[1])
+	receiveChain, receiveAsset, err := ParseChainAsset(chainAssets[1])
 	if err != nil {
 		return "", "", "", "", err
 	}
 	if err := isWhitelisted(sendChain, strings.Replace(string(sendAsset), "secondary", "", 1)); err != nil {
 		return "", "", "", "", err
 	}
-	if err := isWhitelisted(recieveChain, strings.Replace(string(recieveAsset), "secondary", "", 1)); err != nil {
+	if err := isWhitelisted(receiveChain, strings.Replace(string(receiveAsset), "secondary", "", 1)); err != nil {
 		return "", "", "", "", err
 	}
-	return sendChain, recieveChain, sendAsset, recieveAsset, nil
+	return sendChain, receiveChain, sendAsset, receiveAsset, nil
 }
 
 func ParseChainAsset(chainAsset string) (Chain, Asset, error) {

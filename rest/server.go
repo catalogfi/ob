@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-contrib/cors"
@@ -19,6 +18,7 @@ import (
 var upgrader = websocket.Upgrader{
 	//check origin will check the cross region source (note : please not using in production)
 	CheckOrigin: func(r *http.Request) bool {
+		// return r.Header.Get("Origin") == "http://wbtcgarden"
 		// TODO: add better origin checks
 		return true
 	},
@@ -36,9 +36,9 @@ type Store interface {
 	// get value locked in the given chain for the given user
 	GetValueLocked(user string, chain model.Chain) (*big.Int, error)
 	// create order
-	CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string, userWalletBTCAddress string, urls map[model.Chain]string) (uint, error)
+	CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userWalletBTCAddress string, urls map[model.Chain]string) (uint, error)
 	// fill order
-	FillOrder(orderID uint, filler, sendAddress, recieveAddress string, urls map[model.Chain]string) error
+	FillOrder(orderID uint, filler, sendAddress, receiveAddress string, urls map[model.Chain]string) error
 	// get order by id
 	GetOrder(orderID uint) (*model.Order, error)
 	// cancel order by id
@@ -91,16 +91,16 @@ func (s *Server) Run(addr string) error {
 
 type CreateOrder struct {
 	SendAddress          string `json:"sendAddress"`
-	RecieveAddress       string `json:"recieveAddress"`
+	ReceiveAddress       string `json:"receiveAddress"`
 	OrderPair            string `json:"orderPair"`
 	SendAmount           string `json:"sendAmount"`
-	RecieveAmount        string `json:"recieveAmount"`
+	ReceiveAmount        string `json:"receiveAmount"`
 	SecretHash           string `json:"secretHash"`
 	UserWalletBTCAddress string `json:"userWalletBTCAddress"`
 }
 
 type Auth interface {
-	Verfiy(req model.VerifySiwe) (*jwt.Token, error)
+	Verify(req model.VerifySiwe) (*jwt.Token, error)
 }
 
 func (s *Server) authenticateJWT(ctx *gin.Context) {
@@ -238,17 +238,19 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 				}
 
 				for {
-					orders, err := s.store.FilterOrders(maker, "", "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
+					orders2, err := s.store.FilterOrders(maker, "", "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
 					if err != nil {
 						fmt.Println(err)
 						break
 					}
 
-					if err := ws.WriteJSON(orders); err != nil {
-						fmt.Println(err)
-						break
+					if compareSlices(orders2 , orders) == false {
+							if err := ws.WriteJSON(orders); err != nil {
+								fmt.Println(err)
+								break
+							}
 					}
-					time.Sleep(3 * time.Second)
+					orders = orders2
 				}
 			}
 
@@ -306,7 +308,7 @@ func (s *Server) PostOrders() gin.HandlerFunc {
 			return
 		}
 
-		oid, err := s.store.CreateOrder(creator.(string), req.SendAddress, req.RecieveAddress, req.OrderPair, req.SendAmount, req.RecieveAmount, req.SecretHash, req.UserWalletBTCAddress, s.config.RPC)
+		oid, err := s.store.CreateOrder(creator.(string), req.SendAddress, req.ReceiveAddress, req.OrderPair, req.SendAmount, req.ReceiveAmount, req.SecretHash, req.UserWalletBTCAddress, s.config.RPC)
 		if err != nil {
 			errorMessage := fmt.Sprintf("failed to create order: %v", err.Error())
 			// fmt.Println(errorMessage, "error")
@@ -324,7 +326,7 @@ func (s *Server) PostOrders() gin.HandlerFunc {
 
 type FillOrder struct {
 	SendAddress    string `json:"sendAddress"`
-	RecieveAddress string `json:"recieveAddress"`
+	ReceiveAddress string `json:"receiveAddress"`
 }
 
 func (s *Server) FillOrder() gin.HandlerFunc {
@@ -347,7 +349,7 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 			return
 		}
 
-		if err := s.store.FillOrder(uint(orderID), filler.(string), req.SendAddress, req.RecieveAddress, s.config.RPC); err != nil {
+		if err := s.store.FillOrder(uint(orderID), filler.(string), req.SendAddress, req.ReceiveAddress, s.config.RPC); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": fmt.Sprintf("failed to fill the Order %v", err.Error()),
 			})
@@ -465,7 +467,7 @@ func (s *Server) Verify() gin.HandlerFunc {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		token, err := s.auth.Verfiy(req)
+		token, err := s.auth.Verify(req)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -479,4 +481,17 @@ func (s *Server) Verify() gin.HandlerFunc {
 		ctx.JSON(http.StatusOK, gin.H{"token": tokenString})
 
 	}
+}
+
+func compareSlices(a, b []model.Order) bool {
+    if len(a) != len(b) {
+        return false
+    }
+    for i, v := range a {
+        if v.Status != b[i].Status {
+            return false
+        }
+    }
+    return true
+
 }
