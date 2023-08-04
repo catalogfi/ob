@@ -18,7 +18,7 @@ func Create(entropy []byte, store Store) *cobra.Command {
 		url           string
 		orderPair     string
 		sendAmount    string
-		recieveAmount string
+		receiveAmount string
 	)
 
 	var cmd = &cobra.Command{
@@ -68,7 +68,7 @@ func Create(entropy []byte, store Store) *cobra.Command {
 				return
 			}
 
-			id, err := client.CreateOrder(fromAddress, toAddress, orderPair, sendAmount, recieveAmount, secretHash)
+			id, err := client.CreateOrder(fromAddress, toAddress, orderPair, sendAmount, receiveAmount, secretHash)
 			if err != nil {
 				cobra.CheckErr(fmt.Sprintf("Error while creating order: %v", err))
 				return
@@ -90,7 +90,7 @@ func Create(entropy []byte, store Store) *cobra.Command {
 	cmd.MarkFlagRequired("order-pair")
 	cmd.Flags().StringVar(&sendAmount, "send-amount", "", "User should provide the send amount")
 	cmd.MarkFlagRequired("send-amount")
-	cmd.Flags().StringVar(&recieveAmount, "recieve-amount", "", "User should provide the recieve amount")
-	cmd.MarkFlagRequired("recieve-amount")
+	cmd.Flags().StringVar(&receiveAmount, "receive-amount", "", "User should provide the receive amount")
+	cmd.MarkFlagRequired("receive-amount")
 	return cmd
 }

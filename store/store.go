@@ -77,14 +77,14 @@ func (s *store) GetValueLocked(user string, chain model.Chain) (*big.Int, error)
 	return sum, nil
 }
 
-func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string, userBtcWalletAddress string, urls map[model.Chain]string) (uint, error) {
+func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userBtcWalletAddress string, urls map[model.Chain]string) (uint, error) {
 
-	sendChain, recieveChain, sendAsset, recieveAsset, err := model.ParseOrderPair(orderPair)
+	sendChain, receiveChain, sendAsset, receiveAsset, err := model.ParseOrderPair(orderPair)
 	if err != nil {
 		return 0, err
 	}
 
-	if err := verifyHexString(secretHash); err != nil {
+	if err := model.VerifyHexString(secretHash); err != nil {
 		return 0, err
 	}
 
@@ -110,10 +110,10 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 	}
 
 	followerAtomicSwap := model.AtomicSwap{
-		RedeemerAddress: recieveAddress,
-		Chain:           recieveChain,
-		Asset:           recieveAsset,
-		Amount:          recieveAmount,
+		RedeemerAddress: receiveAddress,
+		Chain:           receiveChain,
+		Asset:           receiveAsset,
+		Amount:          receiveAmount,
 	}
 
 	orders, err := s.FilterOrders(creator, "", "", "", "", 0, 0, 0, 0, 0, false)
@@ -126,9 +126,9 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 		return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
 	}
 
-	recieveAmt, ok := new(big.Int).SetString(recieveAmount, 10)
+	receiveAmt, ok := new(big.Int).SetString(receiveAmount, 10)
 	if !ok {
-		return 0, fmt.Errorf("invalid recieve amount: %s", recieveAmount)
+		return 0, fmt.Errorf("invalid receive amount: %s", receiveAmount)
 	}
 
 	// validate orderpair
@@ -146,7 +146,7 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 	}
 
 	// ignoring accuracy
-	price, _ := new(big.Float).Quo(new(big.Float).SetInt(sendAmt), new(big.Float).SetInt(recieveAmt)).Float64()
+	price, _ := new(big.Float).Quo(new(big.Float).SetInt(sendAmt), new(big.Float).SetInt(receiveAmt)).Float64()
 
 	order := model.Order{
 		Maker:                 creator,
@@ -176,7 +176,7 @@ func (s *store) CreateOrder(creator, sendAddress, recieveAddress, orderPair, sen
 	return order.ID, nil
 }
 
-func (s *store) FillOrder(orderID uint, filler, sendAddress, recieveAddress string, urls map[model.Chain]string) error {
+func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress string, urls map[model.Chain]string) error {
 	order := &model.Order{}
 	if tx := s.db.First(order, orderID); tx.Error != nil {
 		return tx.Error
@@ -187,15 +187,15 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, recieveAddress stri
 
 	fromChain, toChain, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
-		panic(fmt.Errorf("constraint violation: invalid order pair: %v", err))
+		return fmt.Errorf("constraint violation: invalid order pair: %v", err)
 	}
 	initiateAtomicSwapTimelock, err := blockchain.CalculateExpiry(fromChain, true, urls)
 	if err != nil {
-		panic(fmt.Errorf("constraint violation: invalid order pair: %v", err))
+		return fmt.Errorf("constraint violation: invalid order pair: %v", err)
 	}
 	followerAtomicSwapTimelock, err := blockchain.CalculateExpiry(toChain, false, urls)
 	if err != nil {
-		panic(fmt.Errorf("constraint violation: invalid order pair: %v", err))
+		return fmt.Errorf("constraint violation: invalid order pair: %v", err)
 	}
 
 	initiateAtomicSwap := &model.AtomicSwap{}
@@ -218,7 +218,7 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, recieveAddress stri
 
 	initiatorMinConfirmations := GetMinConfirmations(followerLockedValue, toChain)
 
-	initiateAtomicSwap.RedeemerAddress = recieveAddress
+	initiateAtomicSwap.RedeemerAddress = receiveAddress
 	followerAtomicSwap.InitiatorAddress = sendAddress
 	initiateAtomicSwap.Timelock = initiateAtomicSwapTimelock
 	followerAtomicSwap.Timelock = followerAtomicSwapTimelock

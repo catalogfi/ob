@@ -3,6 +3,8 @@ package model
 import (
 	"database/sql"
 	"database/sql/driver"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -67,7 +69,7 @@ func NewSecondary(address string) Asset {
 }
 
 func (a Asset) SecondaryID() string {
-	if string(a) == "primary" || string(a[:9]) != "secondary" {
+	if string(a) == "primary" || len(a) < 9 || string(a[:9]) != "secondary" {
 		return ""
 	}
 	return string(a[9:])
@@ -131,8 +133,8 @@ type AtomicSwap struct {
 	RedeemTxHash         string  `json:"redeemTxHash" `
 	RefundTxHash         string  `json:"refundTxHash" `
 	PriceByOracle        float64 `json:"priceByOracle"`
-	MinimumConfirmations uint64  `josn:"minimumConfirmations"`
-	IsInstantWallet      bool
+	MinimumConfirmations uint64  `json:"minimumConfirmations"`
+	IsInstantWallet      bool		`json:"-"`
 }
 
 type LockedAmount struct {
@@ -216,17 +218,17 @@ func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {
 	if err != nil {
 		return "", "", "", "", err
 	}
-	recieveChain, recieveAsset, err := ParseChainAsset(chainAssets[1])
+	receiveChain, receiveAsset, err := ParseChainAsset(chainAssets[1])
 	if err != nil {
 		return "", "", "", "", err
 	}
 	if err := isWhitelisted(sendChain, strings.Replace(string(sendAsset), "secondary", "", 1)); err != nil {
 		return "", "", "", "", err
 	}
-	if err := isWhitelisted(recieveChain, strings.Replace(string(recieveAsset), "secondary", "", 1)); err != nil {
+	if err := isWhitelisted(receiveChain, strings.Replace(string(receiveAsset), "secondary", "", 1)); err != nil {
 		return "", "", "", "", err
 	}
-	return sendChain, recieveChain, sendAsset, recieveAsset, nil
+	return sendChain, receiveChain, sendAsset, receiveAsset, nil
 }
 
 func ParseChainAsset(chainAsset string) (Chain, Asset, error) {
@@ -250,4 +252,29 @@ func isWhitelisted(chain Chain, asset string) error {
 		return fmt.Errorf("chain %v is not whitelisted", chain)
 	}
 
+}
+
+func CompareOrderSlices(a, b []Order) bool {
+    if len(a) != len(b) {
+        return false
+    }
+    for i, v := range a {
+        if v.Status != b[i].Status {
+            return false
+        }
+    }
+    return true
+
+}
+
+func VerifyHexString(input string) error {
+	decoded, err := hex.DecodeString(input)
+	if err != nil {
+		return errors.New("wrong secret hash: not a valid hexadecimal string")
+	}
+	if len(decoded) != 32 {
+		return errors.New("wrong secret hash: length should be 32 bytes (64 characters)")
+	}
+
+	return nil
 }

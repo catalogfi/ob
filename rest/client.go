@@ -17,8 +17,8 @@ import (
 )
 
 type Client interface {
-	FillOrder(orderID uint, sendAddress, recieveAddress string) error
-	CreateOrder(sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string) (uint, error)
+	FillOrder(orderID uint, sendAddress, receiveAddress string) error
+	CreateOrder(sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string) (uint, error)
 	GetOrder(id uint) (model.Order, error)
 	GetOrders(filter GetOrdersFilter) ([]model.Order, error)
 	GetFollowerInitiateOrders() ([]model.Order, error)
@@ -52,9 +52,9 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
-func (c *client) FillOrder(orderID uint, sendAddress, recieveAddress string) error {
+func (c *client) FillOrder(orderID uint, sendAddress, receiveAddress string) error {
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(FillOrder{SendAddress: sendAddress, RecieveAddress: recieveAddress}); err != nil {
+	if err := json.NewEncoder(&buf).Encode(FillOrder{SendAddress: sendAddress, ReceiveAddress: receiveAddress}); err != nil {
 		return err
 	}
 
@@ -74,7 +74,7 @@ func (c *client) FillOrder(orderID uint, sendAddress, recieveAddress string) err
 	if resp.StatusCode != http.StatusAccepted {
 		if resp.StatusCode == http.StatusUnauthorized {
 			c.ReLogin()
-			return c.FillOrder(orderID, sendAddress, recieveAddress)
+			return c.FillOrder(orderID, sendAddress, receiveAddress)
 		}
 		var errorResponse map[string]string
 		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
@@ -85,9 +85,9 @@ func (c *client) FillOrder(orderID uint, sendAddress, recieveAddress string) err
 	return nil
 }
 
-func (c *client) CreateOrder(sendAddress, recieveAddress, orderPair, sendAmount, recieveAmount, secretHash string) (uint, error) {
+func (c *client) CreateOrder(sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string) (uint, error) {
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(CreateOrder{SendAddress: sendAddress, RecieveAddress: recieveAddress, OrderPair: orderPair, SendAmount: sendAmount, RecieveAmount: recieveAmount, SecretHash: secretHash}); err != nil {
+	if err := json.NewEncoder(&buf).Encode(CreateOrder{SendAddress: sendAddress, ReceiveAddress: receiveAddress, OrderPair: orderPair, SendAmount: sendAmount, ReceiveAmount: receiveAmount, SecretHash: secretHash}); err != nil {
 		return 0, err
 	}
 
@@ -186,11 +186,11 @@ func (c *client) GetOrders(filter GetOrdersFilter) ([]model.Order, error) {
 	}
 
 	if filter.SecretHash != "" {
-		filterString = appendFilterString(filterString, "secretHash", filter.SecretHash)
+		filterString = appendFilterString(filterString, "secret_hash", filter.SecretHash)
 	}
 
 	if filter.OrderBy != "" {
-		filterString = appendFilterString(filterString, "orderBy", filter.OrderBy)
+		filterString = appendFilterString(filterString, "sort", filter.OrderBy)
 	}
 
 	if filter.Verbose {
@@ -202,11 +202,11 @@ func (c *client) GetOrders(filter GetOrdersFilter) ([]model.Order, error) {
 	}
 
 	if filter.MinPrice != 0 {
-		filterString = appendFilterString(filterString, "minPrice", strconv.FormatFloat(filter.MinPrice, 'f', -1, 64))
+		filterString = appendFilterString(filterString, "min_price", strconv.FormatFloat(filter.MinPrice, 'f', -1, 64))
 	}
 
 	if filter.MaxPrice != 0 {
-		filterString = appendFilterString(filterString, "maxPrice", strconv.FormatFloat(filter.MaxPrice, 'f', -1, 64))
+		filterString = appendFilterString(filterString, "max_price", strconv.FormatFloat(filter.MaxPrice, 'f', -1, 64))
 	}
 
 	if filter.Page != 0 {
@@ -214,7 +214,7 @@ func (c *client) GetOrders(filter GetOrdersFilter) ([]model.Order, error) {
 	}
 
 	if filter.PerPage != 0 {
-		filterString = appendFilterString(filterString, "perPage", strconv.Itoa(filter.PerPage))
+		filterString = appendFilterString(filterString, "per_page", strconv.Itoa(filter.PerPage))
 	}
 
 	resp, err := http.Get(fmt.Sprintf("%s/orders%s", c.url, filterString))

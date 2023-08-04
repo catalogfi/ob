@@ -21,10 +21,10 @@ var _ = Describe("Store", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash", "recievebtcAddress", urls)
+		_, err = store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash", "receivebtcAddress", urls)
 
 		Expect(err).NotTo(HaveOccurred())
-		_, err = store.CreateOrder("creator", "sendAddress", "recieveAddress", "bitcoin-ethereum", "100", "200", "secretHash", "recievebtcAddress", urls)
+		_, err = store.CreateOrder("creator", "sendAddress", "receiveAddress", "bitcoin-ethereum", "100", "200", "secretHash", "receivebtcAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
 		initiatorUnfilledOrders, err := store.FilterOrders("creator", "", "ethereum-bitcoin", "", "", model.OrderCreated, 0, 0, 0, 0, true)
 		Expect(err).NotTo(HaveOccurred())
@@ -44,14 +44,14 @@ var _ = Describe("Store", func() {
 	// It("should be able to create an order", func() {
 	// 	store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 	// 	Expect(err).NotTo(HaveOccurred())
-	// 	id, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ethereum:primary-bitcoin:primary", "100", "200", "secretHash", urls)
+	// 	id, err := store.CreateOrder("creator", "sendAddress", "receiveAddress", "ethereum:primary-bitcoin:primary", "100", "200", "secretHash", urls)
 	// 	Expect(err).NotTo(HaveOccurred())
 	// 	order, err := store.GetOrder(id)
 	// 	Expect(err).NotTo(HaveOccurred())
 	// 	Expect(order.ID).To(Equal(id))
 	// 	Expect(order.Maker).To(Equal("creator"))
 	// 	Expect(order.InitiatorAtomicSwap.InitiatorAddress).To(Equal("sendAddress"))
-	// 	Expect(order.FollowerAtomicSwap.RedeemerAddress).To(Equal("recieveAddress"))
+	// 	Expect(order.FollowerAtomicSwap.RedeemerAddress).To(Equal("receiveAddress"))
 	// 	Expect(order.InitiatorAtomicSwap.Amount).To(Equal("100"))
 	// 	Expect(order.FollowerAtomicSwap.Amount).To(Equal("200"))
 	// 	Expect(order.SecretHash).To(Equal("secretHash"))
@@ -64,7 +64,7 @@ var _ = Describe("Store", func() {
 	It("should be able to fill an order", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
-		id, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash", "recievebtcAddress", urls)
+		id, err := store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash", "receivebtcAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
 		err = store.FillOrder(id, "filler", "sendFollowerAddress", "reciveFollowerAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
@@ -84,7 +84,7 @@ var _ = Describe("Store", func() {
 	It("should be able to cancel an order", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
-		cid, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash", "recievebtcAddress", urls)
+		cid, err := store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash", "receivebtcAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
 		order, err := store.GetOrder(cid)
 		Expect(err).NotTo(HaveOccurred())
@@ -99,7 +99,7 @@ var _ = Describe("Store", func() {
 	It("shouldn't be able to cancel a filled order", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
-		cid, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash", "recievebtcAddress", urls)
+		cid, err := store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash", "receivebtcAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
 		err = store.FillOrder(cid, "filler", "sendFollowerAddress", "reciveFollowerAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
@@ -114,16 +114,16 @@ var _ = Describe("Store", func() {
 	It("should be able to get all open orders", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
-		cid1, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash", "recievebtcAddress", urls)
+		cid1, err := store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash", "receivebtcAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
 
-		cid2, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "200", "300", "secretHash", "recievebtcAddress", urls)
+		cid2, err := store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:ETH-BTC:BTC", "200", "300", "secretHash", "receivebtcAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
 
-		cid3, err := store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "200", "150", "secretHash", "recievebtcAddress", urls)
+		cid3, err := store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:ETH-BTC:BTC", "200", "150", "secretHash", "receivebtcAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:ETH-BTC:BTC", "200", "400", "secretHash", "recievebtcAddress", urls)
+		_, err = store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:ETH-BTC:BTC", "200", "400", "secretHash", "receivebtcAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
 
 		orders, err := store.GetActiveOrders()
@@ -156,16 +156,16 @@ var _ = Describe("Store", func() {
 	It("should be able to get all user's orders", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
-		_, err = store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:WBTC-BTC:BTC", "100", "200", "secretHash", "recievebtcAddress", urls)
+		_, err = store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:WBTC-BTC:BTC", "100", "200", "secretHash", "receivebtcAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:WBTC-BTC:BTC", "200", "300", "secretHash", "recievebtcAddress", urls)
+		_, err = store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:WBTC-BTC:BTC", "200", "300", "secretHash", "receivebtcAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = store.CreateOrder("creator", "sendAddress", "recieveAddress", "ETH:WBTC-BTC:BTC", "200", "150", "secretHash", "recievebtcAddress", urls)
+		_, err = store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:WBTC-BTC:BTC", "200", "150", "secretHash", "receivebtcAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = store.CreateOrder("creator2", "sendAddress", "recieveAddress", "ETH:WBTC-BTC:BTC", "200", "400", "secretHash", "recievebtcAddress", urls)
+		_, err = store.CreateOrder("creator2", "sendAddress", "receiveAddress", "ETH:WBTC-BTC:BTC", "200", "400", "secretHash", "receivebtcAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
 
 		// 	unfilledOrders, err := store.FilterOrders("creator", "", "", "", "", model.Status(1), 0, 0, 0, 0, true)
