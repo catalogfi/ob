@@ -17,10 +17,10 @@ type Strategy struct {
 	MaxFillOrders   uint     `json:"maxFillOrders"`
 	MaxFillDeadline uint64   `json:"maxFillDeadline"`
 	FromMaker       string   `json:"fromMaker"`
-	FromChain       string   `json:"fromChain"`
-	ToChain         string   `json:"toChain"`
-	FromAsset       []string `json:"fromAsset"`
-	ToAsset         []string `json:"toAsset"`
+	FromChain       string   `json:"fromChain" binding:"required"`
+	ToChain         string   `json:"toChain" binding:"required"`
+	FromAsset       []string `json:"fromAsset" binding:"required"`
+	ToAsset         []string `json:"toAsset" binding:"required"`
 	MinFillAmount   float64  `json:"minFillAmount"`
 	MaxFillAmount   float64  `json:"maxFillAmount"`
 	OrderBy         string   `json:"orderBy"`
@@ -200,12 +200,11 @@ func GetAllAssets(
 
 	filteredOrders := make([]model.Order, 0)
 	for _, order := range orders {
-		
 
 		orderPair := order.OrderPair
 		FromChain, ToChain, FromAsset, ToAsset, err := model.ParseOrderPair(orderPair)
 
-		if len(fromAsset) == 1 && len(toAsset) == 1 && string(FromChain) == fromChain && string(ToChain) == toChain{
+		if len(fromAsset) == 1 && len(toAsset) == 1 && string(FromChain) == fromChain && string(ToChain) == toChain {
 			filteredOrders = append(filteredOrders, order)
 			continue
 		}
