@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -49,7 +50,7 @@ func (a *auth) Verify(req model.VerifySiwe) (*jwt.Token, error) {
 	}
 
 	claims := &Claims{
-		UserWallet: fromAddress.String(),
+		UserWallet: strings.ToLower(fromAddress.String()),
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(time.Hour * 24).Unix(), // Token expires in 24 hours
 			IssuedAt:  time.Now().Unix(),

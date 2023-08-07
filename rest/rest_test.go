@@ -3,6 +3,7 @@ package rest_test
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -25,10 +26,21 @@ var (
 )
 
 var _ = BeforeSuite(func() {
+	filePath := "gorm.db"
+	if _, err := os.Stat(filePath); err == nil {
+		// If file exists, then remove
+		os.Remove(filePath)
+	}
+
 	// done := make(chan bool)
 	StartServer()
 	// <-done
 	time.Sleep(3 * time.Second) // await server to start
+
+	if os.Getenv("PRIVATE_KEY") == "" {
+		panic("PRIVATE_KEY not set")
+	}
+
 	c = rest.NewClient("http://localhost:8080", os.Getenv("PRIVATE_KEY"))
 	jwtToken = ""
 	CurrentOrderID = 0
@@ -79,8 +91,8 @@ var _ = Describe("Rest", func() {
 		Expect(CurrentOrder.ID).To(Equal(CurrentOrderID))
 		// Expect(CurrentOrder.Status).To(Equal("FILLED"))
 		Expect(CurrentOrder.OrderPair).To(Equal("bitcoin_testnet:primary-ethereum_sepolia:0x4FDAAe676608f2a768f9c57BFDAeFA7559283316"))
-		Expect(CurrentOrder.Taker).To(Equal("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da"))
-		Expect(CurrentOrder.Maker).To(Equal("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da"))
+		Expect(CurrentOrder.Taker).To(Equal(strings.ToLower("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da")))
+		Expect(CurrentOrder.Maker).To(Equal(strings.ToLower("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da")))
 		Expect(CurrentOrder.Status).To(Equal(model.Status(2)))
 		// fmt.Println("CurrentOrder: ", CurrentOrder.Taker, CurrentOrder.Status, CurrentOrder.OrderPair)
 	})
@@ -128,7 +140,7 @@ var _ = Describe("Rest", func() {
 		fmt.Println("responseji: ", string(response))
 		time.Sleep(5 * time.Second)
 		var creatorOrderId uint
-		creatorOrderId , err = c.CreateOrder("mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet:primary-ethereum_sepolia:0x4FDAAe676608f2a768f9c57BFDAeFA7559283316", "1", "10", "d87c01599e0f31a704ca73e5de993e274430101d4675d80da19d84b2bf19817d")
+		creatorOrderId, err = c.CreateOrder("mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet:primary-ethereum_sepolia:0x4FDAAe676608f2a768f9c57BFDAeFA7559283316", "1", "10", "d87c01599e0f31a704ca73e5de993e274430101d4675d80da19d84b2bf19817d")
 		count := 0
 		for {
 			_, message, err := conn.ReadMessage()
@@ -139,7 +151,7 @@ var _ = Describe("Rest", func() {
 				break
 			}
 			time.Sleep(5 * time.Second)
-			creatorOrderId , err = c.CreateOrder("mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet:primary-ethereum_sepolia:0x4FDAAe676608f2a768f9c57BFDAeFA7559283316", "1", "10", fmt.Sprintf("d87c01599e0f31a704ca73e5de993e274430101d4675d80da19d84b2bf19817%d" , count))
+			creatorOrderId, err = c.CreateOrder("mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet:primary-ethereum_sepolia:0x4FDAAe676608f2a768f9c57BFDAeFA7559283316", "1", "10", fmt.Sprintf("d87c01599e0f31a704ca73e5de993e274430101d4675d80da19d84b2bf19817%d", count))
 			time.Sleep(5 * time.Second)
 			c.FillOrder(creatorOrderId, "0xF403cE7776B22B74EcA871EcDaBeAA2103CD4A49", "mxHKgg7dU4pt9abWXveMofqRvWr7f6xx7g")
 		}

@@ -128,7 +128,7 @@ func (s *Server) authenticateJWT(ctx *gin.Context) {
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		if userWallet, exists := claims["userWallet"]; exists {
-			ctx.Set("userWallet", userWallet.(string))
+			ctx.Set("userWallet", strings.ToLower(userWallet.(string)))
 
 		} else {
 			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
@@ -227,7 +227,7 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 			}
 			vals := strings.Split(string(message), ":")
 			if vals[0] == "subscribe" {
-				maker := string(vals[1])
+				maker := strings.ToLower(string(vals[1]))
 				orders, err := s.store.FilterOrders(maker, "", "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
 				if err != nil {
 					fmt.Println(err)
@@ -246,14 +246,14 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 						break
 					}
 
-					if model.CompareOrderSlices(orders2 , orders) == false {
-							if err := ws.WriteJSON(orders); err != nil {
-								fmt.Println(err)
-								break
-							}
+					if model.CompareOrderSlices(orders2, orders) == false {
+						if err := ws.WriteJSON(orders2); err != nil {
+							fmt.Println(err)
+							break
+						}
 					}
 					orders = orders2
-					time.Sleep(2)
+					time.Sleep(time.Second * 2)
 				}
 			}
 
@@ -275,6 +275,7 @@ func (s *Server) GetValueLockedByChain() gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "userWallet not provided"})
 			return
 		}
+		user = strings.ToLower(user)
 		asset, exists := c.GetQuery("chainSelector")
 		if !exists {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "chain not provided"})
@@ -311,7 +312,7 @@ func (s *Server) PostOrders() gin.HandlerFunc {
 			return
 		}
 
-		oid, err := s.store.CreateOrder(creator.(string), req.SendAddress, req.ReceiveAddress, req.OrderPair, req.SendAmount, req.ReceiveAmount, req.SecretHash, req.UserWalletBTCAddress, s.config.RPC)
+		oid, err := s.store.CreateOrder(strings.ToLower(creator.(string)), req.SendAddress, req.ReceiveAddress, req.OrderPair, req.SendAmount, req.ReceiveAmount, req.SecretHash, req.UserWalletBTCAddress, s.config.RPC)
 		if err != nil {
 			errorMessage := fmt.Sprintf("failed to create order: %v", err.Error())
 			// fmt.Println(errorMessage, "error")
@@ -352,7 +353,7 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 			return
 		}
 
-		if err := s.store.FillOrder(uint(orderID), filler.(string), req.SendAddress, req.ReceiveAddress, s.config.RPC); err != nil {
+		if err := s.store.FillOrder(uint(orderID), strings.ToLower(filler.(string)), req.SendAddress, req.ReceiveAddress, s.config.RPC); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": fmt.Sprintf("failed to fill the Order %v", err.Error()),
 			})
@@ -393,7 +394,7 @@ func (s *Server) CancelOrder() gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode id has to be a number: %v", err.Error())})
 			return
 		}
-		if err := s.store.CancelOrder(maker.(string), uint(orderID)); err != nil {
+		if err := s.store.CancelOrder(strings.ToLower(maker.(string)), uint(orderID)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":   "failed to get account details",
 				"message": err.Error(),
@@ -410,6 +411,10 @@ func (s *Server) GetOrders() gin.HandlerFunc {
 		orderPair := c.DefaultQuery("order_pair", "")
 		secretHash := c.DefaultQuery("secret_hash", "")
 		orderBy := c.DefaultQuery("sort", "")
+
+		maker = strings.ToLower(maker)
+		taker = strings.ToLower(taker)
+
 		verbose, err := strconv.ParseBool(c.DefaultQuery("verbose", "false"))
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode verbose has to be a boolean: %v", err.Error())})
@@ -485,5 +490,3 @@ func (s *Server) Verify() gin.HandlerFunc {
 
 	}
 }
-
-
