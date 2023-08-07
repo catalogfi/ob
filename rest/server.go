@@ -91,13 +91,13 @@ func (s *Server) Run(addr string) error {
 }
 
 type CreateOrder struct {
-	SendAddress          string `json:"sendAddress"`
-	ReceiveAddress       string `json:"receiveAddress"`
-	OrderPair            string `json:"orderPair"`
-	SendAmount           string `json:"sendAmount"`
-	ReceiveAmount        string `json:"receiveAmount"`
-	SecretHash           string `json:"secretHash"`
-	UserWalletBTCAddress string `json:"userWalletBTCAddress"`
+	SendAddress          string `json:"sendAddress" binding:"required"`
+	ReceiveAddress       string `json:"receiveAddress" binding:"required"`
+	OrderPair            string `json:"orderPair" binding:"required"`
+	SendAmount           string `json:"sendAmount" binding:"required"`
+	ReceiveAmount        string `json:"receiveAmount" binding:"required"`
+	SecretHash           string `json:"secretHash" binding:"required"`
+	UserWalletBTCAddress string `json:"userWalletBTCAddress" binding:"required"`
 }
 
 type Auth interface {
@@ -329,8 +329,8 @@ func (s *Server) PostOrders() gin.HandlerFunc {
 }
 
 type FillOrder struct {
-	SendAddress    string `json:"sendAddress"`
-	ReceiveAddress string `json:"receiveAddress"`
+	SendAddress    string `json:"sendAddress" binding:"required"`
+	ReceiveAddress string `json:"receiveAddress" binding:"required"`
 }
 
 func (s *Server) FillOrder() gin.HandlerFunc {
