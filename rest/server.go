@@ -218,6 +218,8 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 			return
 		}
 		defer ws.Close()
+		var socketError error
+		socketError = nil
 		for {
 			//Read Message from client
 			mt, message, err := ws.ReadMessage()
@@ -230,25 +232,25 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 				maker := strings.ToLower(string(vals[1]))
 				orders, err := s.store.FilterOrders(maker, "", "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
 				if err != nil {
-					fmt.Println(err)
+					socketError = err
 					break
 				}
 
 				if err := ws.WriteJSON(orders); err != nil {
-					fmt.Println(err)
+					socketError = err
 					break
 				}
 
 				for {
 					orders2, err := s.store.FilterOrders(maker, "", "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
 					if err != nil {
-						fmt.Println(err)
+						socketError = err
 						break
 					}
 
 					if model.CompareOrderSlices(orders2, orders) == false {
 						if err := ws.WriteJSON(orders2); err != nil {
-							fmt.Println(err)
+							socketError = err
 							break
 						}
 					}
@@ -258,7 +260,7 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 			}
 
 			//Response message to client
-			err = ws.WriteMessage(mt, message)
+			err = ws.WriteMessage(mt, []byte(fmt.Sprintf("%v", socketError)))
 			if err != nil {
 				fmt.Println(err)
 				break
