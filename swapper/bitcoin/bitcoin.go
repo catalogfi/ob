@@ -70,7 +70,7 @@ func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerAddr btcutil.Address,
 		return nil, fmt.Errorf("failed to create script address: %w", err)
 	}
 
-	fmt.Println("script address:", scriptAddr.EncodeAddress())
+	// fmt.Println("script address:", scriptAddr.EncodeAddress())
 
 	watcher, err := NewWatcher(initiatorAddr, redeemerAddr, secretHash, waitBlocks, amount, minConfirmations, client)
 	if err != nil {
@@ -147,7 +147,7 @@ func NewRedeemerSwap(redeemer *btcec.PrivateKey, initiator btcutil.Address, secr
 		return nil, fmt.Errorf("failed to create script address: %w", err)
 	}
 
-	fmt.Println("script address:", scriptAddr.EncodeAddress())
+	// fmt.Println("script address:", scriptAddr.EncodeAddress())
 	watcher, err := NewWatcher(initiator, redeemerAddr, secretHash, waitBlocks, amount, minConfirmations, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create watcher: %w", err)
@@ -201,7 +201,7 @@ func NewWatcher(initiator, redeemerAddr btcutil.Address, secretHash []byte, wait
 		return nil, fmt.Errorf("failed to create script address: %w", err)
 	}
 
-	fmt.Println("script address:", scriptAddr.EncodeAddress())
+	// fmt.Println("script address:", scriptAddr.EncodeAddress())
 	return &watcher{scriptAddr: scriptAddr, amount: amount, waitBlocks: waitBlocks, minConfirmations: minConfirmations, client: client}, nil
 }
 

@@ -339,7 +339,7 @@ func (watcher *watcher) IsRefunded() (bool, string, error) {
 		Addresses: []common.Address{
 			watcher.atomicSwapAddr,
 		},
-		Topics: [][]common.Hash{{refundedEvent.ID}},
+		Topics: [][]common.Hash{{refundedEvent.ID},{common.BytesToHash(watcher.secretHash)}},
 	}
 
 	logs, err := watcher.client.GetProvider().FilterLogs(context.Background(), query)
