@@ -8,6 +8,7 @@ import (
 
 type Status uint
 
+// dont change sequence of status fields might conflict retry feature
 const (
 	Unknown Status = iota
 	Created
@@ -18,12 +19,12 @@ const (
 	FollowerRedeemed
 	InitiatorRefunded
 	FollowerRefunded
-	FollowerFailedToInitiate
-	FollowerFailedToRedeem
-	FollowerFailedToRefund
 	InitiatorFailedToInitiate
+	FollowerFailedToInitiate
 	InitiatorFailedToRedeem
+	FollowerFailedToRedeem
 	InitiatorFailedToRefund
+	FollowerFailedToRefund
 )
 
 type Order struct {
@@ -44,6 +45,7 @@ type Store interface {
 	PutError(secretHash, err string, status Status) error
 	CheckStatus(secretHash string) (bool, string)
 	Status(secretHash string) Status
+	GetOrder(id uint) (Order, error)
 }
 
 type store struct {
@@ -135,4 +137,12 @@ func (s *store) Status(secretHash string) Status {
 		return 0
 	}
 	return order.Status
+}
+
+func (s *store) GetOrder(id uint) (Order, error) {
+	var order Order
+	if tx := s.db.Where("order_id = ?", id).First(&order); tx.Error != nil {
+		return Order{}, tx.Error
+	}
+	return order, nil
 }
