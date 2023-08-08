@@ -222,7 +222,7 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 		socketError = nil
 		for {
 			//Read Message from client
-			mt, message, err := ws.ReadMessage()
+			_, message, err := ws.ReadMessage()
 			if err != nil {
 				socketError = err
 				break
@@ -244,13 +244,17 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 				for {
 					orders2, err := s.store.FilterOrders(maker, "", "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
 					if err != nil {
-						ws.WriteMessage(mt, []byte(err.Error()))
+						ws.WriteJSON(map[string]interface{}{
+							"error": err,
+						})
 						break
 					}
 
 					if model.CompareOrderSlices(orders2, orders) == false {
 						if err := ws.WriteJSON(orders2); err != nil {
-							ws.WriteMessage(mt, []byte(err.Error()))
+							ws.WriteJSON(map[string]interface{}{
+								"error": err,
+							})
 							break
 						}
 					}
@@ -260,12 +264,15 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 			}
 
 			//Response message to client
-			err = ws.WriteMessage(mt, []byte(fmt.Sprintf("%v", socketError)))
-			if err != nil {
-				fmt.Println(err)
-				break
+			if socketError != nil {
+				err = ws.WriteJSON(map[string]interface{}{
+					"error": fmt.Sprintf("%v", socketError),
+				})
+				if err != nil {
+					fmt.Println(err)
+					break
+				}
 			}
-
 		}
 	}
 }
