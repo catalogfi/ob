@@ -87,7 +87,7 @@ func (c *client) FillOrder(orderID uint, sendAddress, receiveAddress string) err
 
 func (c *client) CreateOrder(sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string) (uint, error) {
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(CreateOrder{SendAddress: sendAddress, ReceiveAddress: receiveAddress, OrderPair: orderPair, SendAmount: sendAmount, ReceiveAmount: receiveAmount, SecretHash: secretHash}); err != nil {
+	if err := json.NewEncoder(&buf).Encode(CreateOrder{SendAddress: sendAddress, ReceiveAddress: receiveAddress, OrderPair: orderPair, SendAmount: sendAmount, ReceiveAmount: receiveAmount, SecretHash: secretHash, UserWalletBTCAddress: receiveAddress}); err != nil {
 		return 0, err
 	}
 

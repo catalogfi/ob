@@ -72,7 +72,7 @@ func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerAddr btcutil.Address,
 
 	// fmt.Println("script address:", scriptAddr.EncodeAddress())
 
-	watcher, err := NewWatcher(initiatorAddr, redeemerAddr, secretHash, waitBlocks, amount, minConfirmations, client)
+	watcher, err := NewWatcher(initiatorAddr, redeemerAddr, secretHash, waitBlocks, minConfirmations, amount, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create watcher: %w", err)
 	}
@@ -148,7 +148,7 @@ func NewRedeemerSwap(redeemer *btcec.PrivateKey, initiator btcutil.Address, secr
 	}
 
 	// fmt.Println("script address:", scriptAddr.EncodeAddress())
-	watcher, err := NewWatcher(initiator, redeemerAddr, secretHash, waitBlocks, amount, minConfirmations, client)
+	watcher, err := NewWatcher(initiator, redeemerAddr, secretHash, waitBlocks, minConfirmations, amount, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create watcher: %w", err)
 	}
@@ -218,7 +218,7 @@ func (w *watcher) Expired() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if currentBlock > initiateBlockHeight+uint64(w.waitBlocks) {
+	if currentBlock >= initiateBlockHeight+uint64(w.waitBlocks) {
 		return true, nil
 	}
 	return false, nil
@@ -251,7 +251,7 @@ func (w *watcher) IsRedeemed() (bool, []byte, string, error) {
 	if err != nil {
 		return false, nil, "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
-	if len(witness) != 0 {
+	if len(witness) == 5 {
 		fmt.Println("Redeemed:", witness)
 		// inputs are [ 0 : sig, 1 : spender.PubKey().SerializeCompressed(),2 : secret, 3 :[]byte{0x1}, script]
 		secretString := witness[2]
@@ -270,18 +270,11 @@ func (w *watcher) IsRefunded() (bool, string, error) {
 	if err != nil {
 		return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
-	if len(witness) != 0 {
+	if len(witness) == 4 {
 		fmt.Println("Refunded:", witness)
 		// inputs are [ 0 : sig, 1 : spender.PubKey().SerializeCompressed(), 2 :[]byte{}, script]
-		secretString := witness[2]
-		secretBytes := make([]byte, hex.DecodedLen(len(secretString)))
-		_, err := hex.Decode(secretBytes, []byte(secretString))
-		if err != nil {
-			return false, "", fmt.Errorf("failed to decode secret: %w", err)
-		}
-		if len(witness) == 4 {
-			return true, tx, nil
-		}
+		return true, tx, nil
+
 	}
 	return false, "", nil
 }
