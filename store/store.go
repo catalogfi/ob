@@ -78,27 +78,56 @@ func (s *store) GetValueLocked(user string, chain model.Chain) (*big.Int, error)
 }
 
 func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userBtcWalletAddress string, urls map[model.Chain]string) (uint, error) {
+	// check if creator_addr is valid eth address
+	if err := model.ValidateEthereumAddress(creator); err != nil {
+		return 0, err
+	}
 
 	sendChain, receiveChain, sendAsset, receiveAsset, err := model.ParseOrderPair(orderPair)
 	if err != nil {
 		return 0, err
 	}
 
-	if err := model.VerifyHexString(secretHash); err != nil {
+	// check if send address and receive address are proper addresses for respective chains
+	if sendChain.IsBTC() {
+		if err := model.ValidateBitcoinAddress(sendAddress, sendChain); err != nil {
+			return 0, err
+		}
+		if err := model.ValidateBitcoinAddress(userBtcWalletAddress, sendChain); err != nil {
+			return 0, err
+		}
+		if err := model.ValidateEthereumAddress(receiveAddress); err != nil {
+			return 0, err
+		}
+	} else {
+		if err := model.ValidateEthereumAddress(sendAddress); err != nil {
+			return 0, err
+		}
+		if err := model.ValidateBitcoinAddress(receiveAddress, receiveChain); err != nil {
+			return 0, err
+		}
+		if err := model.ValidateBitcoinAddress(userBtcWalletAddress, receiveChain); err != nil {
+			return 0, err
+		}
+	}
+
+	// validate secretHash
+	if err := model.ValidateSecretHash(secretHash); err != nil {
 		return 0, err
 	}
 
+	//fetch current price of btc from chain [for analytics]
 	priceByOracle, err := s.Price("bitcoin", "ethereum")
 	if err != nil {
 		return 0, err
 	}
 
-	// initiatorLockValue, err := s.GetValueLocked(creator, sendChain)
-	// if err != nil {
-	// 	return 0, err
-	// }
+	initiatorLockValue, err := s.GetValueLocked(creator, sendChain)
+	if err != nil {
+		return 0, err
+	}
 
-	initiatorLockValue := big.NewInt(0)
+	// initiatorLockValue := big.NewInt(0)
 	initiatorMinConfirmations := GetMinConfirmations(initiatorLockValue, sendChain)
 
 	initiatorAtomicSwap := model.AtomicSwap{
@@ -190,6 +219,23 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	if err != nil {
 		return fmt.Errorf("constraint violation: invalid order pair: %v", err)
 	}
+
+	if fromChain.IsBTC() {
+		if err := model.ValidateBitcoinAddress(receiveAddress, fromChain); err != nil {
+			return err
+		}
+		if err := model.ValidateEthereumAddress(sendAddress); err != nil {
+			return err
+		}
+	} else {
+		if err := model.ValidateEthereumAddress(receiveAddress); err != nil {
+			return err
+		}
+		if err := model.ValidateBitcoinAddress(sendAddress, toChain); err != nil {
+			return err
+		}
+	}
+
 	initiateAtomicSwapTimelock, err := blockchain.CalculateExpiry(fromChain, true, urls)
 	if err != nil {
 		return fmt.Errorf("constraint violation: invalid order pair: %v", err)
@@ -212,11 +258,11 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	if err != nil {
 		return err
 	}
-	// followerLockedValue, err := s.GetValueLocked(filler, toChain)
-	// if err != nil {
-	// 	return err
-	// }
-	followerLockedValue := big.NewInt(0)
+	followerLockedValue, err := s.GetValueLocked(filler, toChain)
+	if err != nil {
+		return err
+	}
+	// followerLockedValue := big.NewInt(0)
 	initiatorMinConfirmations := GetMinConfirmations(followerLockedValue, toChain)
 
 	initiateAtomicSwap.RedeemerAddress = receiveAddress
