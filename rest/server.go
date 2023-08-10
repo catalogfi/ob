@@ -229,8 +229,8 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 			}
 			vals := strings.Split(string(message), ":")
 			if vals[0] == "subscribe" {
-				maker := strings.ToLower(string(vals[1]))
-				orders, err := s.store.FilterOrders(maker, "", "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
+				makerOrTaker := strings.ToLower(string(vals[1]))
+				orders, err := s.store.FilterOrders(makerOrTaker, makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
 				if err != nil {
 					socketError = err
 					break
@@ -242,7 +242,7 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 				}
 
 				for {
-					orders2, err := s.store.FilterOrders(maker, "", "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
+					orders2, err := s.store.FilterOrders(makerOrTaker, makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
 					if err != nil {
 						ws.WriteJSON(map[string]interface{}{
 							"error": err,
