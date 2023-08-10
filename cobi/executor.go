@@ -4,10 +4,8 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"log"
-	Url "net/url"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -36,10 +34,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 				privKey := vals[0].(*ecdsa.PrivateKey)
 				makerOrTaker := crypto.PubkeyToAddress(privKey.PublicKey)
 
-				addr := flag.String("addr", url, "http service address")
-				u := Url.URL{Scheme: "wss", Host: *addr, Path: "/ws/orders"}
-				client, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
-				fmt.Println(u.String())
+				client, _, err := websocket.DefaultDialer.Dial(url, nil)
 				if err != nil {
 					log.Fatal("dial:", err)
 				}
@@ -59,6 +54,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 						fmt.Println(err)
 						break
 					}
+					fmt.Println("orders to process :", len(orders))
 
 					for _, order := range orders {
 						if order.Maker == makerOrTaker.Hex() {
