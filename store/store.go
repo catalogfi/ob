@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/susruth/wbtc-garden/blockchain"
 	"github.com/susruth/wbtc-garden/model"
@@ -52,6 +53,46 @@ func (s *store) GetValueLocked(user string, chain model.Chain) (*big.Int, error)
 		Select("asset as asset,SUM(amount::bigint) as amount").
 		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
 		Where("orders.taker = ? AND (orders.status = ? OR orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapRedeemed, model.FollowerAtomicSwapInitiated, model.InitiatorAtomicSwapRefunded, chain).
+		Group("asset").
+		Find(&followAmounts).Error; err != nil {
+		return big.NewInt(0), err
+	}
+	combinedArray := model.CombineAndAddAmount(initAmounts, followAmounts)
+
+	if len(combinedArray) == 0 {
+		return big.NewInt(0), nil
+	}
+	sum := big.NewInt(0)
+	for _, tokenAmount := range combinedArray {
+
+		if tokenAmount.Amount.Valid {
+			priceInUSD, err := s.Price("bitcoin", "ethereum")
+			if err != nil {
+				return big.NewInt(0), err
+			}
+			sum = new(big.Int).Add(price.GetPrice(model.Asset(tokenAmount.Asset), chain, big.NewInt(tokenAmount.Amount.Int64), big.NewInt(int64(priceInUSD))), sum)
+			fmt.Println(sum)
+		}
+	}
+	//flooring the sum
+	return sum, nil
+}
+
+func (s *store) GetVolumeTraded(user string, chain model.Chain) (*big.Int, error) {
+	var initAmounts, followAmounts []model.LockedAmount
+	validateTime := time.Now().Add(-24 * time.Hour).UTC()
+	if err := s.db.Table("atomic_swaps").
+		Select("asset as asset,SUM(amount::bigint) as amount").
+		Joins("JOIN orders ON orders.initiator_atomic_swap_id = atomic_swaps.id").
+		Where("created_at >= ?", validateTime).
+		Group("asset").
+		Find(&initAmounts).Error; err != nil {
+		return big.NewInt(0), err
+	}
+	if err := s.db.Table("atomic_swaps").
+		Select("asset as asset,SUM(amount::bigint) as amount").
+		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
+		Where("created_at >= ?", validateTime).
 		Group("asset").
 		Find(&followAmounts).Error; err != nil {
 		return big.NewInt(0), err
@@ -153,6 +194,10 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 
 	sendAmt, ok := new(big.Int).SetString(sendAmount, 10)
 	if !ok {
+		return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
+	}
+	// check if send amount is not less than 1000
+	if sendAmt.Cmp(big.NewInt(100000)) == -1 || sendAmt.Cmp(big.NewInt(10000000)) == 1 {
 		return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
 	}
 
