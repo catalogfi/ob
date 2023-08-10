@@ -80,7 +80,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 								}
 							}
 
-							if order.Status == model.InitiatorAtomicSwapInitiated {
+							if order.Status == model.InitiatorAtomicSwapInitiated || order.Status == model.FollowerAtomicSwapRefunded {
 								// assuming that the function would just return nil if the swap has not expired yet
 								if err := handleInitiatorRefund(order, entropy, account, config, store); err != nil {
 									fmt.Println(err)
