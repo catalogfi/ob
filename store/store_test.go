@@ -26,12 +26,12 @@ var _ = Describe("Store", func() {
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("creator", "sendAddress", "receiveAddress", "bitcoin-ethereum", "100", "200", "secretHash", "receivebtcAddress", urls)
 		Expect(err).NotTo(HaveOccurred())
-		initiatorUnfilledOrders, err := store.FilterOrders("creator", "", "ethereum-bitcoin", "", "", model.OrderCreated, 0, 0, 0, 0, true)
+		initiatorUnfilledOrders, err := store.FilterOrders("creator", "", "ethereum-bitcoin", "", "", model.OrderCreated, 0, 0, 0, 0, 0, 0, true)
 		Expect(err).NotTo(HaveOccurred())
 		order := initiatorUnfilledOrders[0]
 		order.Status = model.InitiatorAtomicSwapInitiated
 		store.UpdateOrder(&order)
-		followerUnfilledOrders, err := store.FilterOrders("creator", "", "bitcoin-ethereum", "", "", model.Status(1), 0, 0, 0, 0, true)
+		followerUnfilledOrders, err := store.FilterOrders("creator", "", "bitcoin-ethereum", "", "", model.Status(1), 0, 0, 0, 0, 0, 0, true)
 		Expect(err).NotTo(HaveOccurred())
 		order = followerUnfilledOrders[0]
 		order.Status = model.InitiatorAtomicSwapRedeemed

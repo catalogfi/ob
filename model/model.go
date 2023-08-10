@@ -43,7 +43,7 @@ func ParseChain(c string) (Chain, error) {
 		return EthereumSepolia, nil
 	case "ethereum_localnet", "ethereum-localnet":
 		return EthereumLocalnet, nil
-	case "ethereum_optimism" , "optimism" , "ethereum-optimism":
+	case "ethereum_optimism", "optimism", "ethereum-optimism":
 		return EthereumOptimism, nil
 	default:
 		return Chain(""), fmt.Errorf("unknown chain %v", c)
@@ -134,7 +134,7 @@ type AtomicSwap struct {
 	RefundTxHash         string  `json:"refundTxHash" `
 	PriceByOracle        float64 `json:"priceByOracle"`
 	MinimumConfirmations uint64  `json:"minimumConfirmations"`
-	IsInstantWallet      bool		`json:"-"`
+	IsInstantWallet      bool    `json:"-"`
 }
 
 type LockedAmount struct {
@@ -255,15 +255,15 @@ func isWhitelisted(chain Chain, asset string) error {
 }
 
 func CompareOrderSlices(a, b []Order) bool {
-    if len(a) != len(b) {
-        return false
-    }
-    for i, v := range a {
-        if v.Status != b[i].Status {
-            return false
-        }
-    }
-    return true
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v.Status != b[i].Status {
+			return false
+		}
+	}
+	return true
 
 }
 

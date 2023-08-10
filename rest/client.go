@@ -157,6 +157,8 @@ type GetOrdersFilter struct {
 	Status     int
 	MinPrice   float64
 	MaxPrice   float64
+	MinAmount  float64
+	MaxAmount  float64
 	Page       int
 	PerPage    int
 }
@@ -215,6 +217,13 @@ func (c *client) GetOrders(filter GetOrdersFilter) ([]model.Order, error) {
 
 	if filter.PerPage != 0 {
 		filterString = appendFilterString(filterString, "per_page", strconv.Itoa(filter.PerPage))
+	}
+
+	if filter.MinAmount != 0 {
+		filterString = appendFilterString(filterString, "min_amount", strconv.FormatFloat(filter.MinAmount, 'f', -1, 64))
+	}
+	if filter.MaxAmount != 0 {
+		filterString = appendFilterString(filterString, "max_amount", strconv.FormatFloat(filter.MaxAmount, 'f', -1, 64))
 	}
 
 	resp, err := http.Get(fmt.Sprintf("%s/orders%s", c.url, filterString))

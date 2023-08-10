@@ -93,11 +93,12 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		return 0, err
 	}
 
-	initiatorLockValue, err := s.GetValueLocked(creator, sendChain)
-	if err != nil {
-		return 0, err
-	}
+	// initiatorLockValue, err := s.GetValueLocked(creator, sendChain)
+	// if err != nil {
+	// 	return 0, err
+	// }
 
+	initiatorLockValue := big.NewInt(0)
 	initiatorMinConfirmations := GetMinConfirmations(initiatorLockValue, sendChain)
 
 	initiatorAtomicSwap := model.AtomicSwap{
@@ -116,7 +117,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		Amount:          receiveAmount,
 	}
 
-	orders, err := s.FilterOrders(creator, "", "", "", "", 0, 0, 0, 0, 0, false)
+	orders, err := s.FilterOrders(creator, "", "", "", "", 0, 0, 0, 0, 0, 0, 0, false)
 	if err != nil {
 		return 0, err
 	}
@@ -211,11 +212,11 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	if err != nil {
 		return err
 	}
-	followerLockedValue, err := s.GetValueLocked(filler, toChain)
-	if err != nil {
-		return err
-	}
-
+	// followerLockedValue, err := s.GetValueLocked(filler, toChain)
+	// if err != nil {
+	// 	return err
+	// }
+	followerLockedValue := big.NewInt(0)
 	initiatorMinConfirmations := GetMinConfirmations(followerLockedValue, toChain)
 
 	initiateAtomicSwap.RedeemerAddress = receiveAddress
@@ -255,11 +256,19 @@ func (s *store) CancelOrder(creator string, orderID uint) error {
 	return nil
 }
 
-func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, status model.Status, minPrice, maxPrice float64, page, perPage int, verbose bool) ([]model.Order, error) {
+func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, status model.Status, minPrice, maxPrice float64, minAmount, maxAmount float64, page, perPage int, verbose bool) ([]model.Order, error) {
 	orders := []model.Order{}
-	tx := s.db
+	tx := s.db.Table("orders")
 	if orderPair != "" {
 		tx = tx.Where("order_pair = ?", orderPair)
+	}
+	if minAmount != 0 {
+		tx = tx.Joins("JOIN atomic_swaps ON orders.initiator_atomic_swap_id = atomic_swaps.id ")
+		tx = tx.Where("atomic_swaps.amount >= ?", uint(minAmount))
+	}
+	if maxAmount != 0 {
+		tx = tx.Joins("JOIN atomic_swaps ON orders.initiator_atomic_swap_id = atomic_swaps.id")
+		tx = tx.Where("atomic_swaps.amount <= ?", uint(maxAmount))
 	}
 	if minPrice != 0 {
 		tx = tx.Where("price >= ?", minPrice)
