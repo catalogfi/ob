@@ -266,11 +266,15 @@ func (w *watcher) IsRedeemed() (bool, []byte, string, error) {
 }
 
 func (w *watcher) IsRefunded() (bool, string, error) {
+	_, bal, err := w.client.GetUTXOs(w.scriptAddr, 0)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
+	}
 	witness, tx, err := w.client.GetSpendingWitness(w.scriptAddr)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
-	if len(witness) == 4 {
+	if len(witness) == 4 && bal == 0 {
 		fmt.Println("Refunded:", witness)
 		// inputs are [ 0 : sig, 1 : spender.PubKey().SerializeCompressed(), 2 :[]byte{}, script]
 		return true, tx, nil
