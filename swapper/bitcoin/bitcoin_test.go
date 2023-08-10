@@ -105,4 +105,27 @@ var _ = Describe("Bitcoin", func() {
 		}
 
 	})
+	It("should send via segwit", func() {
+		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" //tb1q5428vq2uzwhm3taey9sr9x5vm6tk78ew9gs838
+		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" //tb1qcjzphr67dug28rw9ueewrqllmxlqe5f0v7g34m
+
+		privKeyBytes1, _ := hex.DecodeString(PRIV_KEY_1)
+		privKey1, _ := btcec.PrivKeyFromBytes(privKeyBytes1)
+
+		privKeyBytes2, _ := hex.DecodeString(PRIV_KEY_2)
+		privKey2, _ := btcec.PrivKeyFromBytes(privKeyBytes2)
+
+		pkAddr1, err := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(privKey1.PubKey().SerializeCompressed()), &chaincfg.TestNet3Params)
+		Expect(err).To(BeNil())
+		fmt.Println("pkAddr1:", pkAddr1.EncodeAddress())
+		pkAddr2, err := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(privKey2.PubKey().SerializeCompressed()), &chaincfg.TestNet3Params)
+		Expect(err).To(BeNil())
+		fmt.Println("pkAddr2:", pkAddr2.EncodeAddress())
+
+		client := bitcoin.NewClient("https://mempool.space/testnet/api", &chaincfg.TestNet3Params)
+		txhash, err := client.Send(pkAddr2, 10000, privKey1)
+		Expect(txhash).NotTo(BeNil())
+		Expect(err).To(BeNil())
+		fmt.Printf("https://mempool.space/testnet/tx/%s", txhash)
+	})
 })

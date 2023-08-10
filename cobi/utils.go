@@ -40,7 +40,7 @@ func getKeys(entropy []byte, chain model.Chain, user uint32, selector []uint32) 
 		if err != nil {
 			return nil, fmt.Errorf("failed to create child key: %v", err)
 		}
-	case model.Ethereum, model.EthereumLocalnet, model.EthereumSepolia , model.EthereumOptimism:
+	case model.Ethereum, model.EthereumLocalnet, model.EthereumSepolia, model.EthereumOptimism:
 		key, err = masterKey.NewChildKey(60)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create child key: %v", err)
