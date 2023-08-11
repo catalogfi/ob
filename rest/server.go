@@ -45,7 +45,7 @@ type Store interface {
 	// cancel order by id
 	CancelOrder(creator string, orderID uint) error
 	// get all orders for the given user
-	FilterOrders(maker, taker, orderPair, secretHash, sort string, status model.Status, minPrice, maxPrice float64, page, perPage int, verbose bool) ([]model.Order, error)
+	FilterOrders(maker, taker, orderPair, secretHash, sort string, status model.Status, minPrice, maxPrice float64, minAmount, maxAmount float64, page, perPage int, verbose bool) ([]model.Order, error)
 }
 
 func NewServer(store Store, config model.Config, secret string) *Server {
@@ -230,12 +230,12 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 			vals := strings.Split(string(message), ":")
 			if vals[0] == "subscribe" {
 				makerOrTaker := strings.ToLower(string(vals[1]))
-				makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
+				makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0,0.0, 0.0, 0, 0, true)
 				if err != nil {
 					socketError = err
 					break
 				}
-				takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
+				takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0,0.0, 0.0, 0, 0, true)
 				if err != nil {
 					socketError = err
 					break
@@ -250,14 +250,14 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 				}
 
 				for {
-					makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
+					makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0,0.0, 0.0, 0, 0, true)
 					if err != nil {
 						ws.WriteJSON(map[string]interface{}{
 							"error": err,
 						})
 						break
 					}
-					takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0, 0, 0, true)
+					takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0,0.0, 0.0, 0, 0, true)
 					if err != nil {
 						ws.WriteJSON(map[string]interface{}{
 							"error": err,
@@ -475,7 +475,19 @@ func (s *Server) GetOrders() gin.HandlerFunc {
 			return
 		}
 
-		orders, err := s.store.FilterOrders(maker, taker, orderPair, secretHash, orderBy, model.Status(status), minPrice, maxPrice, page, perPage, verbose)
+		minAmount, err := strconv.ParseFloat(c.DefaultQuery("min_amount", "0"), 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode minAmount has to be a number: %v", err.Error())})
+			return
+		}
+
+		maxAmount, err := strconv.ParseFloat(c.DefaultQuery("max_amount", "0"), 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode maxAmount has to be a number: %v", err.Error())})
+			return
+		}
+
+		orders, err := s.store.FilterOrders(maker, taker, orderPair, secretHash, orderBy, model.Status(status), minPrice, maxPrice, minAmount, maxAmount, page, perPage, verbose)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": fmt.Errorf("failed to get orders %s", err.Error()),

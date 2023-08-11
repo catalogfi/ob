@@ -113,8 +113,8 @@ func AutoFill(entropy []byte, store Store) *cobra.Command {
 								OrderPair: orderPair,
 								OrderBy:   strategy.OrderBy,
 								Verbose:   false,
-								MinPrice:  strategy.MinFillAmount,
-								MaxPrice:  strategy.MaxFillAmount,
+								MinAmount: strategy.MinFillAmount,
+								MaxAmount: strategy.MaxFillAmount,
 								Status:    int(model.OrderCreated),
 								PerPage:   strategy.FilterByPage,
 							})
@@ -185,13 +185,13 @@ func GetAllAssets(
 	OrderBy string,
 ) ([]model.Order, error) {
 	orders, err := client.GetOrders(rest.GetOrdersFilter{
-		Maker:    maker,
-		OrderBy:  OrderBy,
-		Verbose:  false,
-		Status:   int(model.OrderCreated),
-		MinPrice: minPrice,
-		MaxPrice: maxPrice,
-		PerPage:  fetchPerPage,
+		Maker:     maker,
+		OrderBy:   OrderBy,
+		Verbose:   false,
+		Status:    int(model.OrderCreated),
+		MinAmount: minPrice,
+		MaxAmount: maxPrice,
+		PerPage:   fetchPerPage,
 	})
 	if err != nil {
 		fmt.Println("Error while getting orders:", err)

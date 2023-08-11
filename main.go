@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/price"
@@ -40,7 +41,9 @@ func main() {
 	// psql db
 	envConfig := LoadConfiguration("./config.json")
 	// fmt.Println(envConfig.PSQL_DB)
-	store, err := store.New(postgres.Open(envConfig.PSQL_DB), &gorm.Config{})
+	store, err := store.New(postgres.Open(envConfig.PSQL_DB), &gorm.Config{
+		NowFunc: func() time.Time { return time.Now().UTC() },
+	})
 	if err != nil {
 		panic(err)
 	}

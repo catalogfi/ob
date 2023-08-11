@@ -87,7 +87,19 @@ func (c *client) FillOrder(orderID uint, sendAddress, receiveAddress string) err
 
 func (c *client) CreateOrder(sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string) (uint, error) {
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(CreateOrder{SendAddress: sendAddress, ReceiveAddress: receiveAddress, OrderPair: orderPair, SendAmount: sendAmount, ReceiveAmount: receiveAmount, SecretHash: secretHash, UserWalletBTCAddress: receiveAddress}); err != nil {
+
+	fromchain,_,_,_,err := model.ParseOrderPair(orderPair)
+	if err != nil {
+		return 0, err
+	}
+
+	var userBtcAddress string
+	if fromchain.IsBTC() {
+		userBtcAddress = sendAddress
+	} else {
+		userBtcAddress = receiveAddress
+	}
+	if err := json.NewEncoder(&buf).Encode(CreateOrder{SendAddress: sendAddress, ReceiveAddress: receiveAddress, OrderPair: orderPair, SendAmount: sendAmount, ReceiveAmount: receiveAmount, SecretHash: secretHash, UserWalletBTCAddress: userBtcAddress}); err != nil {
 		return 0, err
 	}
 
@@ -157,6 +169,8 @@ type GetOrdersFilter struct {
 	Status     int
 	MinPrice   float64
 	MaxPrice   float64
+	MinAmount  float64
+	MaxAmount  float64
 	Page       int
 	PerPage    int
 }
@@ -215,6 +229,13 @@ func (c *client) GetOrders(filter GetOrdersFilter) ([]model.Order, error) {
 
 	if filter.PerPage != 0 {
 		filterString = appendFilterString(filterString, "per_page", strconv.Itoa(filter.PerPage))
+	}
+
+	if filter.MinAmount != 0 {
+		filterString = appendFilterString(filterString, "min_amount", strconv.FormatFloat(filter.MinAmount, 'f', -1, 64))
+	}
+	if filter.MaxAmount != 0 {
+		filterString = appendFilterString(filterString, "max_amount", strconv.FormatFloat(filter.MaxAmount, 'f', -1, 64))
 	}
 
 	resp, err := http.Get(fmt.Sprintf("%s/orders%s", c.url, filterString))
