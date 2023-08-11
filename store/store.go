@@ -115,6 +115,9 @@ func (s *store) GetVolumeTraded(user string, chain model.Chain) (*big.Int, error
 }
 
 func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userBtcWalletAddress string, urls map[model.Chain]string) (uint, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
 	// check if creator_addr is valid eth address
 	if err := model.ValidateEthereumAddress(creator); err != nil {
 		return 0, err
@@ -257,6 +260,9 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 }
 
 func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress string, urls map[model.Chain]string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
 	order := &model.Order{}
 	if tx := s.db.First(order, orderID); tx.Error != nil {
 		return tx.Error
