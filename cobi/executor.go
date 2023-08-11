@@ -57,7 +57,8 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 					fmt.Println("orders to process :", len(orders))
 
 					for _, order := range orders {
-						if order.Maker == makerOrTaker.Hex() {
+						if order.Maker == strings.ToLower(makerOrTaker.Hex()) {
+							fmt.Printf("Handling order as maker id : %d status : %d", order.ID, order.Status)
 							if order.Status == model.OrderFilled {
 								if err := handleInitiatorInitiateOrder(order, entropy, account, config, store); err != nil {
 									fmt.Println(err)
@@ -91,7 +92,8 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 							}
 						}
 
-						if order.Taker == makerOrTaker.Hex() {
+						if order.Taker == strings.ToLower(makerOrTaker.Hex()) {
+							fmt.Printf("Handling order as taker id : %d status : %d", order.ID, order.Status)
 							if order.Status == model.InitiatorAtomicSwapInitiated {
 								if err := handleFollowerInitiateOrder(order, entropy, account, config, store); err != nil {
 									fmt.Println(err)
@@ -127,6 +129,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 }
 
 func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store) error {
+	fmt.Println("handleInitiatorInitiateOrder")
 	if isValid, err := store.CheckStatus(order.SecretHash); !isValid {
 		fmt.Printf("Skipping order %d failed earlier with %s", order.ID, err)
 		return nil
@@ -164,7 +167,7 @@ func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32
 }
 
 func handleInitiatorRedeemOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store, secret []byte) error {
-
+	fmt.Println("handleInitiatorRedeemOrder")
 	if isValid, err := store.CheckStatus(order.SecretHash); !isValid {
 		// if the bot is a initiator and redeem failed and bob did not refund
 		if !strings.Contains(err, "Order not found in local storage") {
@@ -209,6 +212,7 @@ func handleInitiatorRedeemOrder(order model.Order, entropy []byte, user uint32, 
 }
 
 func handleFollowerInitiateOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store) error {
+	fmt.Println("handleFollowerInitiateOrder")
 	if isValid, err := store.CheckStatus(order.SecretHash); !isValid {
 		fmt.Printf("Skipping order %d failed earlier with %s", order.ID, err)
 		return nil
@@ -246,6 +250,7 @@ func handleFollowerInitiateOrder(order model.Order, entropy []byte, user uint32,
 }
 
 func handleFollowerRedeemOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store) error {
+	fmt.Println("handleFollowerRedeemOrder")
 	if isValid, err := store.CheckStatus(order.SecretHash); !isValid {
 		fmt.Printf("Skipping order %d failed earlier with %s", order.ID, err)
 		return nil
@@ -288,6 +293,7 @@ func handleFollowerRedeemOrder(order model.Order, entropy []byte, user uint32, c
 	return nil
 }
 func handleFollowerRefund(order model.Order, entropy []byte, user uint32, config model.Config, store Store) error {
+	fmt.Println("handleFollowerRefund")
 	status := store.Status(order.SecretHash)
 	if status == FollowerRefunded {
 		return nil
@@ -330,6 +336,7 @@ func handleFollowerRefund(order model.Order, entropy []byte, user uint32, config
 	return nil
 }
 func handleInitiatorRefund(order model.Order, entropy []byte, user uint32, config model.Config, store Store) error {
+	fmt.Println("handleInitiatorRefund")
 
 	status := store.Status(order.SecretHash)
 	if status == InitiatorRefunded {
