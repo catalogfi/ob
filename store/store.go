@@ -52,7 +52,7 @@ func (s *store) GetValueLocked(user string, chain model.Chain) (*big.Int, error)
 	if err := s.db.Table("atomic_swaps").
 		Select("asset as asset,SUM(amount::bigint) as amount").
 		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
-		Where("orders.taker = ? AND (orders.status = ? OR orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapRedeemed, model.FollowerAtomicSwapInitiated, model.InitiatorAtomicSwapRefunded, chain).
+		Where("orders.taker = ? AND (orders.status = ? OR orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.FollowerAtomicSwapRedeemed, model.FollowerAtomicSwapInitiated, model.InitiatorAtomicSwapRefunded, chain).
 		Group("asset").
 		Find(&followAmounts).Error; err != nil {
 		return big.NewInt(0), err

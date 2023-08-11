@@ -103,7 +103,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 								}
 							}
 
-							if order.Status == model.InitiatorAtomicSwapRedeemed {
+							if order.Status == model.FollowerAtomicSwapRedeemed {
 								if err := handleFollowerRedeemOrder(order, entropy, account, config, store); err != nil {
 									fmt.Println(err)
 									continue
