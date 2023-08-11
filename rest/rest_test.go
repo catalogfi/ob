@@ -162,7 +162,9 @@ var _ = Describe("Rest", func() {
 
 func StartServer() {
 	go func() {
-		store, err := store.New(sqlite.Open("gorm.db"), &gorm.Config{})
+		store, err := store.New(sqlite.Open("gorm.db"), &gorm.Config{
+			NowFunc: func() time.Time { return time.Now().UTC() },
+		})
 		Expect(err).NotTo(HaveOccurred())
 		config := model.Config{
 			RPC: map[model.Chain]string{

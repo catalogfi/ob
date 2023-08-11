@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"gorm.io/gorm"
 
 	"github.com/catalogfi/wbtc-garden/config"
@@ -267,7 +269,7 @@ func CompareOrderSlices(a, b []Order) bool {
 
 }
 
-func VerifyHexString(input string) error {
+func ValidateSecretHash(input string) error {
 	decoded, err := hex.DecodeString(input)
 	if err != nil {
 		return errors.New("wrong secret hash: not a valid hexadecimal string")
@@ -277,4 +279,41 @@ func VerifyHexString(input string) error {
 	}
 
 	return nil
+}
+
+func ValidateEthereumAddress(input string) error {
+	if len(input) > 2 && input[:2] == "0x" {
+		input = input[2:]
+	}
+	if len(input) != 40 {
+		return errors.New("wrong ethereum address: length should be 40 bytes")
+	}
+	_, err := hex.DecodeString(input)
+	// fmt.Println("IsEthereumAddress", len(input))
+	if err != nil {
+		return errors.New("wrong ethereum address: not a valid hexadecimal string")
+	}
+	return nil
+}
+
+func ValidateBitcoinAddress(address string, chain Chain) error {
+	chaincfg, err := GetParams(chain)
+	if err != nil {
+		return err
+	}
+	_, err = btcutil.DecodeAddress(address, chaincfg)
+	return err
+}
+
+func GetParams(chain Chain) (*chaincfg.Params, error) {
+	switch chain {
+	case Bitcoin:
+		return &chaincfg.MainNetParams, nil
+	case BitcoinTestnet:
+		return &chaincfg.TestNet3Params, nil
+	case BitcoinRegtest:
+		return &chaincfg.RegressionNetParams, nil
+	default:
+		return nil, errors.New("constraint violation: unknown chain")
+	}
 }
