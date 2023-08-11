@@ -4,9 +4,9 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/spf13/cobra"
-	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/rest"
 )
 
 func Fill(entropy []byte, store Store) *cobra.Command {

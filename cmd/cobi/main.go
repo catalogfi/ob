@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/susruth/wbtc-garden/cobi"
-	"github.com/susruth/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/cobi"
+	"github.com/catalogfi/wbtc-garden/model"
 )
 
 type Config struct {
-	BTC_RPC         string
-	ETH_RPC         string
-	BTC_TESTNET_RPC string
-	ETH_SEPOLIA_RPC string
+	BTC_RPC          string
+	ETH_RPC          string
+	BTC_TESTNET_RPC  string
+	ETH_SEPOLIA_RPC  string
 	ETH_OPTIMISM_RPC string
 }
 
@@ -33,10 +33,10 @@ func main() {
 	envConfig := LoadConfiguration("../../config.json")
 	if err := cobi.Run(model.Config{
 		RPC: map[model.Chain]string{
-			model.Bitcoin:         envConfig.BTC_RPC,
-			model.BitcoinTestnet:  envConfig.BTC_TESTNET_RPC,
-			model.EthereumSepolia: envConfig.ETH_SEPOLIA_RPC,
-			model.Ethereum:        envConfig.ETH_RPC,
+			model.Bitcoin:          envConfig.BTC_RPC,
+			model.BitcoinTestnet:   envConfig.BTC_TESTNET_RPC,
+			model.EthereumSepolia:  envConfig.ETH_SEPOLIA_RPC,
+			model.Ethereum:         envConfig.ETH_RPC,
 			model.EthereumOptimism: envConfig.ETH_OPTIMISM_RPC,
 		},
 	}); err != nil {

@@ -8,16 +8,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/spruceid/siwe-go"
-	"github.com/susruth/wbtc-garden/model"
 )
 
 var upgrader = websocket.Upgrader{
-	//check origin will check the cross region source (note : please not using in production)
+	// check origin will check the cross region source (note : please not using in production)
 	CheckOrigin: func(r *http.Request) bool {
 		// return r.Header.Get("Origin") == "http://wbtcgarden"
 		// TODO: add better origin checks
@@ -146,7 +146,7 @@ func (s *Server) authenticateJWT(ctx *gin.Context) {
 
 func (s *Server) GetOrderBySocket() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		//upgrade get request to websocket protocol
+		// upgrade get request to websocket protocol
 		ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
 			fmt.Println(err)
@@ -154,7 +154,7 @@ func (s *Server) GetOrderBySocket() gin.HandlerFunc {
 		}
 		defer ws.Close()
 		for {
-			//Read Message from client
+			// Read Message from client
 			mt, message, err := ws.ReadMessage()
 			if err != nil {
 				fmt.Println(err)
@@ -199,7 +199,7 @@ func (s *Server) GetOrderBySocket() gin.HandlerFunc {
 				}
 			}
 
-			//Response message to client
+			// Response message to client
 			err = ws.WriteMessage(mt, message)
 			if err != nil {
 				fmt.Println(err)
@@ -211,7 +211,7 @@ func (s *Server) GetOrderBySocket() gin.HandlerFunc {
 
 func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		//upgrade get request to websocket protocol
+		// upgrade get request to websocket protocol
 		ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to upgrade to websocket %v", err)})
@@ -221,7 +221,7 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 		var socketError error
 		socketError = nil
 		for {
-			//Read Message from client
+			// Read Message from client
 			_, message, err := ws.ReadMessage()
 			if err != nil {
 				socketError = err
@@ -281,7 +281,7 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 				}
 			}
 
-			//Response message to client
+			// Response message to client
 			if socketError != nil {
 				err = ws.WriteJSON(map[string]interface{}{
 					"error": fmt.Sprintf("%v", socketError),

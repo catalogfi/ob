@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/catalogfi/wbtc-garden/model"
+	ERC1271 "github.com/catalogfi/wbtc-garden/rest/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/susruth/wbtc-garden/model"
-	ERC1271 "github.com/susruth/wbtc-garden/rest/types"
 )
 
 func GetEthClientByChainId(chainId int, config model.Config) (*ethclient.Client, error) {

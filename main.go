@@ -5,23 +5,23 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/price"
-	"github.com/susruth/wbtc-garden/rest"
-	"github.com/susruth/wbtc-garden/store"
-	"github.com/susruth/wbtc-garden/watcher"
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/price"
+	"github.com/catalogfi/wbtc-garden/rest"
+	"github.com/catalogfi/wbtc-garden/store"
+	"github.com/catalogfi/wbtc-garden/watcher"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 type Config struct {
-	PORT            string `binding:"required"`
-	PSQL_DB         string `binding:"required"`
-	PRICE_FEED_URL  string `binding:"required"`
-	BTC_RPC         string
-	ETH_RPC         string
-	BTC_TESTNET_RPC string
-	ETH_SEPOLIA_RPC string
+	PORT             string `binding:"required"`
+	PSQL_DB          string `binding:"required"`
+	PRICE_FEED_URL   string `binding:"required"`
+	BTC_RPC          string
+	ETH_RPC          string
+	BTC_TESTNET_RPC  string
+	ETH_SEPOLIA_RPC  string
 	ETH_OPTIMISM_RPC string
 }
 
@@ -47,10 +47,10 @@ func main() {
 
 	config := model.Config{
 		RPC: map[model.Chain]string{
-			model.BitcoinTestnet:  envConfig.BTC_TESTNET_RPC,
-			model.EthereumSepolia: envConfig.ETH_SEPOLIA_RPC,
-			model.Ethereum:        envConfig.ETH_RPC,
-			model.Bitcoin:         envConfig.BTC_RPC,
+			model.BitcoinTestnet:   envConfig.BTC_TESTNET_RPC,
+			model.EthereumSepolia:  envConfig.ETH_SEPOLIA_RPC,
+			model.Ethereum:         envConfig.ETH_RPC,
+			model.Bitcoin:          envConfig.BTC_RPC,
 			model.EthereumOptimism: envConfig.ETH_OPTIMISM_RPC,
 		},
 	}
