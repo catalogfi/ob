@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/price"
 	"github.com/catalogfi/wbtc-garden/rest"
@@ -12,7 +14,9 @@ import (
 
 func main() {
 	// sqlite db
-	store, err := store.New(sqlite.Open("test.db"), &gorm.Config{})
+	store, err := store.New(sqlite.Open("test.db"), &gorm.Config{
+		NowFunc: func() time.Time { return time.Now().UTC() },
+	})
 	if err != nil {
 		panic(err)
 	}

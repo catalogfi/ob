@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/spf13/cobra"
@@ -26,7 +27,9 @@ func Run(config model.Config) error {
 		return err
 	}
 
-	store, err := NewStore(sqlite.Open("test.db"), &gorm.Config{})
+	store, err := NewStore(sqlite.Open("test.db"), &gorm.Config{
+		NowFunc: func() time.Time { return time.Now().UTC() },
+	})
 	if err != nil {
 		return err
 	}
