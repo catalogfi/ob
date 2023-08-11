@@ -86,7 +86,7 @@ func getAddresses(entropy []byte, chain model.Chain, user uint32, selector []uin
 	addrs := make([]interface{}, len(keys))
 	for i, key := range keys {
 		if chain.IsBTC() {
-			addrs[i], err = btcutil.NewAddressPubKeyHash(btcutil.Hash160(key.(*btcec.PrivateKey).PubKey().SerializeCompressed()), getParams(chain))
+			addrs[i], err = btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(key.(*btcec.PrivateKey).PubKey().SerializeCompressed()), getParams(chain))
 			if err != nil {
 				return nil, fmt.Errorf("failed to create address: %v", err)
 			}
