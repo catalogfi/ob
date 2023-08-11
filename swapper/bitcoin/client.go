@@ -184,7 +184,7 @@ func (client *client) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, u
 func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error) {
 	tx := wire.NewMsgTx(BTC_VERSION)
 
-	fromAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(from.PubKey().SerializeCompressed()), client.Net())
+	fromAddr, err := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(from.PubKey().SerializeCompressed()), client.Net())
 	if err != nil {
 		return "", fmt.Errorf("failed to create address from private key: %w", err)
 	}
@@ -193,7 +193,7 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
-	FEE, err := client.CalculateFee(len(utxosWithoutFee), 2, Legacy)
+	FEE, err := client.CalculateFee(len(utxosWithoutFee), 2, SegWit)
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate fee: %w", err)
 	}
@@ -222,12 +222,18 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 	tx.AddTxOut(wire.NewTxOut(int64(amount), toScript))
 	tx.AddTxOut(wire.NewTxOut(int64(selectedAmount-amount-FEE), fromScript))
 
-	for i := range tx.TxIn {
-		sigScript, err := txscript.SignatureScript(tx, i, fromScript, txscript.SigHashAll, from, true)
+	for i, utxo := range utxosWihFee {
+		fetcher := txscript.NewCannedPrevOutputFetcher(fromScript, int64(utxo.Amount))
 		if err != nil {
-			return "", fmt.Errorf("failed to sign transaction: %w", err)
+			return "", err
 		}
-		tx.TxIn[i].SignatureScript = sigScript
+
+		sigHashes := txscript.NewTxSigHashes(tx, fetcher)
+		witness, err := txscript.WitnessSignature(tx, sigHashes, i, int64(utxo.Amount), fromScript, txscript.SigHashAll, from, true)
+		if err != nil {
+			return "", err
+		}
+		tx.TxIn[i].Witness = witness
 	}
 
 	return client.SubmitTx(tx)
@@ -317,7 +323,7 @@ func (client *client) IsFinal(txHash string, waitPeriod uint64) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to get block height: %w", err)
 	}
-	if int64(currentBlock-minedBlock) >= int64(waitPeriod)-1 || waitPeriod == 0 {
+	if int64(currentBlock-minedBlock) >= int64(waitPeriod)-1 {
 		return true, nil
 	}
 	return false, nil

@@ -12,7 +12,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"gorm.io/gorm"
 
-	"github.com/susruth/wbtc-garden/config"
+	"github.com/catalogfi/wbtc-garden/config"
 )
 
 type Config struct {

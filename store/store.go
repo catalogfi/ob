@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/susruth/wbtc-garden/blockchain"
-	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/price"
-	"github.com/susruth/wbtc-garden/rest"
-	"github.com/susruth/wbtc-garden/watcher"
+	"github.com/catalogfi/wbtc-garden/blockchain"
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/price"
+	"github.com/catalogfi/wbtc-garden/rest"
+	"github.com/catalogfi/wbtc-garden/watcher"
 	"gorm.io/gorm"
 )
 
@@ -110,7 +110,7 @@ func (s *store) GetVolumeTraded(user string, chain model.Chain) (*big.Int, error
 			// fmt.Println(sum)
 		}
 	}
-	//flooring the sum
+	// flooring the sum
 	return sum, nil
 }
 

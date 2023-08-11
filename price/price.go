@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/susruth/wbtc-garden/config"
-	"github.com/susruth/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/config"
+	"github.com/catalogfi/wbtc-garden/model"
 )
 
 type Store interface {

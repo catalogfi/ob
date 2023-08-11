@@ -1,11 +1,11 @@
 package main
 
 import (
-	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/price"
-	"github.com/susruth/wbtc-garden/rest"
-	"github.com/susruth/wbtc-garden/store"
-	"github.com/susruth/wbtc-garden/watcher"
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/price"
+	"github.com/catalogfi/wbtc-garden/rest"
+	"github.com/catalogfi/wbtc-garden/store"
+	"github.com/catalogfi/wbtc-garden/watcher"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -19,8 +19,8 @@ func main() {
 
 	config := model.Config{
 		RPC: map[model.Chain]string{
-			model.BitcoinTestnet:  "https://mempool.space/testnet/api",
-			model.EthereumSepolia: "https://gateway.tenderly.co/public/sepolia",
+			model.BitcoinTestnet:   "https://mempool.space/testnet/api",
+			model.EthereumSepolia:  "https://gateway.tenderly.co/public/sepolia",
 			model.EthereumOptimism: "https://opt-mainnet.g.alchemy.com/v2/lM_wORHU7fDVp_SSYJPCCO-erSffgpX9",
 		},
 	}

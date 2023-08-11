@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/susruth/wbtc-garden/blockchain"
-	"github.com/susruth/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/blockchain"
+	"github.com/catalogfi/wbtc-garden/model"
 )
 
 type Store interface {
@@ -50,13 +50,13 @@ func (w *watcher) Run() {
 
 func (w *watcher) watch(order model.Order) error {
 
-	//to check isFinal when changing status from 2 -> 3
+	// to check isFinal when changing status from 2 -> 3
 	iW, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config.RPC, order.InitiatorAtomicSwap.MinimumConfirmations)
 	if err != nil {
 		return err
 	}
 
-	//to check isFinal when changing status from 3 -> 4
+	// to check isFinal when changing status from 3 -> 4
 	fW, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config.RPC, order.FollowerAtomicSwap.MinimumConfirmations)
 	if err != nil {
 		return err
@@ -172,7 +172,7 @@ func (w *watcher) watch(order model.Order) error {
 		}
 	}
 
-	if order.Status == model.FollowerAtomicSwapRefunded{
+	if order.Status == model.FollowerAtomicSwapRefunded {
 		refunded, txHash, err := iW.IsRefunded()
 		if err != nil {
 			return err

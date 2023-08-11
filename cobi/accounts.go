@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/spf13/cobra"
-	"github.com/susruth/wbtc-garden/model"
 )
 
 func Accounts(entropy []byte, config model.Config) *cobra.Command {

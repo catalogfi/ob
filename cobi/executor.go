@@ -3,14 +3,16 @@ package cobi
 import (
 	"crypto/ecdsa"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
-	"time"
 
+	"github.com/catalogfi/wbtc-garden/blockchain"
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
-	"github.com/susruth/wbtc-garden/blockchain"
-	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/rest"
 )
 
 func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
@@ -23,7 +25,6 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 		Use:   "start",
 		Short: "Start the atomic swap executor",
 		Run: func(c *cobra.Command, args []string) {
-			fmt.Println("check")
 			for {
 				vals, err := getKeys(entropy, model.Ethereum, account, []uint32{0})
 				if err != nil {
@@ -31,131 +32,90 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 					return
 				}
 				privKey := vals[0].(*ecdsa.PrivateKey)
-				client := rest.NewClient(url, privKey.D.Text(16))
-				token, err := client.Login()
+				makerOrTaker := crypto.PubkeyToAddress(privKey.PublicKey)
+
+				client, _, err := websocket.DefaultDialer.Dial(url, nil)
 				if err != nil {
-					cobra.CheckErr(fmt.Sprintf("Error while getting the signing key: %v", err))
-					return
+					log.Fatal("dial:", err)
 				}
-				if err := client.SetJwt(token); err != nil {
-					cobra.CheckErr(fmt.Sprintf("Error to parse signing key: %v", err))
-					return
-				}
-				fmt.Println("")
-				fmt.Println("ORDER")
-				fmt.Println("")
-				orders, err := client.GetInitiatorInitiateOrders()
-				if err != nil {
-					fmt.Println(err)
-					continue
+				if err := client.WriteMessage(websocket.BinaryMessage, []byte(fmt.Sprintf("subscribe:%v", makerOrTaker))); err != nil {
+					log.Fatal("dial:", err)
 				}
 
-				for _, order := range orders {
-					// fmt.Println(order, entropy, account, config, store)
-					if err := handleInitiatorInitiateOrder(order, entropy, account, config, store); err != nil {
-						fmt.Println(err)
-						continue
-					}
-				}
-
-				orders, err = client.GetFollowerInitiateOrders()
-				if err != nil {
-					fmt.Println(err)
-					continue
-				}
-				for _, order := range orders {
-					if err := handleFollowerInitiateOrder(order, entropy, account, config, store); err != nil {
-						fmt.Println(err)
-						continue
-					}
-				}
-
-				orders, err = client.GetInitiatorRedeemOrders()
-				if err != nil {
-					fmt.Println(err)
-					continue
-				}
-
-				for _, order := range orders {
-					secret, err := store.Secret(order.SecretHash)
+				for {
+					fmt.Println("Cycle get orders")
+					_, msg, err := client.ReadMessage()
 					if err != nil {
 						fmt.Println(err)
-						continue
+						break
 					}
+					var orders []model.Order
+					if err := json.Unmarshal(msg, &orders); err != nil {
+						fmt.Println(err)
+						break
+					}
+					fmt.Println("orders to process :", len(orders))
 
-					secretBytes, err := hex.DecodeString(secret)
-					if err != nil {
-						fmt.Println(err)
-						continue
-					}
-					// if the bot is a initiator and redeem failed it will refund
-					if err := handleInitiatorRedeemOrRefundOrder(order, entropy, account, config, store, secretBytes); err != nil {
-						fmt.Println(err)
-						continue
-					}
-				}
+					for _, order := range orders {
+						if order.Maker == makerOrTaker.Hex() {
+							if order.Status == model.OrderFilled {
+								if err := handleInitiatorInitiateOrder(order, entropy, account, config, store); err != nil {
+									fmt.Println(err)
+									continue
+								}
+							}
 
-				orders, err = client.GetFollowerRedeemOrders()
-				if err != nil {
-					fmt.Println(err)
-					continue
-				}
-				for _, order := range orders {
-					if err := handleFollowerRedeemOrder(order, entropy, account, config, store); err != nil {
-						fmt.Println(err)
-						continue
-					}
-				}
-				//if status is 4 for 24 hours
-				// if the bot is a follower it will refund
-				orders, err = client.FollowerWaitForRedeemOrders()
-				if err != nil {
-					fmt.Println(err)
-					continue
-				}
-				for _, order := range orders {
-					if err := handleFollowerRefund(order, entropy, account, config, store); err != nil {
-						fmt.Println(err)
-						continue
-					}
-				}
-				orders, err = client.InitiatorWaitForInitiateOrders()
-				if err != nil {
-					fmt.Println(err)
-					continue
-				}
-				for _, order := range orders {
-					if err := handleInitiatorRefund(order, entropy, account, config, store); err != nil {
-						fmt.Println(err)
-						continue
-					}
-				}
-				// should be resolved explicitly as this case occurs onlt if follower refund failed the first time
-				// orders, err = client.GetInitiatorRefundedOrders()
-				// if err != nil {
-				// 	fmt.Println(err)
-				// 	continue
-				// }
-				// for _, order := range orders {
-				// 	if err := handleFollowerRefund(order, entropy, account, config, store); err != nil {
-				// 		fmt.Println(err)
-				// 		continue
-				// 	}
-				// }
+							if order.Status == model.FollowerAtomicSwapInitiated {
+								secret, err := store.Secret(order.SecretHash)
+								if err != nil {
+									fmt.Println(err)
+									continue
+								}
+								secretBytes, err := hex.DecodeString(secret)
+								if err != nil {
+									fmt.Println(err)
+									continue
+								}
+								if err := handleInitiatorRedeemOrder(order, entropy, account, config, store, secretBytes); err != nil {
+									fmt.Println(err)
+									continue
+								}
+							}
 
-				orders, err = client.GetFollowerRefundedOrders()
-				if err != nil {
-					fmt.Println(err)
-					continue
-				}
-				for _, order := range orders {
-					if err := handleInitiatorRefund(order, entropy, account, config, store); err != nil {
-						fmt.Println(err)
-						continue
+							if order.Status == model.InitiatorAtomicSwapInitiated || order.Status == model.FollowerAtomicSwapRefunded {
+								// assuming that the function would just return nil if the swap has not expired yet
+								if err := handleInitiatorRefund(order, entropy, account, config, store); err != nil {
+									fmt.Println(err)
+									continue
+								}
+							}
+						}
+
+						if order.Taker == makerOrTaker.Hex() {
+							if order.Status == model.InitiatorAtomicSwapInitiated {
+								if err := handleFollowerInitiateOrder(order, entropy, account, config, store); err != nil {
+									fmt.Println(err)
+									continue
+								}
+							}
+
+							if order.Status == model.InitiatorAtomicSwapRedeemed {
+								if err := handleFollowerRedeemOrder(order, entropy, account, config, store); err != nil {
+									fmt.Println(err)
+									continue
+								}
+							}
+
+							if order.Status == model.FollowerAtomicSwapInitiated {
+								// assuming that the function would just return nil if the swap has not expired yet
+								if err := handleFollowerRefund(order, entropy, account, config, store); err != nil {
+									fmt.Println(err)
+									continue
+								}
+							}
+						}
 					}
 				}
-
-				time.Sleep(15 * time.Second)
 			}
 		},
 		DisableAutoGenTag: true,
@@ -167,7 +127,6 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 }
 
 func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store) error {
-
 	if isValid, err := store.CheckStatus(order.SecretHash); !isValid {
 		fmt.Printf("Skipping order %d failed earlier with %s", order.ID, err)
 		return nil
@@ -204,7 +163,7 @@ func handleInitiatorInitiateOrder(order model.Order, entropy []byte, user uint32
 	return nil
 }
 
-func handleInitiatorRedeemOrRefundOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store, secret []byte) error {
+func handleInitiatorRedeemOrder(order model.Order, entropy []byte, user uint32, config model.Config, store Store, secret []byte) error {
 
 	if isValid, err := store.CheckStatus(order.SecretHash); !isValid {
 		// if the bot is a initiator and redeem failed and bob did not refund
