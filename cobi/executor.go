@@ -8,11 +8,11 @@ import (
 	"log"
 	"strings"
 
+	"github.com/catalogfi/wbtc-garden/blockchain"
+	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
-	"github.com/susruth/wbtc-garden/blockchain"
-	"github.com/susruth/wbtc-garden/model"
 )
 
 func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {

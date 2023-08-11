@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/spf13/cobra"
-	"github.com/susruth/wbtc-garden/model"
 	"github.com/tyler-smith/go-bip39"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

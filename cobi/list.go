@@ -4,11 +4,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/spf13/cobra"
-	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/rest"
 )
 
 func List() *cobra.Command {

@@ -5,13 +5,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/rest/utils"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/spruceid/siwe-go"
-	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/rest/utils"
 )
 
 type auth struct {

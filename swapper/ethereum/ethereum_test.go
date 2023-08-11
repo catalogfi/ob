@@ -7,12 +7,12 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/catalogfi/wbtc-garden/swapper"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/susruth/wbtc-garden/swapper"
-	"github.com/susruth/wbtc-garden/swapper/ethereum"
 )
 
 func randomHex(n int) ([]byte, error) {
@@ -29,8 +29,8 @@ var _ = Describe("Bitcoin", func() {
 		// PRIV_KEY_2 := os.Getenv("PRIV_KEY_2")
 		// Skip("")
 
-		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" //0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" //0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" // 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" // 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
 		atomicSwapAdrr := common.HexToAddress("0x9CC8B5379C40E24F374cd55973c138fff83ed214")
 		// TOKEN := common.HexToAddress("0x87c470437282174b3f8368c7CF1Ac03bcAe57954")
 		// instantClientConfig := ethereum.InstantClientConfig{

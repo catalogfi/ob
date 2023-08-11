@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/susruth/wbtc-garden/blockchain"
-	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/swapper"
+	"github.com/catalogfi/wbtc-garden/blockchain"
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/swapper"
 )
 
 const SwapInitiationTimeout = 30 * time.Minute
