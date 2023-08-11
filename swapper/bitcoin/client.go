@@ -262,7 +262,7 @@ func (client *client) Spend(script []byte, redeemScript wire.TxWitness, spender 
 		tx.AddTxIn(wire.NewTxIn(wire.NewOutPoint(txid, utxo.Vout), nil, nil))
 	}
 
-	spenderAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(spender.PubKey().SerializeCompressed()), client.Net())
+	spenderAddr, err := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(spender.PubKey().SerializeCompressed()), client.Net())
 	if err != nil {
 		return "", fmt.Errorf("failed to create address from private key: %w", err)
 	}
