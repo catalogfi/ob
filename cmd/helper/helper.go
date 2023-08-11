@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/ERC20"
 	geth "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/swapper/ethereum"
-	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/ERC20"
 	"github.com/tyler-smith/go-bip32"
 	"github.com/tyler-smith/go-bip39"
 )
@@ -39,7 +39,7 @@ func getKeys(entropy []byte, chain model.Chain, user uint32, selector []uint32) 
 		if err != nil {
 			return nil, fmt.Errorf("failed to create child key: %v", err)
 		}
-	case model.Ethereum, model.EthereumLocalnet, model.EthereumSepolia , model.EthereumOptimism:
+	case model.Ethereum, model.EthereumLocalnet, model.EthereumSepolia, model.EthereumOptimism:
 		key, err = masterKey.NewChildKey(60)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create child key: %v", err)

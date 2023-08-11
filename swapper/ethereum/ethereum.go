@@ -7,10 +7,10 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/catalogfi/wbtc-garden/swapper"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/susruth/wbtc-garden/swapper"
-	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
 )
 
 type initiatorSwap struct {
@@ -339,7 +339,7 @@ func (watcher *watcher) IsRefunded() (bool, string, error) {
 		Addresses: []common.Address{
 			watcher.atomicSwapAddr,
 		},
-		Topics: [][]common.Hash{{refundedEvent.ID},{common.BytesToHash(watcher.secretHash)}},
+		Topics: [][]common.Hash{{refundedEvent.ID}, {common.BytesToHash(watcher.secretHash)}},
 	}
 
 	logs, err := watcher.client.GetProvider().FilterLogs(context.Background(), query)

@@ -11,13 +11,13 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/catalogfi/wbtc-garden/blockchain"
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/swapper/bitcoin"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/ERC20"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/susruth/wbtc-garden/blockchain"
-	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/swapper/bitcoin"
-	"github.com/susruth/wbtc-garden/swapper/ethereum"
-	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/ERC20"
 	"github.com/tyler-smith/go-bip32"
 )
 

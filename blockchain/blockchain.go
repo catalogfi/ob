@@ -10,12 +10,12 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/swapper"
+	"github.com/catalogfi/wbtc-garden/swapper/bitcoin"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/swapper"
-	"github.com/susruth/wbtc-garden/swapper/bitcoin"
-	"github.com/susruth/wbtc-garden/swapper/ethereum"
 )
 
 // The function `LoadClient` returns a client for a given blockchain chain and its corresponding URLs(set during config).

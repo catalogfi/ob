@@ -19,7 +19,7 @@ package ethereum
 // 	"github.com/ethereum/go-ethereum/common/hexutil"
 // 	"github.com/ethereum/go-ethereum/crypto"
 // 	"github.com/ethereum/go-ethereum/ethclient"
-// 	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/ERC20"
+// 	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/ERC20"
 // )
 
 // type InstantClientConfig struct {

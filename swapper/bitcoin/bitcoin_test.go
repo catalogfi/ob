@@ -10,10 +10,10 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/catalogfi/wbtc-garden/swapper"
+	"github.com/catalogfi/wbtc-garden/swapper/bitcoin"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/susruth/wbtc-garden/swapper"
-	"github.com/susruth/wbtc-garden/swapper/bitcoin"
 )
 
 func randomHex(n int) ([]byte, error) {
@@ -29,8 +29,8 @@ var _ = Describe("Bitcoin", func() {
 		// PRIV_KEY_1 := os.Getenv("PRIV_KEY_1")
 		// PRIV_KEY_2 := os.Getenv("PRIV_KEY_2")
 		// Skip("")
-		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" //mvb8yA23gtNPsBpd21Wq5J6YY4GEnfYQyX
-		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" //myS2zesC4Va7ofV5MtnqZDct8iZdaBzULE
+		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" // mvb8yA23gtNPsBpd21Wq5J6YY4GEnfYQyX
+		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" // myS2zesC4Va7ofV5MtnqZDct8iZdaBzULE
 
 		privKeyBytes1, _ := hex.DecodeString(PRIV_KEY_1)
 		privKey1, _ := btcec.PrivKeyFromBytes(privKeyBytes1)
@@ -69,8 +69,8 @@ var _ = Describe("Bitcoin", func() {
 	})
 	It("should create a new swap and refund", func() {
 		// Skip("")
-		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" //mvb8yA23gtNPsBpd21Wq5J6YY4GEnfYQyX
-		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" //myS2zesC4Va7ofV5MtnqZDct8iZdaBzULE
+		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" // mvb8yA23gtNPsBpd21Wq5J6YY4GEnfYQyX
+		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" // myS2zesC4Va7ofV5MtnqZDct8iZdaBzULE
 
 		privKeyBytes1, _ := hex.DecodeString(PRIV_KEY_1)
 		privKey1, _ := btcec.PrivKeyFromBytes(privKeyBytes1)
@@ -106,8 +106,8 @@ var _ = Describe("Bitcoin", func() {
 
 	})
 	It("should send via segwit", func() {
-		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" //tb1q5428vq2uzwhm3taey9sr9x5vm6tk78ew9gs838
-		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" //tb1qcjzphr67dug28rw9ueewrqllmxlqe5f0v7g34m
+		PRIV_KEY_1 := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" // tb1q5428vq2uzwhm3taey9sr9x5vm6tk78ew9gs838
+		PRIV_KEY_2 := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" // tb1qcjzphr67dug28rw9ueewrqllmxlqe5f0v7g34m
 
 		privKeyBytes1, _ := hex.DecodeString(PRIV_KEY_1)
 		privKey1, _ := btcec.PrivKeyFromBytes(privKeyBytes1)

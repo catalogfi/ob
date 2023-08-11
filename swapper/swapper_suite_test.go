@@ -6,14 +6,14 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/TestERC20"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
-	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/TestERC20"
 )
 
 func TestSwapper(t *testing.T) {
