@@ -218,8 +218,7 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 			return
 		}
 		defer ws.Close()
-		var socketError error
-		socketError = nil
+		var socketError error = nil
 		for {
 			// Read Message from client
 			_, message, err := ws.ReadMessage()
@@ -279,8 +278,16 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 					orders = orders2
 					time.Sleep(time.Second * 2)
 				}
+			} else {
+				socketError = fmt.Errorf("invalid request. Request has to be in the form of subscribe:makerOrTaker")
+				err = ws.WriteJSON(map[string]interface{}{
+					"error": fmt.Sprintf("%v", socketError),
+				})
+				if err != nil {
+					fmt.Println(err)
+					break
+				}
 			}
-
 			// Response message to client
 			if socketError != nil {
 				err = ws.WriteJSON(map[string]interface{}{
@@ -291,6 +298,7 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 					break
 				}
 			}
+			time.Sleep(time.Second * 2)
 		}
 	}
 }
