@@ -58,7 +58,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 
 					for _, order := range orders {
 						if order.Maker == strings.ToLower(makerOrTaker.Hex()) {
-							fmt.Printf("Handling order as maker id : %d status : %d", order.ID, order.Status)
+							fmt.Printf("Handling order as maker id : %d status : %d\n", order.ID, order.Status)
 							if order.Status == model.OrderFilled {
 								if err := handleInitiatorInitiateOrder(order, entropy, account, config, store); err != nil {
 									fmt.Println(err)
@@ -93,7 +93,7 @@ func Execute(entropy []byte, store Store, config model.Config) *cobra.Command {
 						}
 
 						if order.Taker == strings.ToLower(makerOrTaker.Hex()) {
-							fmt.Printf("Handling order as taker id : %d status : %d", order.ID, order.Status)
+							fmt.Printf("Handling order as taker id : %d status : %d\n", order.ID, order.Status)
 							if order.Status == model.InitiatorAtomicSwapInitiated {
 								if err := handleFollowerInitiateOrder(order, entropy, account, config, store); err != nil {
 									fmt.Println(err)
