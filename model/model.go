@@ -1,11 +1,16 @@
 package model
 
 import (
+	"database/sql"
 	"database/sql/driver"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
 	"gorm.io/gorm"
+
+	"github.com/catalogfi/wbtc-garden/config"
 )
 
 type Config struct {
@@ -21,6 +26,7 @@ const (
 	Ethereum         Chain = "ethereum"
 	EthereumSepolia  Chain = "ethereum_sepolia"
 	EthereumLocalnet Chain = "ethereum_localnet"
+	EthereumOptimism Chain = "ethereum_optimism"
 )
 
 func ParseChain(c string) (Chain, error) {
@@ -37,13 +43,15 @@ func ParseChain(c string) (Chain, error) {
 		return EthereumSepolia, nil
 	case "ethereum_localnet", "ethereum-localnet":
 		return EthereumLocalnet, nil
+	case "ethereum_optimism", "optimism", "ethereum-optimism":
+		return EthereumOptimism, nil
 	default:
 		return Chain(""), fmt.Errorf("unknown chain %v", c)
 	}
 }
 
 func (c Chain) IsEVM() bool {
-	return c == Ethereum || c == EthereumSepolia || c == EthereumLocalnet
+	return c == Ethereum || c == EthereumSepolia || c == EthereumLocalnet || c == EthereumOptimism
 }
 
 func (c Chain) IsBTC() bool {
@@ -61,7 +69,7 @@ func NewSecondary(address string) Asset {
 }
 
 func (a Asset) SecondaryID() string {
-	if string(a) == "primary" || string(a[:9]) != "secondary" {
+	if string(a) == "primary" || len(a) < 9 || string(a[:9]) != "secondary" {
 		return ""
 	}
 	return string(a[9:])
@@ -82,6 +90,7 @@ const (
 	OrderExecuted
 	OrderFailedSoft
 	OrderFailedHard
+	OrderCancelled
 )
 
 type VerifySiwe struct {
@@ -101,24 +110,79 @@ type Order struct {
 	InitiatorAtomicSwap   *AtomicSwap `json:"initiatorAtomicSwap" gorm:"foreignKey:InitiatorAtomicSwapID"`
 	FollowerAtomicSwap    *AtomicSwap `json:"followerAtomicSwap" gorm:"foreignKey:FollowerAtomicSwapID"`
 
-	SecretHash string  `json:"secretHash"`
-	Secret     string  `json:"secret"`
-	Price      float64 `json:"price"`
-	Status     Status  `json:"status"`
+	SecretHash           string  `json:"secretHash" gorm:"unique;not null"`
+	Secret               string  `json:"secret"`
+	Price                float64 `json:"price"`
+	Status               Status  `json:"status"`
+	SecretNonce          uint64  `json:"secretNonce"`
+	UserBtcWalletAddress string  `json:"userBtcWalletAddress"`
+
+	Fee uint `json:"fee"`
 }
 
 type AtomicSwap struct {
 	gorm.Model
 
-	InitiatorAddress string `json:"initiatorAddress"`
-	RedeemerAddress  string `json:"redeemerAddress"`
-	Timelock         string `json:"timelock"`
-	Chain            Chain  `json:"chain"`
-	Asset            Asset  `json:"asset"`
-	Amount           string `json:"amount"`
-	InitiateTxHash   string `json:"initiateTxHash"`
-	RedeemTxHash     string `json:"redeemTxHash"`
-	RefundTxHash     string `json:"refundTxHash"`
+	InitiatorAddress     string  `json:"initiatorAddress"`
+	RedeemerAddress      string  `json:"redeemerAddress"`
+	Timelock             string  `json:"timelock"`
+	Chain                Chain   `json:"chain"`
+	Asset                Asset   `json:"asset"`
+	Amount               string  `json:"amount"`
+	InitiateTxHash       string  `json:"initiateTxHash" `
+	RedeemTxHash         string  `json:"redeemTxHash" `
+	RefundTxHash         string  `json:"refundTxHash" `
+	PriceByOracle        float64 `json:"priceByOracle"`
+	MinimumConfirmations uint64  `json:"minimumConfirmations"`
+	IsInstantWallet      bool    `json:"-"`
+}
+
+type LockedAmount struct {
+	Asset  string
+	Amount sql.NullInt64
+}
+
+func CombineAndAddAmount(arr1, arr2 []LockedAmount) []LockedAmount {
+	combinedMap := make(map[string]sql.NullInt64)
+
+	if len(arr1) == 0 {
+		return arr2
+	} else if len(arr2) == 0 {
+		return arr1
+	} else if len(arr1) == 0 && len(arr2) == 0 {
+		return nil
+	}
+	for _, item := range arr1 {
+		if _, ok := combinedMap[item.Asset]; ok {
+			combinedMap[item.Asset] = sql.NullInt64{
+				Int64: combinedMap[item.Asset].Int64 + item.Amount.Int64,
+				Valid: true,
+			}
+		} else {
+			combinedMap[item.Asset] = item.Amount
+		}
+	}
+
+	for _, item := range arr2 {
+		if _, ok := combinedMap[item.Asset]; ok {
+			combinedMap[item.Asset] = sql.NullInt64{
+				Int64: combinedMap[item.Asset].Int64 + item.Amount.Int64,
+				Valid: true,
+			}
+		} else {
+			combinedMap[item.Asset] = item.Amount
+		}
+	}
+
+	var combinedArray []LockedAmount
+	for asset, amount := range combinedMap {
+		combinedArray = append(combinedArray, LockedAmount{
+			Asset:  asset,
+			Amount: amount,
+		})
+	}
+
+	return combinedArray
 }
 
 type StringArray []string
@@ -154,11 +218,17 @@ func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {
 	if err != nil {
 		return "", "", "", "", err
 	}
-	recieveChain, recieveAsset, err := ParseChainAsset(chainAssets[1])
+	receiveChain, receiveAsset, err := ParseChainAsset(chainAssets[1])
 	if err != nil {
 		return "", "", "", "", err
 	}
-	return sendChain, recieveChain, sendAsset, recieveAsset, nil
+	if err := isWhitelisted(sendChain, strings.Replace(string(sendAsset), "secondary", "", 1)); err != nil {
+		return "", "", "", "", err
+	}
+	if err := isWhitelisted(receiveChain, strings.Replace(string(receiveAsset), "secondary", "", 1)); err != nil {
+		return "", "", "", "", err
+	}
+	return sendChain, receiveChain, sendAsset, receiveAsset, nil
 }
 
 func ParseChainAsset(chainAsset string) (Chain, Asset, error) {
@@ -170,4 +240,41 @@ func ParseChainAsset(chainAsset string) (Chain, Asset, error) {
 		return Chain(chainAndAsset[0]), Primary, nil
 	}
 	return Chain(chainAndAsset[0]), NewSecondary(chainAndAsset[1]), nil
+}
+
+func isWhitelisted(chain Chain, asset string) error {
+	if chainMap, ok := config.ConfigMap[string(chain)]; ok {
+		if _, ok := chainMap[asset]; ok {
+			return nil
+		}
+		return fmt.Errorf("asset %v is not whitelisted for chain %v", asset, chain)
+	} else {
+		return fmt.Errorf("chain %v is not whitelisted", chain)
+	}
+
+}
+
+func CompareOrderSlices(a, b []Order) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v.Status != b[i].Status {
+			return false
+		}
+	}
+	return true
+
+}
+
+func VerifyHexString(input string) error {
+	decoded, err := hex.DecodeString(input)
+	if err != nil {
+		return errors.New("wrong secret hash: not a valid hexadecimal string")
+	}
+	if len(decoded) != 32 {
+		return errors.New("wrong secret hash: length should be 32 bytes (64 characters)")
+	}
+
+	return nil
 }

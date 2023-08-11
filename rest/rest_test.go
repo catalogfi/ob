@@ -1,15 +1,19 @@
 package rest_test
 
 import (
+	"fmt"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/rest"
-	"github.com/susruth/wbtc-garden/store"
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/price"
+	"github.com/catalogfi/wbtc-garden/rest"
+	"github.com/catalogfi/wbtc-garden/store"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -22,10 +26,21 @@ var (
 )
 
 var _ = BeforeSuite(func() {
+	filePath := "gorm.db"
+	if _, err := os.Stat(filePath); err == nil {
+		// If file exists, then remove
+		os.Remove(filePath)
+	}
+
 	// done := make(chan bool)
 	StartServer()
 	// <-done
 	time.Sleep(3 * time.Second) // await server to start
+
+	if os.Getenv("PRIVATE_KEY") == "" {
+		panic("PRIVATE_KEY not set")
+	}
+
 	c = rest.NewClient("http://localhost:8080", os.Getenv("PRIVATE_KEY"))
 	jwtToken = ""
 	CurrentOrderID = 0
@@ -36,7 +51,7 @@ var _ = Describe("Rest", func() {
 		Expect(c).NotTo(BeNil())
 		Expect(jwtToken).To(Equal(""))
 		Expect(CurrentOrderID).To(Equal(uint(0)))
-		Expect(c.Health()).To(Equal("ok"))
+		Expect(c.Health()).To(Equal("online"))
 	})
 
 	It("check nonce", func() {
@@ -53,18 +68,21 @@ var _ = Describe("Rest", func() {
 	})
 
 	It("should create Order", func() {
-		OrderID, err := c.CreateOrder("mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin:primary-ethereum:primary", "1", "10", "0xd87c01599e0f31a714ca73e5de993e274430101d4675d80da19d84b2bf19817d")
+		// Skip("will test after price fetching logic implemented")
+		OrderID, err := c.CreateOrder("mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet:primary-ethereum_sepolia:0x4FDAAe676608f2a768f9c57BFDAeFA7559283316", "1", "10", "d87c01599e0f31a714ca73e5de993e274430101d4675d80da19d84b2bf19817d")
 		CurrentOrderID = OrderID
 		Expect(err).NotTo(HaveOccurred())
 		Expect(OrderID).To(BeNumerically(">=", 0))
 	})
 
 	It("fill the order", func() {
-		err := c.FillOrder(CurrentOrderID, "0xF403cE7776B22B74EcA871EcDaBeAA2103CD4A49", "mg54DDo8jfNkx5tF4d7Ag6G6VrJaSjr7ES")
+		// Skip("will test after price fetching logic implemented")
+		err := c.FillOrder(CurrentOrderID, "0xF403cE7776B22B74EcA871EcDaBeAA2103CD4A49", "mxHKgg7dU4pt9abWXveMofqRvWr7f6xx7g")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("get Initiator Initiate Orders", func() {
+		// Skip("will test after price fetching logic implemented")
 		orders, err := c.GetInitiatorInitiateOrders()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(orders).ToNot(BeNil())
@@ -72,14 +90,15 @@ var _ = Describe("Rest", func() {
 		CurrentOrder := orders[len(orders)-1]
 		Expect(CurrentOrder.ID).To(Equal(CurrentOrderID))
 		// Expect(CurrentOrder.Status).To(Equal("FILLED"))
-		Expect(CurrentOrder.OrderPair).To(Equal("bitcoin:primary-ethereum:primary"))
-		Expect(CurrentOrder.Taker).To(Equal("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da"))
-		Expect(CurrentOrder.Maker).To(Equal("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da"))
+		Expect(CurrentOrder.OrderPair).To(Equal("bitcoin_testnet:primary-ethereum_sepolia:0x4FDAAe676608f2a768f9c57BFDAeFA7559283316"))
+		Expect(CurrentOrder.Taker).To(Equal(strings.ToLower("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da")))
+		Expect(CurrentOrder.Maker).To(Equal(strings.ToLower("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da")))
 		Expect(CurrentOrder.Status).To(Equal(model.Status(2)))
 		// fmt.Println("CurrentOrder: ", CurrentOrder.Taker, CurrentOrder.Status, CurrentOrder.OrderPair)
 	})
 
 	It("get Followers init Orders", func() {
+		// Skip("will test after price fetching logic implemented")
 		orders, err := c.GetFollowerInitiateOrders()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(orders).ToNot(BeNil())
@@ -89,6 +108,7 @@ var _ = Describe("Rest", func() {
 	})
 
 	It("get Initiator Redeem Orders", func() {
+		// Skip("will test after price fetching logic implemented")
 		order, err := c.GetInitiatorRedeemOrders()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(order).ToNot(BeNil())
@@ -96,10 +116,46 @@ var _ = Describe("Rest", func() {
 	})
 
 	It("get Followers Redeem Orders", func() {
+		// Skip("will test after price fetching logic implemented")
 		order, err := c.GetFollowerRedeemOrders()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(order).ToNot(BeNil())
 		Expect(len(order)).To(BeNumerically("==", 0)) // as atomic swap is not implemented yet
+	})
+
+	It("should return orders for ws request", func() {
+		wsURL := "ws://localhost:8080/ws/orders"
+		conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+		Expect(err).NotTo(HaveOccurred())
+		defer conn.Close()
+		subscribeMsg := []byte("subscribe:0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da")
+
+		// Send the subscribe message to the server
+		err = conn.WriteMessage(websocket.TextMessage, subscribeMsg)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Receive the response from the server
+		_, response, err := conn.ReadMessage()
+		Expect(err).NotTo(HaveOccurred())
+		fmt.Println("responseji: ", string(response))
+		time.Sleep(5 * time.Second)
+		var creatorOrderId uint
+		creatorOrderId, err = c.CreateOrder("mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet:primary-ethereum_sepolia:0x4FDAAe676608f2a768f9c57BFDAeFA7559283316", "1", "10", "d87c01599e0f31a704ca73e5de993e274430101d4675d80da19d84b2bf19817d")
+		count := 0
+		for {
+			_, message, err := conn.ReadMessage()
+			Expect(err).NotTo(HaveOccurred())
+			fmt.Println("message: ", string(message))
+			count++
+			if count >= 3 {
+				break
+			}
+			time.Sleep(5 * time.Second)
+			creatorOrderId, err = c.CreateOrder("mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet:primary-ethereum_sepolia:0x4FDAAe676608f2a768f9c57BFDAeFA7559283316", "1", "10", fmt.Sprintf("d87c01599e0f31a704ca73e5de993e274430101d4675d80da19d84b2bf19817%d", count))
+			time.Sleep(5 * time.Second)
+			c.FillOrder(creatorOrderId, "0xF403cE7776B22B74EcA871EcDaBeAA2103CD4A49", "mxHKgg7dU4pt9abWXveMofqRvWr7f6xx7g")
+		}
+
 	})
 
 })
@@ -110,11 +166,13 @@ func StartServer() {
 		Expect(err).NotTo(HaveOccurred())
 		config := model.Config{
 			RPC: map[model.Chain]string{
-				model.BitcoinRegtest:   "http://localhost:30000",
-				model.EthereumLocalnet: "http://localhost:8545",
+				model.BitcoinTestnet:  "https://mempool.space/testnet/api",
+				model.EthereumSepolia: "http://localhost:8545",
 			},
 		}
 		s := rest.NewServer(store, config, "PANTHER")
+		price := price.NewPriceChecker(store, "https://api.coincap.io/v2/assets/bitcoin")
+		go price.Run()
 		s.Run(":8080")
 	}()
 }

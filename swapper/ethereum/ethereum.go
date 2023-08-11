@@ -7,10 +7,10 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/catalogfi/wbtc-garden/swapper"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/susruth/wbtc-garden/swapper"
-	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
 )
 
 type initiatorSwap struct {
@@ -65,7 +65,7 @@ func GetAmount(client Client, atomicSwapAddr common.Address, secretHash []byte) 
 	return swap.Amount.Uint64(), nil
 }
 
-func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.InitiatorSwap, error) {
+func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr common.Address, secretHash []byte, expiryBlock, minConfirmations, amount *big.Int, client Client) (swapper.InitiatorSwap, error) {
 
 	initiatorAddr := client.GetPublicAddress(initiator)
 
@@ -74,7 +74,7 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr 
 		latestCheckedBlock = big.NewInt(0)
 	}
 
-	watcher, err := NewWatcher(atomicSwapAddr, secretHash, expiryBlock, amount, client)
+	watcher, err := NewWatcher(atomicSwapAddr, secretHash, expiryBlock, minConfirmations, amount, client)
 	if err != nil {
 		return &initiatorSwap{}, err
 	}
@@ -142,8 +142,8 @@ func (initiatorSwap *initiatorSwap) Refund() (string, error) {
 	return tx, nil
 }
 
-func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.RedeemerSwap, error) {
-	watcher, err := NewWatcher(atomicSwapAddr, secretHash, expiryBlock, amount, client)
+func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr common.Address, secretHash []byte, expiryBlock, amount, minConfirmations *big.Int, client Client) (swapper.RedeemerSwap, error) {
+	watcher, err := NewWatcher(atomicSwapAddr, secretHash, expiryBlock, minConfirmations, amount, client)
 	if err != nil {
 		return &redeemerSwap{}, err
 	}
@@ -200,9 +200,10 @@ type watcher struct {
 	amount           *big.Int
 	expiryBlock      *big.Int
 	secretHash       []byte
+	minConfirmations *big.Int
 }
 
-func NewWatcher(atomicSwapAddr common.Address, secretHash []byte, expiryBlock *big.Int, amount *big.Int, client Client) (swapper.Watcher, error) {
+func NewWatcher(atomicSwapAddr common.Address, secretHash []byte, expiryBlock, minConfirmations, amount *big.Int, client Client) (swapper.Watcher, error) {
 	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(12000))
 	if latestCheckedBlock.Cmp(big.NewInt(0)) == -1 {
 		latestCheckedBlock = big.NewInt(0)
@@ -214,6 +215,7 @@ func NewWatcher(atomicSwapAddr common.Address, secretHash []byte, expiryBlock *b
 		expiryBlock:      expiryBlock,
 		amount:           amount,
 		secretHash:       secretHash,
+		minConfirmations: minConfirmations,
 	}, nil
 }
 
@@ -263,8 +265,14 @@ func (watcher *watcher) IsInitiated() (bool, []string, error) {
 	}
 
 	vLog := logs[0]
+
+	isFinal, err := watcher.client.IsFinal(vLog.TxHash.Hex(), watcher.minConfirmations.Uint64())
 	if err != nil {
 		return false, []string{}, err
+	}
+
+	if !isFinal {
+		return false, []string{}, fmt.Errorf("transaction not finalized yet")
 	}
 
 	return true, []string{vLog.TxHash.Hex()}, nil
@@ -331,7 +339,7 @@ func (watcher *watcher) IsRefunded() (bool, string, error) {
 		Addresses: []common.Address{
 			watcher.atomicSwapAddr,
 		},
-		Topics: [][]common.Hash{{refundedEvent.ID}},
+		Topics: [][]common.Hash{{refundedEvent.ID}, {common.BytesToHash(watcher.secretHash)}},
 	}
 
 	logs, err := watcher.client.GetProvider().FilterLogs(context.Background(), query)

@@ -4,12 +4,12 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/spf13/cobra"
-	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/rest"
 )
 
-func Fill(entropy []byte) *cobra.Command {
+func Fill(entropy []byte, store Store) *cobra.Command {
 	var (
 		url     string
 		account uint32
@@ -42,8 +42,6 @@ func Fill(entropy []byte) *cobra.Command {
 				return
 			}
 
-			fmt.Println(order)
-
 			fromChain, toChain, _, _, err := model.ParseOrderPair(order.OrderPair)
 			if err != nil {
 				cobra.CheckErr(fmt.Sprintf("Error while parsing order pair: %v", err))
@@ -66,6 +64,11 @@ func Fill(entropy []byte) *cobra.Command {
 				cobra.CheckErr(fmt.Sprintf("Error while getting address string: %v", err))
 				return
 			}
+			if err = store.PutSecretHash(order.SecretHash, uint64(orderId)); err != nil {
+				cobra.CheckErr(fmt.Sprintf("Error while storing secret hash: %v", err))
+				return
+			}
+
 			fmt.Println("Order filled successfully")
 		}}
 	cmd.Flags().StringVar(&url, "url", "", "config file (default is ./config.json)")

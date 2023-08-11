@@ -9,12 +9,16 @@ import (
 	"time"
 
 	// "crypto/rand"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/ERC20"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
-	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/ERC20"
+)
+
+var (
+	maxApproval = new(big.Int).Sub(new(big.Int).Exp(big.NewInt(2), big.NewInt(256), nil), big.NewInt(1))
 )
 
 type Client interface {
@@ -30,7 +34,7 @@ type Client interface {
 	GetCurrentBlock() (uint64, error)
 	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
 	GetTokenAddress(contractAddr common.Address) (common.Address, error)
-	IsFinal(txHash string) (bool, error)
+	IsFinal(txHash string, waitBlocks uint64) (bool, error)
 }
 type client struct {
 	url      string
@@ -109,11 +113,16 @@ func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecd
 	}
 	var hash [32]byte
 	copy(hash[:], secretHash)
-	// TODO : Batch approve and init
-	// consider infinite allowance
-	_, err = client.ApproveERC20(initiator, amount, token, contract)
+
+	val, err := client.Allowance(token, contract, client.GetPublicAddress(initiator))
 	if err != nil {
 		return "", err
+	}
+	if val.Cmp(amount) <= 0 {
+		_, err := client.ApproveERC20(initiator, maxApproval, token, contract)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	auth := client.GetTransactOpts(initiator)
@@ -175,7 +184,20 @@ func (client *client) ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, t
 		return "", err
 	}
 	fmt.Printf("Approving %v %s to %s txhash : %s\n", amount, tokenAddr, toAddr, tx.Hash().Hex())
+	bind.WaitMined(context.Background(), client.provider, tx)
 	return tx.Hash().Hex(), err
+}
+func (client *client) Allowance(tokenAddr common.Address, spender common.Address, owner common.Address) (*big.Int, error) {
+	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
+	if err != nil {
+		return nil, err
+	}
+	allowance, err := instance.Allowance(client.GetCallOpts(), owner, spender)
+	if err != nil {
+		return nil, err
+	}
+	return allowance, nil
+
 }
 func (client *client) GetCurrentBlock() (uint64, error) {
 	bn, err := client.provider.BlockNumber(context.Background())
@@ -191,7 +213,24 @@ func (client *client) GetERC20Balance(tokenAddr common.Address, ofAddr common.Ad
 	return balance, err
 }
 
-func (client *client) IsFinal(txHash string) (bool, error) {
-	// TODO: add confirmation checks
-	return true, nil
+func (client *client) IsFinal(txHash string, waitBlocks uint64) (bool, error) {
+	tx, err := client.provider.TransactionReceipt(context.Background(), common.HexToHash(txHash))
+	if err != nil {
+		return false, err
+	}
+	if tx.Status == 0 {
+		return false, nil
+	}
+	currentBlock, err := client.GetCurrentBlock()
+	if err != nil {
+		return false, fmt.Errorf("error getting current block %v", err)
+	}
+	if int64(currentBlock-tx.BlockNumber.Uint64()) >= int64(waitBlocks)-1 || waitBlocks == 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (client *client) FetchOrder(secretHash []byte) {
+	// TODO:
 }

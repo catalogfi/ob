@@ -11,13 +11,13 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/catalogfi/wbtc-garden/blockchain"
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/swapper/bitcoin"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/ERC20"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/susruth/wbtc-garden/blockchain"
-	"github.com/susruth/wbtc-garden/model"
-	"github.com/susruth/wbtc-garden/swapper/bitcoin"
-	"github.com/susruth/wbtc-garden/swapper/ethereum"
-	"github.com/susruth/wbtc-garden/swapper/ethereum/typings/ERC20"
 	"github.com/tyler-smith/go-bip32"
 )
 
@@ -40,7 +40,7 @@ func getKeys(entropy []byte, chain model.Chain, user uint32, selector []uint32) 
 		if err != nil {
 			return nil, fmt.Errorf("failed to create child key: %v", err)
 		}
-	case model.Ethereum, model.EthereumLocalnet, model.EthereumSepolia:
+	case model.Ethereum, model.EthereumLocalnet, model.EthereumSepolia, model.EthereumOptimism:
 		key, err = masterKey.NewChildKey(60)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create child key: %v", err)
@@ -86,7 +86,7 @@ func getAddresses(entropy []byte, chain model.Chain, user uint32, selector []uin
 	addrs := make([]interface{}, len(keys))
 	for i, key := range keys {
 		if chain.IsBTC() {
-			addrs[i], err = btcutil.NewAddressPubKeyHash(btcutil.Hash160(key.(*btcec.PrivateKey).PubKey().SerializeCompressed()), getParams(chain))
+			addrs[i], err = btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(key.(*btcec.PrivateKey).PubKey().SerializeCompressed()), getParams(chain))
 			if err != nil {
 				return nil, fmt.Errorf("failed to create address: %v", err)
 			}
@@ -129,7 +129,7 @@ func getBalances(entropy []byte, chain model.Chain, user uint32, selector []uint
 	for i, key := range keys {
 		switch client := client.(type) {
 		case bitcoin.Client:
-			address, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(key.(*btcec.PrivateKey).PubKey().SerializeCompressed()), getParams(chain))
+			address, err := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(key.(*btcec.PrivateKey).PubKey().SerializeCompressed()), getParams(chain))
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create address: %v", err)
 			}

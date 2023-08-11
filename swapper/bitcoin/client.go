@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 
@@ -19,7 +20,6 @@ import (
 )
 
 const BTC_VERSION = 2
-
 
 type UTXO struct {
 	Amount uint64 `json:"value"`
@@ -36,7 +36,7 @@ type Client interface {
 	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
 	Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error)
 	Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error)
-	IsFinal(txHash string) (bool, error)
+	IsFinal(txHash string, waitPeriod uint64) (bool, error)
 	Net() *chaincfg.Params
 }
 
@@ -60,7 +60,7 @@ const (
 	Taproot
 )
 
-//function to calculate fee on bitcoin chain for a transaction
+// function to calculate fee on bitcoin chain for a transaction
 func (c *client) CalculateFee(nInputs, nOutputs int, txType TxType) (uint64, error) {
 	var feeRates FeeRates
 	resp, err := http.Get("https://mempool.space/api/v1/fees/recommended")
@@ -74,7 +74,7 @@ func (c *client) CalculateFee(nInputs, nOutputs int, txType TxType) (uint64, err
 
 	switch txType {
 	case Legacy:
-		// inputs + 1 to account for input that might be used for fee 
+		// inputs + 1 to account for input that might be used for fee
 		// but if fee is already accounted in the selected utxos it will just lead to a slighty speedy transaction
 		return uint64((nInputs+1)*148+nOutputs*34+10) * (uint64(feeRates.HalfHourFee)), nil
 	case SegWit:
@@ -116,7 +116,7 @@ func (client *client) GetBlockHeight(txhash string) (uint64, error) {
 	}
 
 	if !tx.Status.Confirmed {
-		return 0, nil
+		return math.MaxUint32, nil
 	}
 	return tx.Status.BlockHeight, nil
 }
@@ -184,7 +184,7 @@ func (client *client) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, u
 func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error) {
 	tx := wire.NewMsgTx(BTC_VERSION)
 
-	fromAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(from.PubKey().SerializeCompressed()), client.Net())
+	fromAddr, err := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(from.PubKey().SerializeCompressed()), client.Net())
 	if err != nil {
 		return "", fmt.Errorf("failed to create address from private key: %w", err)
 	}
@@ -193,7 +193,7 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
-	FEE, err := client.CalculateFee(len(utxosWithoutFee), 2, Legacy)
+	FEE, err := client.CalculateFee(len(utxosWithoutFee), 2, SegWit)
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate fee: %w", err)
 	}
@@ -222,12 +222,18 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 	tx.AddTxOut(wire.NewTxOut(int64(amount), toScript))
 	tx.AddTxOut(wire.NewTxOut(int64(selectedAmount-amount-FEE), fromScript))
 
-	for i := range tx.TxIn {
-		sigScript, err := txscript.SignatureScript(tx, i, fromScript, txscript.SigHashAll, from, true)
+	for i, utxo := range utxosWihFee {
+		fetcher := txscript.NewCannedPrevOutputFetcher(fromScript, int64(utxo.Amount))
 		if err != nil {
-			return "", fmt.Errorf("failed to sign transaction: %w", err)
+			return "", err
 		}
-		tx.TxIn[i].SignatureScript = sigScript
+
+		sigHashes := txscript.NewTxSigHashes(tx, fetcher)
+		witness, err := txscript.WitnessSignature(tx, sigHashes, i, int64(utxo.Amount), fromScript, txscript.SigHashAll, from, true)
+		if err != nil {
+			return "", err
+		}
+		tx.TxIn[i].Witness = witness
 	}
 
 	return client.SubmitTx(tx)
@@ -256,7 +262,7 @@ func (client *client) Spend(script []byte, redeemScript wire.TxWitness, spender 
 		tx.AddTxIn(wire.NewTxIn(wire.NewOutPoint(txid, utxo.Vout), nil, nil))
 	}
 
-	spenderAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(spender.PubKey().SerializeCompressed()), client.Net())
+	spenderAddr, err := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(spender.PubKey().SerializeCompressed()), client.Net())
 	if err != nil {
 		return "", fmt.Errorf("failed to create address from private key: %w", err)
 	}
@@ -297,8 +303,6 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}
 
-	
-
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to send transaction: %s", resp.Status)
 	}
@@ -310,9 +314,19 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 	return string(data), nil
 }
 
-func (client *client) IsFinal(txHash string) (bool, error) {
-	// TODO: add confirmation checks
-	return true, nil
+func (client *client) IsFinal(txHash string, waitPeriod uint64) (bool, error) {
+	minedBlock, err := client.GetBlockHeight(txHash)
+	if err != nil {
+		return false, fmt.Errorf("failed to get block height: %w", err)
+	}
+	currentBlock, err := client.GetTipBlockHeight()
+	if err != nil {
+		return false, fmt.Errorf("failed to get block height: %w", err)
+	}
+	if int64(currentBlock-minedBlock) >= int64(waitPeriod)-1 {
+		return true, nil
+	}
+	return false, nil
 }
 
 type Transaction struct {

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/spf13/cobra"
-	"github.com/susruth/wbtc-garden/model"
 	"github.com/tyler-smith/go-bip39"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -33,10 +33,12 @@ func Run(config model.Config) error {
 
 	// cmd.AddCommand(Accounts(entropy))
 	cmd.AddCommand(Create(entropy, store))
-	cmd.AddCommand(Fill(entropy))
+	cmd.AddCommand(Fill(entropy, store))
 	cmd.AddCommand(Execute(entropy, store, config))
+	cmd.AddCommand(Retry(entropy, store))
 	cmd.AddCommand(Accounts(entropy, config))
 	cmd.AddCommand(List())
+	cmd.AddCommand(AutoFill(entropy, store))
 
 	if err := cmd.Execute(); err != nil {
 		return err
