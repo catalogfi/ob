@@ -12,6 +12,8 @@ import (
 	"github.com/susruth/wbtc-garden/swapper"
 )
 
+const SwapInitiationTimeout = 30 * time.Minute
+
 type Store interface {
 	// UpdateOrder updates and order status in the db
 	UpdateOrder(order *model.Order) error
@@ -143,7 +145,7 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		}
 
 		// Order expired
-		if time.Since(order.CreatedAt) > 12*time.Hour {
+		if time.Since(order.CreatedAt) > SwapInitiationTimeout {
 			order.Status = model.OrderCancelled
 			return order, true, nil
 		}
