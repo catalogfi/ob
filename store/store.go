@@ -71,7 +71,7 @@ func (s *store) GetValueLocked(user string, chain model.Chain) (*big.Int, error)
 				return big.NewInt(0), err
 			}
 			sum = new(big.Int).Add(price.GetPrice(model.Asset(tokenAmount.Asset), chain, big.NewInt(tokenAmount.Amount.Int64), big.NewInt(int64(priceInUSD))), sum)
-			fmt.Println(sum)
+			// fmt.Println(sum)
 		}
 	}
 	//flooring the sum
@@ -84,7 +84,7 @@ func (s *store) GetVolumeTraded(user string, chain model.Chain) (*big.Int, error
 	if err := s.db.Table("atomic_swaps").
 		Select("asset as asset,SUM(amount::bigint) as amount").
 		Joins("JOIN orders ON orders.initiator_atomic_swap_id = atomic_swaps.id").
-		Where("created_at >= ?", validateTime).
+		Where("orders.created_at >= ? AND orders.maker = ? AND atomic_swaps.chain = ?", validateTime , user ,  chain).
 		Group("asset").
 		Find(&initAmounts).Error; err != nil {
 		return big.NewInt(0), err
@@ -92,7 +92,7 @@ func (s *store) GetVolumeTraded(user string, chain model.Chain) (*big.Int, error
 	if err := s.db.Table("atomic_swaps").
 		Select("asset as asset,SUM(amount::bigint) as amount").
 		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
-		Where("created_at >= ?", validateTime).
+		Where("orders.created_at >= ? AND orders.taker = ? AND atomic_swaps.chain = ?", validateTime , user ,  chain).
 		Group("asset").
 		Find(&followAmounts).Error; err != nil {
 		return big.NewInt(0), err
@@ -104,14 +104,10 @@ func (s *store) GetVolumeTraded(user string, chain model.Chain) (*big.Int, error
 	}
 	sum := big.NewInt(0)
 	for _, tokenAmount := range combinedArray {
-
 		if tokenAmount.Amount.Valid {
-			priceInUSD, err := s.Price("bitcoin", "ethereum")
-			if err != nil {
-				return big.NewInt(0), err
-			}
-			sum = new(big.Int).Add(price.GetPrice(model.Asset(tokenAmount.Asset), chain, big.NewInt(tokenAmount.Amount.Int64), big.NewInt(int64(priceInUSD))), sum)
-			fmt.Println(sum)
+			amt := big.NewInt(tokenAmount.Amount.Int64)
+			sum = new(big.Int).Add(amt, sum)
+			// fmt.Println(sum)
 		}
 	}
 	//flooring the sum
@@ -123,34 +119,34 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	if err := model.ValidateEthereumAddress(creator); err != nil {
 		return 0, err
 	}
-
 	sendChain, receiveChain, sendAsset, receiveAsset, err := model.ParseOrderPair(orderPair)
 	if err != nil {
 		return 0, err
 	}
-
+	
 	// check if send address and receive address are proper addresses for respective chains
 	if sendChain.IsBTC() {
 		if err := model.ValidateBitcoinAddress(sendAddress, sendChain); err != nil {
 			return 0, err
 		}
+		// fmt.Println("1" , sendAddress , receiveAddress)
 		if err := model.ValidateBitcoinAddress(userBtcWalletAddress, sendChain); err != nil {
 			return 0, err
 		}
 		if err := model.ValidateEthereumAddress(receiveAddress); err != nil {
 			return 0, err
 		}
-	} else {
-		if err := model.ValidateEthereumAddress(sendAddress); err != nil {
-			return 0, err
+		} else {
+			if err := model.ValidateEthereumAddress(sendAddress); err != nil {
+				return 0, err
+			}
+			if err := model.ValidateBitcoinAddress(receiveAddress, receiveChain); err != nil {
+				return 0, err
+			}
+			if err := model.ValidateBitcoinAddress(userBtcWalletAddress, receiveChain); err != nil {
+				return 0, err
+			}
 		}
-		if err := model.ValidateBitcoinAddress(receiveAddress, receiveChain); err != nil {
-			return 0, err
-		}
-		if err := model.ValidateBitcoinAddress(userBtcWalletAddress, receiveChain); err != nil {
-			return 0, err
-		}
-	}
 
 	// validate secretHash
 	if err := model.ValidateSecretHash(secretHash); err != nil {
@@ -166,6 +162,15 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	initiatorLockValue, err := s.GetValueLocked(creator, sendChain)
 	if err != nil {
 		return 0, err
+	}
+
+	VolumeTraded , err := s.GetVolumeTraded(creator, sendChain)
+	if err != nil {
+		return 0, err
+	}
+	// fmt.Println("ValueLocked", VolumeTraded)
+	if VolumeTraded.Cmp(big.NewInt(100000000)) == 1 {
+		return 0, fmt.Errorf("Reached limits to Trade on %s chain" , sendChain)
 	}
 
 	// initiatorLockValue := big.NewInt(0)

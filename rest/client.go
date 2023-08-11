@@ -87,7 +87,19 @@ func (c *client) FillOrder(orderID uint, sendAddress, receiveAddress string) err
 
 func (c *client) CreateOrder(sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string) (uint, error) {
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(CreateOrder{SendAddress: sendAddress, ReceiveAddress: receiveAddress, OrderPair: orderPair, SendAmount: sendAmount, ReceiveAmount: receiveAmount, SecretHash: secretHash, UserWalletBTCAddress: receiveAddress}); err != nil {
+
+	fromchain,_,_,_,err := model.ParseOrderPair(orderPair)
+	if err != nil {
+		return 0, err
+	}
+
+	var userBtcAddress string
+	if fromchain.IsBTC() {
+		userBtcAddress = sendAddress
+	} else {
+		userBtcAddress = receiveAddress
+	}
+	if err := json.NewEncoder(&buf).Encode(CreateOrder{SendAddress: sendAddress, ReceiveAddress: receiveAddress, OrderPair: orderPair, SendAmount: sendAmount, ReceiveAmount: receiveAmount, SecretHash: secretHash, UserWalletBTCAddress: userBtcAddress}); err != nil {
 		return 0, err
 	}
 
