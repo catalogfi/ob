@@ -104,11 +104,13 @@ func (initiatorSwap *initiatorSwap) Expired() (bool, error) {
 func (initiatorSwap *initiatorSwap) WaitForRedeem() ([]byte, string, error) {
 	for {
 		redeemed, secret, txHash, err := initiatorSwap.IsRedeemed()
-		if redeemed {
-			return secret, txHash, err
-		}
 		if err != nil {
 			fmt.Println("failed to check redeemed status", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		if redeemed {
+			return secret, txHash, err
 		}
 		time.Sleep(5 * time.Second)
 	}
