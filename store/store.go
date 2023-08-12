@@ -84,7 +84,7 @@ func (s *store) GetVolumeTraded(user string, chain model.Chain) (*big.Int, error
 	if err := s.db.Table("atomic_swaps").
 		Select("asset as asset,SUM(amount::bigint) as amount").
 		Joins("JOIN orders ON orders.initiator_atomic_swap_id = atomic_swaps.id").
-		Where("orders.created_at >= ? AND orders.maker = ? AND atomic_swaps.chain = ?", validateTime , user ,  chain).
+		Where("orders.created_at >= ? AND orders.maker = ? AND atomic_swaps.chain = ?", validateTime, user, chain).
 		Group("asset").
 		Find(&initAmounts).Error; err != nil {
 		return big.NewInt(0), err
@@ -92,7 +92,7 @@ func (s *store) GetVolumeTraded(user string, chain model.Chain) (*big.Int, error
 	if err := s.db.Table("atomic_swaps").
 		Select("asset as asset,SUM(amount::bigint) as amount").
 		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
-		Where("orders.created_at >= ? AND orders.taker = ? AND atomic_swaps.chain = ?", validateTime , user ,  chain).
+		Where("orders.created_at >= ? AND orders.taker = ? AND atomic_swaps.chain = ?", validateTime, user, chain).
 		Group("asset").
 		Find(&followAmounts).Error; err != nil {
 		return big.NewInt(0), err
@@ -117,7 +117,7 @@ func (s *store) GetVolumeTraded(user string, chain model.Chain) (*big.Int, error
 func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userBtcWalletAddress string, urls map[model.Chain]string) (uint, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// check if creator_addr is valid eth address
 	if err := model.ValidateEthereumAddress(creator); err != nil {
 		return 0, err
@@ -126,7 +126,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	if err != nil {
 		return 0, err
 	}
-	
+
 	// check if send address and receive address are proper addresses for respective chains
 	if sendChain.IsBTC() {
 		if err := model.ValidateBitcoinAddress(sendAddress, sendChain); err != nil {
@@ -139,17 +139,17 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		if err := model.ValidateEthereumAddress(receiveAddress); err != nil {
 			return 0, err
 		}
-		} else {
-			if err := model.ValidateEthereumAddress(sendAddress); err != nil {
-				return 0, err
-			}
-			if err := model.ValidateBitcoinAddress(receiveAddress, receiveChain); err != nil {
-				return 0, err
-			}
-			if err := model.ValidateBitcoinAddress(userBtcWalletAddress, receiveChain); err != nil {
-				return 0, err
-			}
+	} else {
+		if err := model.ValidateEthereumAddress(sendAddress); err != nil {
+			return 0, err
 		}
+		if err := model.ValidateBitcoinAddress(receiveAddress, receiveChain); err != nil {
+			return 0, err
+		}
+		if err := model.ValidateBitcoinAddress(userBtcWalletAddress, receiveChain); err != nil {
+			return 0, err
+		}
+	}
 
 	// validate secretHash
 	if err := model.ValidateSecretHash(secretHash); err != nil {
@@ -167,13 +167,13 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		return 0, err
 	}
 
-	VolumeTraded , err := s.GetVolumeTraded(creator, sendChain)
+	VolumeTraded, err := s.GetVolumeTraded(creator, sendChain)
 	if err != nil {
 		return 0, err
 	}
 	// fmt.Println("ValueLocked", VolumeTraded)
 	if VolumeTraded.Cmp(big.NewInt(100000000)) == 1 {
-		return 0, fmt.Errorf("Reached limits to Trade on %s chain" , sendChain)
+		return 0, fmt.Errorf("Reached limits to Trade on %s chain", sendChain)
 	}
 
 	// initiatorLockValue := big.NewInt(0)
@@ -262,7 +262,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress string, urls map[model.Chain]string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	order := &model.Order{}
 	if tx := s.db.First(order, orderID); tx.Error != nil {
 		return tx.Error

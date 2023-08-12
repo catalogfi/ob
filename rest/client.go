@@ -88,7 +88,7 @@ func (c *client) FillOrder(orderID uint, sendAddress, receiveAddress string) err
 func (c *client) CreateOrder(sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string) (uint, error) {
 	var buf bytes.Buffer
 
-	fromchain,_,_,_,err := model.ParseOrderPair(orderPair)
+	fromchain, _, _, _, err := model.ParseOrderPair(orderPair)
 	if err != nil {
 		return 0, err
 	}

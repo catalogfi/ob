@@ -81,7 +81,6 @@ func (w *watcher) watch(order model.Order) error {
 				return err
 			}
 		}
-
 	}
 
 	if order.Status == model.InitiatorAtomicSwapInitiated {

@@ -19,7 +19,12 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-const BTC_VERSION = 2
+const (
+	BTC_VERSION = 2
+
+	// DustAmount is the minimum amount the node accepts for an UTXO.
+	DustAmount = 546
+)
 
 type UTXO struct {
 	Amount uint64 `json:"value"`
@@ -44,6 +49,7 @@ type client struct {
 	url string
 	net *chaincfg.Params
 }
+
 type FeeRates struct {
 	FastestFee  int `json:"fastestFee"`
 	HalfHourFee int `json:"halfHourFee"`
@@ -59,30 +65,6 @@ const (
 	SegWit
 	Taproot
 )
-
-// function to calculate fee on bitcoin chain for a transaction
-func (c *client) CalculateFee(nInputs, nOutputs int, txType TxType) (uint64, error) {
-	var feeRates FeeRates
-	resp, err := http.Get("https://mempool.space/api/v1/fees/recommended")
-	if err != nil {
-		return 0, fmt.Errorf("failed to get fee rates: %w", err)
-	}
-	err = json.NewDecoder(resp.Body).Decode(&feeRates)
-	if err != nil {
-		return 0, fmt.Errorf("failed to unmarshal response body: %w", err)
-	}
-
-	switch txType {
-	case Legacy:
-		// inputs + 1 to account for input that might be used for fee
-		// but if fee is already accounted in the selected utxos it will just lead to a slighty speedy transaction
-		return uint64((nInputs+1)*148+nOutputs*34+10) * (uint64(feeRates.HalfHourFee)), nil
-	case SegWit:
-		return uint64(nInputs*68+nOutputs*31+10) * uint64(feeRates.HalfHourFee), nil
-	}
-	return 0, fmt.Errorf("tx type not supported")
-
-}
 
 func NewClient(url string, net *chaincfg.Params) Client {
 	return &client{url: url, net: net}
@@ -132,7 +114,7 @@ func (client *client) GetSpendingWitness(address btcutil.Address) ([]string, str
 	}
 	for _, tx := range txs {
 		for _, vin := range tx.VINs {
-			if vin.Prevout.ScriptPubKeyType == "v0_p2wsh" {
+			if vin.Prevout.ScriptPubKeyAddress == address.EncodeAddress() {
 				return *vin.Witness, tx.TxID, nil
 			}
 		}
@@ -146,12 +128,6 @@ func (client *client) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, u
 		return nil, 0, fmt.Errorf("failed to get UTXOs: %w", err)
 	}
 	utxos := UTXOs{}
-
-	// data, err := io.ReadAll(resp.Body)
-	// if err != nil {
-	// 	return nil, 0, fmt.Errorf("failed to read response body: %w", err)
-	// }
-	// fmt.Println(string(data))
 
 	if err := json.NewDecoder(resp.Body).Decode(&utxos); err != nil {
 		return nil, 0, fmt.Errorf("failed to decode UTXOs: %w", err)
@@ -193,11 +169,11 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
-	FEE, err := client.CalculateFee(len(utxosWithoutFee), 2, SegWit)
+	fee, err := client.CalculateFee(len(utxosWithoutFee), 2, SegWit)
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate fee: %w", err)
 	}
-	utxosWihFee, selectedAmount, err := client.GetUTXOs(fromAddr, amount+FEE)
+	utxosWihFee, selectedAmount, err := client.GetUTXOs(fromAddr, amount+fee)
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
@@ -220,7 +196,9 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 	}
 
 	tx.AddTxOut(wire.NewTxOut(int64(amount), toScript))
-	tx.AddTxOut(wire.NewTxOut(int64(selectedAmount-amount-FEE), fromScript))
+	if int64(selectedAmount-amount-fee) > DustAmount {
+		tx.AddTxOut(wire.NewTxOut(int64(selectedAmount-amount-fee), fromScript))
+	}
 
 	for i, utxo := range utxosWihFee {
 		fetcher := txscript.NewCannedPrevOutputFetcher(fromScript, int64(utxo.Amount))
@@ -270,11 +248,14 @@ func (client *client) Spend(script []byte, redeemScript wire.TxWitness, spender 
 	if err != nil {
 		return "", fmt.Errorf("failed to create script for address: %w", err)
 	}
-	FEE, err := client.CalculateFee(len(tx.TxIn), len(tx.TxOut), SegWit)
+	fee, err := client.CalculateFee(len(tx.TxIn), len(tx.TxOut), SegWit)
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate fee: %w", err)
 	}
-	tx.AddTxOut(wire.NewTxOut(int64(balance-FEE), spenderToScript))
+	if balance-fee <= DustAmount {
+		return "", fmt.Errorf("balance too low")
+	}
+	tx.AddTxOut(wire.NewTxOut(int64(balance-fee), spenderToScript))
 
 	for i := range tx.TxIn {
 		fetcher := txscript.NewCannedPrevOutputFetcher(script, int64(amounts[i]))
@@ -329,6 +310,30 @@ func (client *client) IsFinal(txHash string, waitPeriod uint64) (bool, error) {
 	return false, nil
 }
 
+// CalculateFee estimates the fees of the bitcoin tx with given number of inputs and outputs.
+func (client *client) CalculateFee(nInputs, nOutputs int, txType TxType) (uint64, error) {
+	var feeRates FeeRates
+	resp, err := http.Get("https://mempool.space/api/v1/fees/recommended")
+	if err != nil {
+		return 0, fmt.Errorf("failed to get fee rates: %w", err)
+	}
+	err = json.NewDecoder(resp.Body).Decode(&feeRates)
+	if err != nil {
+		return 0, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+
+	switch txType {
+	case Legacy:
+		// inputs + 1 to account for input that might be used for fee
+		// but if fee is already accounted in the selected utxos it will just lead to a slighty speedy transaction
+		return uint64((nInputs+1)*148+nOutputs*34+10) * (uint64(feeRates.HalfHourFee)), nil
+	case SegWit:
+		return uint64(nInputs*68+nOutputs*31+10) * uint64(feeRates.HalfHourFee), nil
+	}
+	return 0, fmt.Errorf("tx type not supported")
+
+}
+
 type Transaction struct {
 	TxID   string `json:"txid"`
 	VINs   []VIN  `json:"vin"`
@@ -344,7 +349,9 @@ type VIN struct {
 }
 
 type Prevout struct {
-	ScriptPubKeyType string `json:"scriptpubkey_type"`
+	ScriptPubKeyType    string `json:"scriptpubkey_type"`
+	ScriptPubKey        string `json:"scriptpubkey"`
+	ScriptPubKeyAddress string `json:"scriptpubkey_address"`
 }
 
 type Status struct {

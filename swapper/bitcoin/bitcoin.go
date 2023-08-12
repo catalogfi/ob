@@ -29,31 +29,6 @@ func GetExpiry(goingFirst bool) int64 {
 	return 144
 }
 
-func GetAddress(client Client, redeemerAddr, initiatorAddr btcutil.Address, secretHash []byte, waitBlocks int64) (btcutil.Address, error) {
-	htlcScript, err := NewHTLCScript(initiatorAddr, redeemerAddr, secretHash, waitBlocks)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTLC script: %w", err)
-	}
-	witnessProgram := sha256.Sum256(htlcScript)
-	scriptAddr, err := btcutil.NewAddressWitnessScriptHash(witnessProgram[:], client.Net())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create script address: %w", err)
-	}
-	return scriptAddr, nil
-}
-
-func GetAmount(client Client, redeemerAddr, initiatorAddr btcutil.Address, secretHash []byte, waitBlocks int64) (uint64, error) {
-	scriptAddr, err := GetAddress(client, redeemerAddr, initiatorAddr, secretHash, waitBlocks)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get script address: %w", err)
-	}
-	_, balance, err := client.GetUTXOs(scriptAddr, 0)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get UTXOs: %w", err)
-	}
-	return balance, nil
-}
-
 func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerAddr btcutil.Address, secretHash []byte, waitBlocks int64, minConfirmations, amount uint64, client Client) (swapper.InitiatorSwap, error) {
 	initiatorAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(initiator.PubKey().SerializeCompressed()), client.Net())
 	if err != nil {
@@ -89,8 +64,8 @@ func (s *initiatorSwap) Initiate() (string, error) {
 	return txHash, nil
 }
 
-func (initiatorSwap *initiatorSwap) Expired() (bool, error) {
-	return initiatorSwap.watcher.Expired()
+func (s *initiatorSwap) Expired() (bool, error) {
+	return s.watcher.Expired()
 }
 
 func (s *initiatorSwap) Refund() (string, error) {

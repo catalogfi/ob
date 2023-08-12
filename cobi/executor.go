@@ -326,8 +326,7 @@ func handleFollowerRefund(order model.Order, entropy []byte, user uint32, config
 	if isExpired {
 		txHash, err := initiatorSwap.Refund()
 		if err != nil {
-			store.PutError(order.SecretHash, err.Error(), FollowerFailedToRedeem)
-			return err
+			return store.PutError(order.SecretHash, err.Error(), FollowerFailedToRedeem)
 		}
 		if err := store.PutStatus(order.SecretHash, FollowerRefunded); err != nil {
 			return err

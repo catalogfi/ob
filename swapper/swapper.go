@@ -65,6 +65,8 @@ func ExecuteAtomicSwapSecond(initiator InitiatorSwap, redeemer RedeemerSwap) err
 		if _, err := redeemer.Redeem(secret); err != nil {
 			return err
 		}
+	} else {
+		return fmt.Errorf("failed to redeem : empty secret")
 	}
 	return nil
 }
