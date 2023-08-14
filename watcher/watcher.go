@@ -9,6 +9,7 @@ import (
 
 	"github.com/catalogfi/wbtc-garden/blockchain"
 	"github.com/catalogfi/wbtc-garden/model"
+	"go.uber.org/zap"
 )
 
 type Store interface {
@@ -21,11 +22,12 @@ type Store interface {
 }
 
 type watcher struct {
+	logger *zap.Logger
 	store  Store
 	config model.Config
 }
 
-func NewWatcher(store Store, config model.Config) *watcher {
+func NewWatcher(logger *zap.Logger, store Store, config model.Config) *watcher {
 	return &watcher{
 		store:  store,
 		config: config,
