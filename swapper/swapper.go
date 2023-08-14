@@ -5,6 +5,11 @@ import (
 	"fmt"
 )
 
+var (
+	ErrInitiateTimeout = errors.New("initiate timeout")
+	ErrRedeemTimeout   = errors.New("redeem timeout")
+)
+
 type InitiatorSwap interface {
 	Initiate() (string, error)
 	WaitForRedeem() ([]byte, string, error)
@@ -25,9 +30,6 @@ type Watcher interface {
 	IsRedeemed() (bool, []byte, string, error)
 	IsRefunded() (bool, string, error)
 }
-
-var ErrInitiateTimeout = errors.New("initiate timeout")
-var ErrRedeemTimeout = errors.New("redeem timeout")
 
 func ExecuteAtomicSwapFirst(initiator InitiatorSwap, redeemer RedeemerSwap, secret []byte) error {
 	if _, err := initiator.Initiate(); err != nil {

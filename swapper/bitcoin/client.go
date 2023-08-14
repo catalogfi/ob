@@ -50,22 +50,6 @@ type client struct {
 	net *chaincfg.Params
 }
 
-type FeeRates struct {
-	FastestFee  int `json:"fastestFee"`
-	HalfHourFee int `json:"halfHourFee"`
-	HourFee     int `json:"hourFee"`
-	MinimumFee  int `json:"minimumFee"`
-	EconomyFee  int `json:"economyFee"`
-}
-
-type TxType int
-
-const (
-	Legacy TxType = iota
-	SegWit
-	Taproot
-)
-
 func NewClient(url string, net *chaincfg.Params) Client {
 	return &client{url: url, net: net}
 }
@@ -169,7 +153,7 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
-	fee, err := client.CalculateFee(len(utxosWithoutFee), 2, SegWit)
+	fee, err := client.CalculateFee(len(utxosWithoutFee), 2, tx.Version)
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate fee: %w", err)
 	}
@@ -248,7 +232,7 @@ func (client *client) Spend(script []byte, redeemScript wire.TxWitness, spender 
 	if err != nil {
 		return "", fmt.Errorf("failed to create script for address: %w", err)
 	}
-	fee, err := client.CalculateFee(len(tx.TxIn), len(tx.TxOut), SegWit)
+	fee, err := client.CalculateFee(len(tx.TxIn), len(tx.TxOut), tx.Version)
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate fee: %w", err)
 	}
@@ -308,7 +292,7 @@ func (client *client) IsFinal(txid string, waitPeriod uint64) (bool, error) {
 }
 
 // CalculateFee estimates the fees of the bitcoin tx with given number of inputs and outputs.
-func (client *client) CalculateFee(nInputs, nOutputs int, txType TxType) (uint64, error) {
+func (client *client) CalculateFee(nInputs, nOutputs int, txVersion int32) (uint64, error) {
 	var feeRates FeeRates
 	resp, err := http.Get("https://mempool.space/api/v1/fees/recommended")
 	if err != nil {
@@ -319,16 +303,24 @@ func (client *client) CalculateFee(nInputs, nOutputs int, txType TxType) (uint64
 		return 0, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
 
-	switch txType {
-	case Legacy:
+	switch txVersion {
+	case 1:
 		// inputs + 1 to account for input that might be used for fee
 		// but if fee is already accounted in the selected utxos it will just lead to a slighty speedy transaction
 		return uint64((nInputs+1)*148+nOutputs*34+10) * (uint64(feeRates.HalfHourFee)), nil
-	case SegWit:
+	case 2:
 		return uint64(nInputs*68+nOutputs*31+10) * uint64(feeRates.HalfHourFee), nil
 	}
 	return 0, fmt.Errorf("tx type not supported")
 
+}
+
+type FeeRates struct {
+	FastestFee  int `json:"fastestFee"`
+	HalfHourFee int `json:"halfHourFee"`
+	HourFee     int `json:"hourFee"`
+	MinimumFee  int `json:"minimumFee"`
+	EconomyFee  int `json:"economyFee"`
 }
 
 type Transaction struct {

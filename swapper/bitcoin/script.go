@@ -32,10 +32,10 @@ func NewHTLCScript(initiatorAddress, redeemerAddress btcutil.Address, secretHash
 		Script()
 }
 
-func NewHTLCRedeemScript(pubKey, secret []byte) wire.TxWitness {
+func NewHTLCRedeemWitness(pubKey, secret []byte) wire.TxWitness {
 	return wire.TxWitness{pubKey, secret, []byte{0x1}}
 }
 
-func NewHTLCRefundScript(pubKey []byte) wire.TxWitness {
+func NewHTLCRefundWitness(pubKey []byte) wire.TxWitness {
 	return wire.TxWitness{pubKey, nil}
 }

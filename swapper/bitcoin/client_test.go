@@ -120,7 +120,7 @@ var _ = Describe("bitcoin client ", func() {
 			time.Sleep(5 * time.Second)
 
 			By("Try to spend the funds in the HTLC using secret")
-			witness := bitcoin.NewHTLCRedeemScript(pk2.PubKey().SerializeCompressed(), secret)
+			witness := bitcoin.NewHTLCRedeemWitness(pk2.PubKey().SerializeCompressed(), secret)
 			redeemTxid, err := client.Spend(script, witness, pk2, 0)
 			Expect(err).Should(BeNil())
 			time.Sleep(5 * time.Second)
