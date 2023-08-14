@@ -22,7 +22,7 @@ import (
 const (
 	BTC_VERSION = 2
 
-	// DustAmount is the minimum amount the node accepts for an UTXO.
+	// DustAmount is the minimum amount sats node will accept for an UTXO.
 	DustAmount = 546
 )
 
@@ -36,12 +36,12 @@ type UTXOs []UTXO
 
 type Client interface {
 	GetSpendingWitness(address btcutil.Address) ([]string, string, error)
-	GetBlockHeight(txhash string) (uint64, error)
+	GetBlockHeight(txid string) (uint64, error)
 	GetTipBlockHeight() (uint64, error)
 	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
 	Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error)
 	Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error)
-	IsFinal(txHash string, waitPeriod uint64) (bool, error)
+	IsFinal(txid string, waitPeriod uint64) (bool, error)
 	Net() *chaincfg.Params
 }
 
@@ -86,8 +86,8 @@ func (client *client) GetTipBlockHeight() (uint64, error) {
 	return strconv.ParseUint(string(data), 10, 64)
 }
 
-func (client *client) GetBlockHeight(txhash string) (uint64, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/tx/%s", client.url, txhash))
+func (client *client) GetBlockHeight(txid string) (uint64, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/tx/%s", client.url, txid))
 	if err != nil {
 		return 0, fmt.Errorf("failed to get transaction: %w", err)
 	}
@@ -295,19 +295,16 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 	return string(data), nil
 }
 
-func (client *client) IsFinal(txHash string, waitPeriod uint64) (bool, error) {
-	minedBlock, err := client.GetBlockHeight(txHash)
+func (client *client) IsFinal(txid string, waitPeriod uint64) (bool, error) {
+	minedBlock, err := client.GetBlockHeight(txid)
 	if err != nil {
 		return false, fmt.Errorf("failed to get block height: %w", err)
 	}
 	currentBlock, err := client.GetTipBlockHeight()
 	if err != nil {
-		return false, fmt.Errorf("failed to get block height: %w", err)
+		return false, fmt.Errorf("failed to get block tip: %w", err)
 	}
-	if int64(currentBlock-minedBlock) >= int64(waitPeriod)-1 {
-		return true, nil
-	}
-	return false, nil
+	return int64(currentBlock-minedBlock)+1 >= int64(waitPeriod), nil
 }
 
 // CalculateFee estimates the fees of the bitcoin tx with given number of inputs and outputs.

@@ -6,26 +6,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-// OP_IF
-//
-//	    OP_SHA256
-//	    ${secretHash}
-//	    OP_EQUALVERIFY
-//	    OP_DUP
-//	    OP_HASH160
-//	    ${redeemerAddress}
-//	    OP_EQUALVERIFY
-//	    OP_CHECKSIG
-//	OP_ELSE
-//	    ${waitTime}
-//	    OP_CHECKSEQUENCEVERIFY
-//	    OP_DROP
-//	    OP_DUP
-//	    OP_HASH160
-//	    ${initiatorAddress}
-//	    OP_EQUALVERIFY
-//	    OP_CHECKSIG
-//	OP_ENDIF
+// NewHTLCScript builds a bitcoin script following BIP-199 (https://github.com/bitcoin/bips/blob/master/bip-0199.mediawiki#summary)
 func NewHTLCScript(initiatorAddress, redeemerAddress btcutil.Address, secretHash []byte, waitTime int64) ([]byte, error) {
 	return txscript.NewScriptBuilder().
 		AddOp(txscript.OP_IF).
@@ -35,6 +16,7 @@ func NewHTLCScript(initiatorAddress, redeemerAddress btcutil.Address, secretHash
 		AddOp(txscript.OP_DUP).
 		AddOp(txscript.OP_HASH160).
 		AddData(redeemerAddress.ScriptAddress()).
+		// TODO : Following two opcodes can be taken out of the if statement.
 		AddOp(txscript.OP_EQUALVERIFY).
 		AddOp(txscript.OP_CHECKSIG).
 		AddOp(txscript.OP_ELSE).
