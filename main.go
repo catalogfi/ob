@@ -11,6 +11,7 @@ import (
 	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/catalogfi/wbtc-garden/store"
 	"github.com/catalogfi/wbtc-garden/watcher"
+	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -58,7 +59,8 @@ func main() {
 		},
 	}
 
-	watcher := watcher.NewWatcher(store, config)
+	logger, _ := zap.NewDevelopment()
+	watcher := watcher.NewWatcher(logger, store, config)
 	price := price.NewPriceChecker(store, envConfig.PRICE_FEED_URL)
 	go price.Run()
 	go watcher.Run()

@@ -2,5 +2,6 @@
 *.json
 .env
 .env.*
+.idea
 cob
 thinkfile
