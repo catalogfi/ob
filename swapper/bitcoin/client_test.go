@@ -35,29 +35,14 @@ var _ = Describe("bitcoin client ", func() {
 			Expect(err).Should(BeNil())
 
 			By("Fund the address")
-			txid, err := NigiriFaucet(addr.EncodeAddress())
+			_, err = NigiriFaucet(addr.EncodeAddress())
 			Expect(err).Should(BeNil())
 			time.Sleep(5 * time.Second)
-
-			By("Check if a tx is confirmed by using `IsFinal()`")
-			isFinal, err := client.IsFinal(txid, 1)
-			Expect(err).Should(BeNil())
-			Expect(isFinal).Should(BeTrue())
-			isFinal, err = client.IsFinal(txid, 2)
-			Expect(err).Should(BeNil())
-			Expect(isFinal).Should(BeFalse())
 
 			By("Fetch the utxo by using `GetUTXOs()`")
 			utxos, _, err := client.GetUTXOs(addr, 0)
 			Expect(err).Should(BeNil())
 			Expect(len(utxos)).Should(BeNumerically(">=", 1))
-
-			By("GetBlockHeight()")
-			for _, utxo := range utxos {
-				height, err := client.GetBlockHeight(utxo.TxID)
-				Expect(err).Should(BeNil())
-				Expect(height).Should(BeNumerically(">", 100))
-			}
 		})
 
 		It("should be able to send bitcoin", func() {
@@ -82,9 +67,6 @@ var _ = Describe("bitcoin client ", func() {
 			Expect(err).To(BeNil())
 			Expect(txid).NotTo(BeNil())
 			time.Sleep(5 * time.Second)
-			isFinal, err := client.IsFinal(txid, 1)
-			Expect(err).Should(BeNil())
-			Expect(isFinal).Should(BeFalse())
 		})
 
 		It("should spend the htlc funds", func() {
@@ -126,9 +108,9 @@ var _ = Describe("bitcoin client ", func() {
 			time.Sleep(5 * time.Second)
 
 			By("Get spending witness")
-			witnesses, txid, err := client.GetSpendingWitness(scriptAddr)
+			witnesses, tx, err := client.GetSpendingWitness(scriptAddr)
 			Expect(err).Should(BeNil())
-			Expect(redeemTxid).Should(Equal(txid))
+			Expect(redeemTxid).Should(Equal(tx.TxID))
 			Expect(len(witnesses)).Should(Equal(5))
 			revealedSecret, err := hex.DecodeString(witnesses[2])
 			Expect(err).Should(BeNil())

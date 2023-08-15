@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"crypto/ecdsa"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"math/big"
@@ -103,7 +104,17 @@ func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, urls map[model.
 
 	switch client := client.(type) {
 	case bitcoin.Client:
-		return bitcoin.NewWatcher(initiatorAddress.(btcutil.Address), redeemerAddress.(btcutil.Address), secHash, expiry.Int64(), minConfirmations, amt.Uint64(), client)
+		htlcScript, err := bitcoin.NewHTLCScript(initiatorAddress.(btcutil.Address), redeemerAddress.(btcutil.Address), secHash, expiry.Int64())
+		if err != nil {
+			return nil, fmt.Errorf("failed to create HTLC script: %w", err)
+		}
+
+		witnessProgram := sha256.Sum256(htlcScript)
+		scriptAddr, err := btcutil.NewAddressWitnessScriptHash(witnessProgram[:], client.Net())
+		if err != nil {
+			return nil, fmt.Errorf("failed to create script address: %w", err)
+		}
+		return bitcoin.NewWatcher(scriptAddr, expiry.Int64(), minConfirmations, amt.Uint64(), client)
 	case ethereum.Client:
 		contractAddr := common.HexToAddress(atomicSwap.Asset.SecondaryID())
 		return ethereum.NewWatcher(contractAddr, secHash, expiry, big.NewInt(int64(minConfirmations)), amt, client)

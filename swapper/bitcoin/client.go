@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"strconv"
 
@@ -27,21 +26,20 @@ const (
 )
 
 type UTXO struct {
-	Amount uint64 `json:"value"`
-	TxID   string `json:"txid"`
-	Vout   uint32 `json:"vout"`
+	Amount uint64  `json:"value"`
+	TxID   string  `json:"txid"`
+	Vout   uint32  `json:"vout"`
+	Status *Status `json:"status"`
 }
 
 type UTXOs []UTXO
 
 type Client interface {
-	GetSpendingWitness(address btcutil.Address) ([]string, string, error)
-	GetBlockHeight(txid string) (uint64, error)
+	GetSpendingWitness(address btcutil.Address) ([]string, Transaction, error)
 	GetTipBlockHeight() (uint64, error)
 	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
 	Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error)
 	Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error)
-	IsFinal(txid string, waitPeriod uint64) (bool, error)
 	Net() *chaincfg.Params
 }
 
@@ -70,40 +68,23 @@ func (client *client) GetTipBlockHeight() (uint64, error) {
 	return strconv.ParseUint(string(data), 10, 64)
 }
 
-func (client *client) GetBlockHeight(txid string) (uint64, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/tx/%s", client.url, txid))
-	if err != nil {
-		return 0, fmt.Errorf("failed to get transaction: %w", err)
-	}
-
-	var tx Transaction
-	if err := json.NewDecoder(resp.Body).Decode(&tx); err != nil {
-		return 0, fmt.Errorf("failed to decode transaction: %w", err)
-	}
-
-	if !tx.Status.Confirmed {
-		return math.MaxUint32, nil
-	}
-	return tx.Status.BlockHeight, nil
-}
-
-func (client *client) GetSpendingWitness(address btcutil.Address) ([]string, string, error) {
+func (client *client) GetSpendingWitness(address btcutil.Address) ([]string, Transaction, error) {
 	resp, err := http.Get(fmt.Sprintf("%s/address/%s/txs", client.url, address.EncodeAddress()))
 	if err != nil {
-		return []string{}, "", fmt.Errorf("failed to get transactions: %w", err)
+		return []string{}, Transaction{}, fmt.Errorf("failed to get transactions: %w", err)
 	}
 	var txs []Transaction
 	if err := json.NewDecoder(resp.Body).Decode(&txs); err != nil {
-		return []string{}, "", fmt.Errorf("failed to decode transactions: %w", err)
+		return []string{}, Transaction{}, fmt.Errorf("failed to decode transactions: %w", err)
 	}
 	for _, tx := range txs {
 		for _, vin := range tx.VINs {
 			if vin.Prevout.ScriptPubKeyAddress == address.EncodeAddress() {
-				return *vin.Witness, tx.TxID, nil
+				return *vin.Witness, tx, nil
 			}
 		}
 	}
-	return []string{}, "", nil
+	return []string{}, Transaction{}, nil
 }
 
 func (client *client) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error) {
@@ -277,18 +258,6 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 		return "", fmt.Errorf("failed to read transaction id: %w", err)
 	}
 	return string(data), nil
-}
-
-func (client *client) IsFinal(txid string, waitPeriod uint64) (bool, error) {
-	minedBlock, err := client.GetBlockHeight(txid)
-	if err != nil {
-		return false, fmt.Errorf("failed to get block height: %w", err)
-	}
-	currentBlock, err := client.GetTipBlockHeight()
-	if err != nil {
-		return false, fmt.Errorf("failed to get block tip: %w", err)
-	}
-	return int64(currentBlock-minedBlock)+1 >= int64(waitPeriod), nil
 }
 
 // CalculateFee estimates the fees of the bitcoin tx with given number of inputs and outputs.
