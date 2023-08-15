@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap"
 )
 
 func randomHex(n int) ([]byte, error) {
@@ -76,7 +77,9 @@ var _ = Describe("Ethereum to Bitcoin", func() {
 		fmt.Println("ethPkAddr1", ethPkAddr1.Hex())
 		fmt.Println("ethPkAddr2", ethPkAddr2.Hex())
 
-		ethClient, err := ethereum.NewClient("http://localhost:8545")
+		logger, err := zap.NewDevelopment()
+		Expect(err).To(BeNil())
+		ethClient, err := ethereum.NewClient(logger, "http://localhost:8545")
 		Expect(err).To(BeNil())
 
 		btcClient := bitcoin.NewClient("https://mempool.space/testnet/api", &chaincfg.RegressionNetParams)
@@ -99,10 +102,10 @@ var _ = Describe("Ethereum to Bitcoin", func() {
 
 		iSwapA, err := ethereum.NewInitiatorSwap(ethPrivKey1, ethPkAddr2, ETH_ATOMICSWAP, secret_hash[:], ethExpiry, big.NewInt(0), big.NewInt(100000), ethClient)
 		Expect(err).To(BeNil())
-		rSwapA, err := bitcoin.NewRedeemerSwap(btcPrivKey1, btcPkAddr2, secret_hash[:], btcExpiry, 0, 10000, btcClient)
+		rSwapA, err := bitcoin.NewRedeemerSwap(logger, btcPrivKey1, btcPkAddr2, secret_hash[:], btcExpiry, 0, 10000, btcClient)
 		Expect(err).To(BeNil())
 
-		iSwapB, err := bitcoin.NewInitiatorSwap(btcPrivKey2, btcPkAddr1, secret_hash[:], btcExpiry, 0, 10000, btcClient)
+		iSwapB, err := bitcoin.NewInitiatorSwap(logger, btcPrivKey2, btcPkAddr1, secret_hash[:], btcExpiry, 0, 10000, btcClient)
 		Expect(err).To(BeNil())
 		rSwapB, err := ethereum.NewRedeemerSwap(ethPrivKey2, ethPkAddr1, ETH_ATOMICSWAP, secret_hash[:], ethExpiry, big.NewInt(0), big.NewInt(100000), ethClient)
 		Expect(err).To(BeNil())

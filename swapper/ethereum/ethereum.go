@@ -69,15 +69,18 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr 
 		return &initiatorSwap{}, err
 	}
 	return &initiatorSwap{
-		initiator: initiator, watcher: watcher,
-		initiatorAddr:  initiatorAddr,
-		expiryBlock:    expiryBlock,
-		atomicSwapAddr: atomicSwapAddr,
-		client:         client, amount: amount,
+		initiator:        initiator,
+		watcher:          watcher,
+		initiatorAddr:    initiatorAddr,
+		expiryBlock:      expiryBlock,
+		atomicSwapAddr:   atomicSwapAddr,
+		client:           client,
+		amount:           amount,
 		tokenAddr:        tokenAddr,
 		redeemerAddr:     redeemerAddr,
 		lastCheckedBlock: latestCheckedBlock,
-		secretHash:       secretHash}, nil
+		secretHash:       secretHash,
+	}, nil
 }
 
 func (initiatorSwap *initiatorSwap) Initiate() (txHash string, err error) {

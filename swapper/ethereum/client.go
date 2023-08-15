@@ -4,17 +4,16 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"log"
 	"math/big"
 	"time"
 
-	// "crypto/rand"
 	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
 	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/ERC20"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"go.uber.org/zap"
 )
 
 var (
@@ -37,29 +36,39 @@ type Client interface {
 	IsFinal(txHash string, waitBlocks uint64) (bool, error)
 }
 type client struct {
+	logger   *zap.Logger
 	url      string
 	provider *ethclient.Client
 }
 
-func NewClient(url string) (Client, error) {
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+func NewClient(logger *zap.Logger, url string) (Client, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	provider, err := ethclient.DialContext(ctx, url)
 	if err != nil {
 		return nil, err
 	}
-	return &client{url: url, provider: provider}, nil
+	childLogger := logger.With(zap.String("service", "ethClient"))
+
+	return &client{
+		logger:   childLogger,
+		url:      url,
+		provider: provider,
+	}, nil
 }
+
 func (client *client) GetTransactOpts(privKey *ecdsa.PrivateKey) *bind.TransactOpts {
 	provider := client.provider
 	chainId, err := provider.ChainID(context.Background())
 	if err != nil {
-		panic(err)
+		client.logger.Panic("chain ID", zap.Error(err))
 	}
 
 	fromAddress := client.GetPublicAddress(privKey)
 	nonce, err := provider.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
-		panic(err)
+		client.logger.Panic("pending nonce", zap.Error(err))
 	}
 
 	// gasPrice, err := provider.SuggestGasPrice(context.Background())
@@ -69,7 +78,7 @@ func (client *client) GetTransactOpts(privKey *ecdsa.PrivateKey) *bind.TransactO
 
 	auth, err := bind.NewKeyedTransactorWithChainID(privKey, chainId)
 	if err != nil {
-		panic(err)
+		client.logger.Panic("new transactor", zap.Error(err))
 	}
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(0)      // in wei
@@ -131,7 +140,7 @@ func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecd
 	if err != nil {
 		return "", err
 	}
-	fmt.Println("hash", initTx.Hash().Hex())
+	client.logger.Info("initiate swap", zap.String("txHash", initTx.Hash().Hex()))
 	return initTx.Hash().Hex(), nil
 }
 
@@ -153,7 +162,7 @@ func (client *client) GetPublicAddress(privKey *ecdsa.PrivateKey) common.Address
 	publicKey := privKey.Public()
 	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 	if !ok {
-		log.Fatal("cannot assert type: publicKey is not of type *ecdsa.PublicKey")
+		client.logger.Fatal("wrong public key type")
 	}
 
 	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
@@ -171,7 +180,11 @@ func (client *client) TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, 
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("Transfering %v %s to %s txhash : %s\n", amount, tokenAddr, toAddr, tx.Hash().Hex())
+	client.logger.Debug("transfer erc20",
+		zap.String("amount", amount.String()),
+		zap.String("token address", tokenAddr.Hex()),
+		zap.String("to address", toAddr.Hex()),
+		zap.String("txHash", tx.Hash().Hex()))
 	return tx.Hash().Hex(), err
 }
 func (client *client) ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error) {
@@ -183,25 +196,26 @@ func (client *client) ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, t
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("Approving %v %s to %s txhash : %s\n", amount, tokenAddr, toAddr, tx.Hash().Hex())
-	bind.WaitMined(context.Background(), client.provider, tx)
-	return tx.Hash().Hex(), err
+	client.logger.Debug("approve erc20",
+		zap.String("amount", amount.String()),
+		zap.String("token address", tokenAddr.Hex()),
+		zap.String("to address", toAddr.Hex()),
+		zap.String("txHash", tx.Hash().Hex()))
+	receipt, err := bind.WaitMined(context.Background(), client.provider, tx)
+	if err != nil {
+		return "", err
+	}
+	return receipt.TxHash.Hex(), err
 }
 func (client *client) Allowance(tokenAddr common.Address, spender common.Address, owner common.Address) (*big.Int, error) {
 	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
 	if err != nil {
 		return nil, err
 	}
-	allowance, err := instance.Allowance(client.GetCallOpts(), owner, spender)
-	if err != nil {
-		return nil, err
-	}
-	return allowance, nil
-
+	return instance.Allowance(client.GetCallOpts(), owner, spender)
 }
 func (client *client) GetCurrentBlock() (uint64, error) {
-	bn, err := client.provider.BlockNumber(context.Background())
-	return bn, err
+	return client.provider.BlockNumber(context.Background())
 }
 
 func (client *client) GetERC20Balance(tokenAddr common.Address, ofAddr common.Address) (*big.Int, error) {
@@ -209,8 +223,7 @@ func (client *client) GetERC20Balance(tokenAddr common.Address, ofAddr common.Ad
 	if err != nil {
 		return big.NewInt(0), err
 	}
-	balance, err := instance.BalanceOf(client.GetCallOpts(), ofAddr)
-	return balance, err
+	return instance.BalanceOf(client.GetCallOpts(), ofAddr)
 }
 
 func (client *client) IsFinal(txHash string, waitBlocks uint64) (bool, error) {
@@ -225,10 +238,7 @@ func (client *client) IsFinal(txHash string, waitBlocks uint64) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error getting current block %v", err)
 	}
-	if int64(currentBlock-tx.BlockNumber.Uint64()) >= int64(waitBlocks)-1 || waitBlocks == 0 {
-		return true, nil
-	}
-	return false, nil
+	return int64(currentBlock-tx.BlockNumber.Uint64()) >= int64(waitBlocks)-1 || waitBlocks == 0, nil
 }
 
 func (client *client) FetchOrder(secretHash []byte) {

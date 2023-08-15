@@ -9,9 +9,11 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/catalogfi/wbtc-garden/swapper"
+	"go.uber.org/zap"
 )
 
 type initiatorSwap struct {
+	logger         *zap.Logger
 	initiator      *btcec.PrivateKey
 	initiateTxHash string
 	htlcScript     []byte
@@ -29,7 +31,7 @@ func GetExpiry(goingFirst bool) int64 {
 	return 144
 }
 
-func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerAddr btcutil.Address, secretHash []byte, waitBlocks int64, minConfirmations, amount uint64, client Client) (swapper.InitiatorSwap, error) {
+func NewInitiatorSwap(logger *zap.Logger, initiator *btcec.PrivateKey, redeemerAddr btcutil.Address, secretHash []byte, waitBlocks int64, minConfirmations, amount uint64, client Client) (swapper.InitiatorSwap, error) {
 	initiatorAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(initiator.PubKey().SerializeCompressed()), client.Net())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create initiator address: %w", err)
@@ -45,13 +47,27 @@ func NewInitiatorSwap(initiator *btcec.PrivateKey, redeemerAddr btcutil.Address,
 		return nil, fmt.Errorf("failed to create script address: %w", err)
 	}
 
-	// fmt.Println("script address:", scriptAddr.EncodeAddress())
-
 	watcher, err := NewWatcher(initiatorAddr, redeemerAddr, secretHash, waitBlocks, minConfirmations, amount, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create watcher: %w", err)
 	}
-	return &initiatorSwap{initiator: initiator, htlcScript: htlcScript, watcher: watcher, scriptAddr: scriptAddr, amount: amount, waitBlocks: waitBlocks, client: client}, nil
+	if logger == nil {
+		logger, err = zap.NewDevelopment()
+		if err != nil {
+			return nil, err
+		}
+	}
+	childLogger := logger.With(zap.String("service", "initSwap"))
+	return &initiatorSwap{
+		logger:     childLogger,
+		initiator:  initiator,
+		htlcScript: htlcScript,
+		watcher:    watcher,
+		scriptAddr: scriptAddr,
+		amount:     amount,
+		waitBlocks: waitBlocks,
+		client:     client,
+	}, nil
 }
 
 func (s *initiatorSwap) Initiate() (string, error) {
@@ -60,7 +76,7 @@ func (s *initiatorSwap) Initiate() (string, error) {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}
 	s.initiateTxHash = txHash
-	fmt.Println("Successfully Initiated:", txHash)
+	s.logger.Info("Initiated", zap.String("txHash", txHash))
 	return txHash, nil
 }
 
@@ -74,20 +90,21 @@ func (s *initiatorSwap) Refund() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}
-	fmt.Println("Successfully Refunded:", txHash)
+	s.logger.Info("Refunded", zap.String("txHash", txHash))
 	return txHash, nil
 }
 
 func (s *initiatorSwap) WaitForRedeem() ([]byte, string, error) {
 	for {
-		fmt.Println("Waiting for Redemption on:", s.scriptAddr)
+		s.logger.Debug("Waiting for Redemption", zap.String("address", s.scriptAddr.EncodeAddress()))
 		redeemed, secret, tx, err := s.IsRedeemed()
 		if redeemed {
+			s.logger.Info("Redeemed", zap.String("secret", hex.EncodeToString(secret)))
 			return secret, tx, nil
 		}
 
 		if err != nil {
-			fmt.Println("failed to check if redeemed:", err)
+			s.logger.Error("check redemption", zap.Error(err))
 		}
 		time.Sleep(5 * time.Second)
 	}
@@ -98,6 +115,7 @@ func (s *initiatorSwap) IsRedeemed() (bool, []byte, string, error) {
 }
 
 type redeemerSwap struct {
+	logger     *zap.Logger
 	amount     uint64
 	redeemer   *btcec.PrivateKey
 	htlcScript []byte
@@ -106,7 +124,7 @@ type redeemerSwap struct {
 	client     Client
 }
 
-func NewRedeemerSwap(redeemer *btcec.PrivateKey, initiator btcutil.Address, secretHash []byte, waitBlocks int64, minConfirmations, amount uint64, client Client) (swapper.RedeemerSwap, error) {
+func NewRedeemerSwap(logger *zap.Logger, redeemer *btcec.PrivateKey, initiator btcutil.Address, secretHash []byte, waitBlocks int64, minConfirmations, amount uint64, client Client) (swapper.RedeemerSwap, error) {
 	redeemerAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(redeemer.PubKey().SerializeCompressed()), client.Net())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create redeemer address: %w", err)
@@ -122,12 +140,29 @@ func NewRedeemerSwap(redeemer *btcec.PrivateKey, initiator btcutil.Address, secr
 		return nil, fmt.Errorf("failed to create script address: %w", err)
 	}
 
-	// fmt.Println("script address:", scriptAddr.EncodeAddress())
 	watcher, err := NewWatcher(initiator, redeemerAddr, secretHash, waitBlocks, minConfirmations, amount, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create watcher: %w", err)
 	}
-	return &redeemerSwap{redeemer: redeemer, watcher: watcher, htlcScript: htlcScript, scriptAddr: scriptAddr, amount: amount, client: client}, nil
+
+	// Initialise the logger
+	if logger == nil {
+		logger, err = zap.NewDevelopment()
+		if err != nil {
+			return nil, err
+		}
+	}
+	childLogger := logger.With(zap.String("service", "redeemSwap"))
+
+	return &redeemerSwap{
+		logger:     childLogger,
+		redeemer:   redeemer,
+		watcher:    watcher,
+		htlcScript: htlcScript,
+		scriptAddr: scriptAddr,
+		amount:     amount,
+		client:     client,
+	}, nil
 }
 
 func (s *redeemerSwap) Redeem(secret []byte) (string, error) {
@@ -136,7 +171,7 @@ func (s *redeemerSwap) Redeem(secret []byte) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}
-	fmt.Println("Successfully Redeemed:", txHash)
+	s.logger.Info("Redeemed", zap.String("txHash", txHash))
 	return txHash, nil
 }
 
@@ -147,7 +182,7 @@ func (s *redeemerSwap) WaitForInitiate() ([]string, error) {
 			return txHashes, nil
 		}
 		if err != nil {
-			fmt.Println("failed to check if initiated:", err)
+			s.logger.Error("wait for initiation", zap.Error(err))
 		}
 		time.Sleep(5 * time.Second)
 	}
@@ -176,7 +211,6 @@ func NewWatcher(initiator, redeemerAddr btcutil.Address, secretHash []byte, wait
 		return nil, fmt.Errorf("failed to create script address: %w", err)
 	}
 
-	// fmt.Println("script address:", scriptAddr.EncodeAddress())
 	return &watcher{scriptAddr: scriptAddr, amount: amount, waitBlocks: waitBlocks, minConfirmations: minConfirmations, client: client}, nil
 }
 
@@ -193,10 +227,7 @@ func (w *watcher) Expired() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if currentBlock >= initiateBlockHeight+uint64(w.waitBlocks) {
-		return true, nil
-	}
-	return false, nil
+	return currentBlock-initiateBlockHeight+1 >= uint64(w.waitBlocks), nil
 }
 
 func (w *watcher) IsInitiated() (bool, []string, error) {
@@ -227,7 +258,6 @@ func (w *watcher) IsRedeemed() (bool, []byte, string, error) {
 		return false, nil, "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
 	if len(witness) == 5 {
-		fmt.Println("Redeemed:", witness)
 		// inputs are [ 0 : sig, 1 : spender.PubKey().SerializeCompressed(),2 : secret, 3 :[]byte{0x1}, script]
 		secretString := witness[2]
 		secretBytes := make([]byte, hex.DecodedLen(len(secretString)))

@@ -30,7 +30,10 @@ func main() {
 		},
 	}
 
-	logger, _ := zap.NewDevelopment()
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
 	watcher := watcher.NewWatcher(logger, store, config)
 	price := price.NewPriceChecker(store, "https://api.coincap.io/v2/assets/bitcoin")
 	go price.Run()

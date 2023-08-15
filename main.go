@@ -59,7 +59,10 @@ func main() {
 		},
 	}
 
-	logger, _ := zap.NewDevelopment()
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
 	watcher := watcher.NewWatcher(logger, store, config)
 	price := price.NewPriceChecker(store, envConfig.PRICE_FEED_URL)
 	go price.Run()

@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap"
 )
 
 func randomHex(n int) ([]byte, error) {
@@ -51,7 +52,9 @@ var _ = Describe("Bitcoin", func() {
 		fmt.Println(pkAddr1.Hex())
 		fmt.Println(pkAddr2.Hex())
 
-		client, err := ethereum.NewClient("http://localhost:8545")
+		logger, err := zap.NewDevelopment()
+		Expect(err).To(BeNil())
+		client, err := ethereum.NewClient(logger, "http://localhost:8545")
 		Expect(err).To(BeNil())
 
 		// client.ApproveERC20(privKey1, big.NewInt(100000), TOKEN, atomicSwapAdrr)

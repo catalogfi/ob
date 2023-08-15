@@ -14,6 +14,7 @@ import (
 	"github.com/catalogfi/wbtc-garden/swapper/bitcoin"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap"
 )
 
 func randomHex(n int) ([]byte, error) {
@@ -51,14 +52,16 @@ var _ = Describe("Bitcoin", func() {
 		secret, _ := randomHex(32)
 		secret_hash := sha256.Sum256(secret)
 
-		iSwapA, err := bitcoin.NewInitiatorSwap(privKey1, pkAddr2, secret_hash[:], 1000, 0, 10000, client)
+		logger, err := zap.NewDevelopment()
 		Expect(err).To(BeNil())
-		rSwapA, err := bitcoin.NewRedeemerSwap(privKey1, pkAddr2, secret_hash[:], 1000, 0, 10000, client)
+		iSwapA, err := bitcoin.NewInitiatorSwap(logger, privKey1, pkAddr2, secret_hash[:], 1000, 0, 10000, client)
+		Expect(err).To(BeNil())
+		rSwapA, err := bitcoin.NewRedeemerSwap(logger, privKey1, pkAddr2, secret_hash[:], 1000, 0, 10000, client)
 		Expect(err).To(BeNil())
 
-		iSwapB, err := bitcoin.NewInitiatorSwap(privKey2, pkAddr1, secret_hash[:], 1000, 0, 10000, client)
+		iSwapB, err := bitcoin.NewInitiatorSwap(logger, privKey2, pkAddr1, secret_hash[:], 1000, 0, 10000, client)
 		Expect(err).To(BeNil())
-		rSwapB, err := bitcoin.NewRedeemerSwap(privKey2, pkAddr1, secret_hash[:], 1000, 0, 10000, client)
+		rSwapB, err := bitcoin.NewRedeemerSwap(logger, privKey2, pkAddr1, secret_hash[:], 1000, 0, 10000, client)
 		Expect(err).To(BeNil())
 
 		go func() {
@@ -91,7 +94,9 @@ var _ = Describe("Bitcoin", func() {
 		secret, _ := randomHex(32)
 		secret_hash := sha256.Sum256(secret)
 
-		iSwapA, err := bitcoin.NewInitiatorSwap(privKey1, pkAddr2, secret_hash[:], 5, 0, 10000, client)
+		logger, err := zap.NewDevelopment()
+		Expect(err).To(BeNil())
+		iSwapA, err := bitcoin.NewInitiatorSwap(logger, privKey1, pkAddr2, secret_hash[:], 5, 0, 10000, client)
 		Expect(err).To(BeNil())
 
 		_, err = iSwapA.Initiate()
