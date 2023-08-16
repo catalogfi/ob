@@ -11,6 +11,7 @@ import (
 	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 const MaxQueryBlockRange = 500
@@ -53,7 +54,7 @@ func GetExpiry(client Client, goingFirst bool) (*big.Int, error) {
 
 func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr common.Address, secretHash []byte, expiryBlock, minConfirmations, amount *big.Int, client Client) (swapper.InitiatorSwap, error) {
 
-	initiatorAddr := client.GetPublicAddress(initiator)
+	initiatorAddr := crypto.PubkeyToAddress(initiator.PublicKey)
 
 	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(12000))
 	if latestCheckedBlock.Cmp(big.NewInt(0)) == -1 {
@@ -125,7 +126,14 @@ func (initiatorSwap *initiatorSwap) IsRedeemed() (bool, []byte, string, error) {
 
 func (initiatorSwap *initiatorSwap) Refund() (string, error) {
 	defer fmt.Println("Done refund")
-	tx, err := initiatorSwap.client.RefundAtomicSwap(initiatorSwap.atomicSwapAddr, initiatorSwap.client.GetTransactOpts(initiatorSwap.initiator), initiatorSwap.tokenAddr, initiatorSwap.secretHash)
+
+	// Initialise the transactor
+	transactor, err := initiatorSwap.client.GetTransactOpts(initiatorSwap.initiator)
+	if err != nil {
+		return "", err
+	}
+
+	tx, err := initiatorSwap.client.RefundAtomicSwap(initiatorSwap.atomicSwapAddr, transactor, initiatorSwap.tokenAddr, initiatorSwap.secretHash)
 	if err != nil {
 		return "", err
 	}
@@ -160,8 +168,11 @@ func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr c
 func (redeemerSwap *redeemerSwap) Redeem(secret []byte) (string, error) {
 	defer fmt.Println("Done redeem")
 	fmt.Println("redeeming...")
-
-	return redeemerSwap.client.RedeemAtomicSwap(redeemerSwap.atomicSwapAddr, redeemerSwap.client.GetTransactOpts(redeemerSwap.redeemer), redeemerSwap.tokenAddr, secret)
+	transactor, err := redeemerSwap.client.GetTransactOpts(redeemerSwap.redeemer)
+	if err != nil {
+		return "", err
+	}
+	return redeemerSwap.client.RedeemAtomicSwap(redeemerSwap.atomicSwapAddr, transactor, redeemerSwap.tokenAddr, secret)
 }
 
 func (redeemerSwap *redeemerSwap) IsInitiated() (bool, []string, error) {
