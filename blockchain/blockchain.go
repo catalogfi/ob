@@ -59,10 +59,11 @@ func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interfac
 	if !ok {
 		return nil, fmt.Errorf("invalid timelock: %s", atomicSwap.Timelock)
 	}
+	logger, _ := zap.NewDevelopment()
 
 	switch client := client.(type) {
 	case bitcoin.Client:
-		return bitcoin.NewInitiatorSwap(nil, initiatorPrivateKey.(*btcec.PrivateKey), redeemerAddress.(btcutil.Address), secHash, expiry.Int64(), minConfirmations, amt.Uint64(), client)
+		return bitcoin.NewInitiatorSwap(logger, initiatorPrivateKey.(*btcec.PrivateKey), redeemerAddress.(btcutil.Address), secHash, expiry.Int64(), minConfirmations, amt.Uint64(), client)
 	case ethereum.Client:
 		contractAddr := common.HexToAddress(atomicSwap.Asset.SecondaryID())
 		return ethereum.NewInitiatorSwap(initiatorPrivateKey.(*ecdsa.PrivateKey), redeemerAddress.(common.Address), contractAddr, secHash, expiry, big.NewInt(int64(minConfirmations)), amt, client)
@@ -165,9 +166,10 @@ func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerPrivateKey interface{
 		return nil, fmt.Errorf("invalid timelock: %s", atomicSwap.Timelock)
 	}
 
+	logger, _ := zap.NewDevelopment()
 	switch client := client.(type) {
 	case bitcoin.Client:
-		return bitcoin.NewRedeemerSwap(nil, redeemerPrivateKey.(*btcec.PrivateKey), initiatorAddress.(btcutil.Address), secHash, expiry.Int64(), minConfirmations, amt.Uint64(), client)
+		return bitcoin.NewRedeemerSwap(logger, redeemerPrivateKey.(*btcec.PrivateKey), initiatorAddress.(btcutil.Address), secHash, expiry.Int64(), minConfirmations, amt.Uint64(), client)
 	case ethereum.Client:
 		contractAddr := common.HexToAddress(atomicSwap.Asset.SecondaryID())
 		return ethereum.NewRedeemerSwap(redeemerPrivateKey.(*ecdsa.PrivateKey), initiatorAddress.(common.Address), contractAddr, secHash, expiry, amt, big.NewInt(int64(minConfirmations)), client)
