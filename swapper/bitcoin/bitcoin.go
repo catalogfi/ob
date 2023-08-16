@@ -23,9 +23,6 @@ func NewHTLCScript(initiatorAddress, redeemerAddress btcutil.Address, secretHash
 		AddOp(txscript.OP_DUP).
 		AddOp(txscript.OP_HASH160).
 		AddData(redeemerAddress.ScriptAddress()).
-		// TODO : Following two opcodes can be taken out of the if statement.
-		AddOp(txscript.OP_EQUALVERIFY).
-		AddOp(txscript.OP_CHECKSIG).
 		AddOp(txscript.OP_ELSE).
 		AddInt64(waitTime).
 		AddOp(txscript.OP_CHECKSEQUENCEVERIFY).
@@ -33,9 +30,9 @@ func NewHTLCScript(initiatorAddress, redeemerAddress btcutil.Address, secretHash
 		AddOp(txscript.OP_DUP).
 		AddOp(txscript.OP_HASH160).
 		AddData(initiatorAddress.ScriptAddress()).
+		AddOp(txscript.OP_ENDIF).
 		AddOp(txscript.OP_EQUALVERIFY).
 		AddOp(txscript.OP_CHECKSIG).
-		AddOp(txscript.OP_ENDIF).
 		Script()
 }
 

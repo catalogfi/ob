@@ -34,8 +34,8 @@ func ParseKey(pkHex string, network *chaincfg.Params) (*btcec.PrivateKey, btcuti
 	}
 	pk, _ := btcec.PrivKeyFromBytes(pkBytes)
 
-	addr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(pk.PubKey().SerializeCompressed()), network)
-	// addr, err := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(pk.PubKey().SerializeCompressed()), network)
+	// addr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(pk.PubKey().SerializeCompressed()), network)
+	addr, err := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(pk.PubKey().SerializeCompressed()), network)
 	if err != nil {
 		return nil, nil, err
 	}
