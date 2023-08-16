@@ -26,7 +26,6 @@ var _ = Describe("Ethereum", func() {
 			By("GetCurrentBlock()")
 			_, err = client.GetCurrentBlock()
 			Expect(err).Should(BeNil())
-
 		})
 
 		It("should read ERC20 related data", func() {

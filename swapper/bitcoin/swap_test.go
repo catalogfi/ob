@@ -221,5 +221,13 @@ var _ = Describe("atomic swap", func() {
 			Expect(err).Should(BeNil())
 			By(color.GreenString("Refund tx hash %v", refundTxid))
 		})
+
+		It("should not allow Alice/Bob to refund if timelock is not expired", func() {
+
+		})
+
+		It("test what happens with other types of address, P2WSH?", func() {
+
+		})
 	})
 })
