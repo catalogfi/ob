@@ -11,7 +11,10 @@ import (
 	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
+
+const MaxQueryBlockRange = 500
 
 type initiatorSwap struct {
 	initiator        *ecdsa.PrivateKey
@@ -49,25 +52,9 @@ func GetExpiry(client Client, goingFirst bool) (*big.Int, error) {
 	return new(big.Int).Add(new(big.Int).SetUint64(blockNumber), big.NewInt(5760)), nil
 }
 
-func GetAmount(client Client, atomicSwapAddr common.Address, secretHash []byte) (uint64, error) {
-	atomicSwap, err := AtomicSwap.NewAtomicSwapCaller(atomicSwapAddr, client.GetProvider())
-	if err != nil {
-		return 0, err
-	}
-	secretHash32 := [32]byte{}
-	copy(secretHash32[:], secretHash)
-
-	swap, err := atomicSwap.AtomicSwapOrders(client.GetCallOpts(), secretHash32)
-	if err != nil {
-		return 0, err
-	}
-
-	return swap.Amount.Uint64(), nil
-}
-
 func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr common.Address, secretHash []byte, expiryBlock, minConfirmations, amount *big.Int, client Client) (swapper.InitiatorSwap, error) {
 
-	initiatorAddr := client.GetPublicAddress(initiator)
+	initiatorAddr := crypto.PubkeyToAddress(initiator.PublicKey)
 
 	latestCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(12000))
 	if latestCheckedBlock.Cmp(big.NewInt(0)) == -1 {
@@ -83,24 +70,26 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr 
 		return &initiatorSwap{}, err
 	}
 	return &initiatorSwap{
-		initiator: initiator, watcher: watcher,
-		initiatorAddr:  initiatorAddr,
-		expiryBlock:    expiryBlock,
-		atomicSwapAddr: atomicSwapAddr,
-		client:         client, amount: amount,
+		initiator:        initiator,
+		watcher:          watcher,
+		initiatorAddr:    initiatorAddr,
+		expiryBlock:      expiryBlock,
+		atomicSwapAddr:   atomicSwapAddr,
+		client:           client,
+		amount:           amount,
 		tokenAddr:        tokenAddr,
 		redeemerAddr:     redeemerAddr,
 		lastCheckedBlock: latestCheckedBlock,
-		secretHash:       secretHash}, nil
+		secretHash:       secretHash,
+	}, nil
 }
 
-func (initiatorSwap *initiatorSwap) Initiate() (string, error) {
-	defer fmt.Printf("Done Initiate on contract : %s : token : %s \n", initiatorSwap.atomicSwapAddr, initiatorSwap.tokenAddr)
-	txHash, err := initiatorSwap.client.InitiateAtomicSwap(initiatorSwap.atomicSwapAddr, initiatorSwap.initiator, initiatorSwap.redeemerAddr, initiatorSwap.tokenAddr, initiatorSwap.expiryBlock, initiatorSwap.amount, initiatorSwap.secretHash)
-	if err != nil {
-		return "", err
-	}
-	return txHash, nil
+func (initiatorSwap *initiatorSwap) Initiate() (txHash string, err error) {
+	defer func() {
+		fmt.Printf("Done Initiate on contract : %s : token : %s : err : %v \n", initiatorSwap.atomicSwapAddr, initiatorSwap.tokenAddr, err)
+	}()
+	txHash, err = initiatorSwap.client.InitiateAtomicSwap(initiatorSwap.atomicSwapAddr, initiatorSwap.initiator, initiatorSwap.redeemerAddr, initiatorSwap.tokenAddr, initiatorSwap.expiryBlock, initiatorSwap.amount, initiatorSwap.secretHash)
+	return
 }
 
 func (initiatorSwap *initiatorSwap) Expired() (bool, error) {
@@ -119,11 +108,13 @@ func (initiatorSwap *initiatorSwap) Expired() (bool, error) {
 func (initiatorSwap *initiatorSwap) WaitForRedeem() ([]byte, string, error) {
 	for {
 		redeemed, secret, txHash, err := initiatorSwap.IsRedeemed()
-		if redeemed {
-			return secret, txHash, err
-		}
 		if err != nil {
 			fmt.Println("failed to check redeemed status", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		if redeemed {
+			return secret, txHash, err
 		}
 		time.Sleep(5 * time.Second)
 	}
@@ -135,7 +126,14 @@ func (initiatorSwap *initiatorSwap) IsRedeemed() (bool, []byte, string, error) {
 
 func (initiatorSwap *initiatorSwap) Refund() (string, error) {
 	defer fmt.Println("Done refund")
-	tx, err := initiatorSwap.client.RefundAtomicSwap(initiatorSwap.atomicSwapAddr, initiatorSwap.client.GetTransactOpts(initiatorSwap.initiator), initiatorSwap.tokenAddr, initiatorSwap.secretHash)
+
+	// Initialise the transactor
+	transactor, err := initiatorSwap.client.GetTransactOpts(initiatorSwap.initiator)
+	if err != nil {
+		return "", err
+	}
+
+	tx, err := initiatorSwap.client.RefundAtomicSwap(initiatorSwap.atomicSwapAddr, transactor, initiatorSwap.tokenAddr, initiatorSwap.secretHash)
 	if err != nil {
 		return "", err
 	}
@@ -170,8 +168,11 @@ func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr c
 func (redeemerSwap *redeemerSwap) Redeem(secret []byte) (string, error) {
 	defer fmt.Println("Done redeem")
 	fmt.Println("redeeming...")
-
-	return redeemerSwap.client.RedeemAtomicSwap(redeemerSwap.atomicSwapAddr, redeemerSwap.client.GetTransactOpts(redeemerSwap.redeemer), redeemerSwap.tokenAddr, secret)
+	transactor, err := redeemerSwap.client.GetTransactOpts(redeemerSwap.redeemer)
+	if err != nil {
+		return "", err
+	}
+	return redeemerSwap.client.RedeemAtomicSwap(redeemerSwap.atomicSwapAddr, transactor, redeemerSwap.tokenAddr, secret)
 }
 
 func (redeemerSwap *redeemerSwap) IsInitiated() (bool, []string, error) {
@@ -238,6 +239,9 @@ func (watcher *watcher) IsInitiated() (bool, []string, error) {
 		return false, []string{}, err
 	}
 	currentBlock := big.NewInt(int64(currBlock))
+	if currentBlock.Int64() > watcher.lastCheckedBlock.Int64()+MaxQueryBlockRange {
+		currentBlock = big.NewInt(0).Add(watcher.lastCheckedBlock, big.NewInt(MaxQueryBlockRange))
+	}
 
 	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
 	if err != nil {
@@ -260,6 +264,11 @@ func (watcher *watcher) IsInitiated() (bool, []string, error) {
 	}
 
 	if len(logs) == 0 {
+		// Update the last checked block height
+		newLastCheckedBlock := big.NewInt(0).Sub(currentBlock, watcher.minConfirmations)
+		if newLastCheckedBlock.Cmp(watcher.lastCheckedBlock) == 1 {
+			watcher.lastCheckedBlock = currentBlock
+		}
 		fmt.Println("No logs found")
 		return false, []string{}, err
 	}
@@ -284,6 +293,9 @@ func (watcher *watcher) IsRedeemed() (bool, []byte, string, error) {
 		return false, nil, "", err
 	}
 	currentBlock := big.NewInt(int64(currBlock))
+	if currentBlock.Int64() > watcher.lastCheckedBlock.Int64()+MaxQueryBlockRange {
+		currentBlock = big.NewInt(0).Add(watcher.lastCheckedBlock, big.NewInt(MaxQueryBlockRange))
+	}
 
 	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
 	if err != nil {
@@ -306,6 +318,11 @@ func (watcher *watcher) IsRedeemed() (bool, []byte, string, error) {
 	}
 
 	if len(logs) == 0 {
+		// Update the last checked block height
+		newLastCheckedBlock := big.NewInt(0).Sub(currentBlock, watcher.minConfirmations)
+		if newLastCheckedBlock.Cmp(watcher.lastCheckedBlock) == 1 {
+			watcher.lastCheckedBlock = currentBlock
+		}
 		fmt.Println("No logs found")
 		return false, nil, "", err
 	}
@@ -326,6 +343,9 @@ func (watcher *watcher) IsRefunded() (bool, string, error) {
 		return false, "", err
 	}
 	currentBlock := big.NewInt(int64(currBlock))
+	if currentBlock.Int64() > watcher.lastCheckedBlock.Int64()+MaxQueryBlockRange {
+		currentBlock = big.NewInt(0).Add(watcher.lastCheckedBlock, big.NewInt(MaxQueryBlockRange))
+	}
 
 	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
 	if err != nil {
@@ -348,6 +368,11 @@ func (watcher *watcher) IsRefunded() (bool, string, error) {
 	}
 
 	if len(logs) == 0 {
+		// Update the last checked block height
+		newLastCheckedBlock := big.NewInt(0).Sub(currentBlock, watcher.minConfirmations)
+		if newLastCheckedBlock.Cmp(watcher.lastCheckedBlock) == 1 {
+			watcher.lastCheckedBlock = currentBlock
+		}
 		fmt.Println("No logs found")
 		return false, "", err
 	}

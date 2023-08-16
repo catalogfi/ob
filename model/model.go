@@ -10,9 +10,8 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"gorm.io/gorm"
-
 	"github.com/catalogfi/wbtc-garden/config"
+	"gorm.io/gorm"
 )
 
 type Config struct {

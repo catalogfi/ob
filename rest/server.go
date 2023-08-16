@@ -229,12 +229,12 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 			vals := strings.Split(string(message), ":")
 			if vals[0] == "subscribe" {
 				makerOrTaker := strings.ToLower(string(vals[1]))
-				makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0,0.0, 0.0, 0, 0, true)
+				makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
 				if err != nil {
 					socketError = err
 					break
 				}
-				takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0,0.0, 0.0, 0, 0, true)
+				takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
 				if err != nil {
 					socketError = err
 					break
@@ -249,14 +249,14 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 				}
 
 				for {
-					makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0,0.0, 0.0, 0, 0, true)
+					makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
 					if err != nil {
 						ws.WriteJSON(map[string]interface{}{
 							"error": err,
 						})
 						break
 					}
-					takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0,0.0, 0.0, 0, 0, true)
+					takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
 					if err != nil {
 						ws.WriteJSON(map[string]interface{}{
 							"error": err,

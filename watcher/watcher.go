@@ -10,6 +10,7 @@ import (
 	"github.com/catalogfi/wbtc-garden/blockchain"
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/swapper"
+	"go.uber.org/zap"
 )
 
 const SwapInitiationTimeout = 30 * time.Minute
@@ -27,6 +28,7 @@ type Watcher interface {
 }
 
 type watcher struct {
+	logger  *zap.Logger
 	store   Store
 	config  model.Config
 	workers int
@@ -34,12 +36,14 @@ type watcher struct {
 }
 
 // NewWatcher returns a new Watcher
-func NewWatcher(store Store, config model.Config) Watcher {
+func NewWatcher(logger *zap.Logger, store Store, config model.Config) Watcher {
 	workers := runtime.NumCPU() * 4
 	if workers == 0 {
 		workers = 4
 	}
+	childLogger := logger.With(zap.String("service", "watcher"))
 	return &watcher{
+		logger:  childLogger,
 		store:   store,
 		config:  config,
 		workers: workers,
@@ -52,7 +56,7 @@ func (w *watcher) Run() {
 		go func() {
 			for order := range w.orders {
 				if err := w.watch(order); err != nil {
-					fmt.Printf("error updating order: %v\n", err)
+					w.logger.Error("update order", zap.Error(err), zap.Uint("orderID", order.ID))
 				}
 			}
 		}()
@@ -62,7 +66,7 @@ func (w *watcher) Run() {
 	for {
 		orders, err := w.store.GetActiveOrders()
 		if err != nil {
-			fmt.Printf("error getting active orders: %v\n", err)
+			w.logger.Error("get active order", zap.Error(err))
 			continue
 		}
 		for _, order := range orders {
@@ -101,11 +105,11 @@ func (w *watcher) watch(order model.Order) error {
 	// Fetch swapper watchers for both parties
 	initiatorWatcher, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config.RPC, order.InitiatorAtomicSwap.MinimumConfirmations)
 	if err != nil {
-		return err
+		return fmt.Errorf("load initiator watcher, %w", err)
 	}
 	followerWatcher, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config.RPC, order.FollowerAtomicSwap.MinimumConfirmations)
 	if err != nil {
-		return err
+		return fmt.Errorf("load follower watcher, %w", err)
 	}
 
 	// Status update
@@ -114,7 +118,7 @@ func (w *watcher) watch(order model.Order) error {
 		var ctn bool
 		order, ctn, err = w.statusCheck(order, initiatorWatcher, followerWatcher)
 		if err != nil {
-			return err
+			return fmt.Errorf("check status, %w", err)
 		}
 		if !ctn {
 			break
@@ -136,7 +140,7 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		// Initiator swap initiated
 		initiated, txHashes, err := initiatorWatcher.IsInitiated()
 		if err != nil {
-			return order, false, err
+			return order, false, fmt.Errorf("initiator swap initiation, %w", err)
 		}
 		if initiated {
 			order.Status = model.InitiatorAtomicSwapInitiated
@@ -154,7 +158,7 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		if time.Now().After(initiatorMinRefundTime) {
 			refunded, txHash, err := initiatorWatcher.IsRefunded()
 			if err != nil {
-				return order, false, err
+				return order, false, fmt.Errorf("initiator swap refund, %w", err)
 			}
 			if refunded {
 				order.Status = model.InitiatorAtomicSwapRefunded
@@ -166,7 +170,7 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		// Follower swap initiated
 		initiated, txHashes, err := followerWatcher.IsInitiated()
 		if err != nil {
-			return order, false, err
+			return order, false, fmt.Errorf("follower swap initiation, %w", err)
 		}
 		if initiated {
 			order.Status = model.FollowerAtomicSwapInitiated
@@ -178,7 +182,7 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		if time.Now().After(followerMinRefundTime) {
 			refunded, txHash, err := followerWatcher.IsRefunded()
 			if err != nil {
-				return order, false, err
+				return order, false, fmt.Errorf("follower swap refund, %w", err)
 			}
 			if refunded {
 				order.Status = model.FollowerAtomicSwapRefunded
@@ -191,7 +195,7 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		if time.Now().After(initiatorMinRefundTime) {
 			refunded, txHash, err := initiatorWatcher.IsRefunded()
 			if err != nil {
-				return order, false, err
+				return order, false, fmt.Errorf("initiator swap refund, %w", err)
 			}
 			if refunded {
 				order.Status = model.InitiatorAtomicSwapRefunded
@@ -203,7 +207,7 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		// Follower swap redeemed
 		redeemed, secret, txHash, err := followerWatcher.IsRedeemed()
 		if err != nil {
-			return order, false, err
+			return order, false, fmt.Errorf("follower swap redeeming, %w", err)
 		}
 		if redeemed {
 			order.Secret = hex.EncodeToString(secret)
@@ -216,19 +220,19 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		if time.Now().After(initiatorMinRefundTime) {
 			refunded, txHash, err := initiatorWatcher.IsRefunded()
 			if err != nil {
-				return order, false, err
+				return order, false, fmt.Errorf("initiator swap refund, %w", err)
 			}
 			if refunded {
 				order.Status = model.InitiatorAtomicSwapRefunded
 				order.InitiatorAtomicSwap.RefundTxHash = txHash
-				return order, true, err
+				return order, true, nil
 			}
 		}
 
 		// Initiator swap redeemed
 		redeemed, _, txHash, err := initiatorWatcher.IsRedeemed()
 		if err != nil {
-			return order, false, err
+			return order, false, fmt.Errorf("initiator swap redeeming, %w", err)
 		}
 		if redeemed {
 			order.Status = model.InitiatorAtomicSwapRedeemed
@@ -242,11 +246,11 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		if time.Now().After(initiatorMinRefundTime) {
 			refunded, txHash, err := initiatorWatcher.IsRefunded()
 			if err != nil {
-				return order, false, err
+				return order, false, fmt.Errorf("initiator swap refund, %w", err)
 			}
 			if refunded {
 				order.InitiatorAtomicSwap.RefundTxHash = txHash
-				return order, false, err
+				return order, false, nil
 			}
 		}
 	}
