@@ -38,7 +38,7 @@ func main() {
 	price := price.NewPriceChecker(store, "https://api.coincap.io/v2/assets/bitcoin")
 	go price.Run()
 	go watcher.Run()
-	server := rest.NewServer(store, config, "SECRET")
+	server := rest.NewServer(store, config, logger, "SECRET")
 	if err := server.Run(":8080"); err != nil {
 		panic(err)
 	}
