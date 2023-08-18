@@ -138,13 +138,17 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 	switch order.Status {
 	case model.OrderFilled:
 		// Initiator swap initiated
-		initiated, txHashes, err := initiatorWatcher.IsInitiated()
+		initiated, txHashes, progress, err := initiatorWatcher.IsInitiated()
 		if err != nil {
 			return order, false, fmt.Errorf("initiator swap initiation, %w", err)
 		}
 		if initiated {
 			order.Status = model.InitiatorAtomicSwapInitiated
 			order.InitiatorAtomicSwap.InitiateTxHash = strings.Join(txHashes, ",")
+			order.InitiatorAtomicSwap.CurrentConfirmationStatus = order.InitiatorAtomicSwap.MinimumConfirmations
+			return order, true, nil
+		} else if order.InitiatorAtomicSwap.CurrentConfirmationStatus < progress {
+			order.InitiatorAtomicSwap.CurrentConfirmationStatus = progress
 			return order, true, nil
 		}
 
@@ -168,13 +172,17 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		}
 
 		// Follower swap initiated
-		initiated, txHashes, err := followerWatcher.IsInitiated()
+		initiated, txHashes, progress, err := followerWatcher.IsInitiated()
 		if err != nil {
 			return order, false, fmt.Errorf("follower swap initiation, %w", err)
 		}
 		if initiated {
 			order.Status = model.FollowerAtomicSwapInitiated
 			order.FollowerAtomicSwap.InitiateTxHash = strings.Join(txHashes, ",")
+			order.FollowerAtomicSwap.CurrentConfirmationStatus = order.FollowerAtomicSwap.MinimumConfirmations
+			return order, true, nil
+		} else if order.FollowerAtomicSwap.CurrentConfirmationStatus < progress {
+			order.FollowerAtomicSwap.CurrentConfirmationStatus = progress
 			return order, true, nil
 		}
 	case model.FollowerAtomicSwapInitiated:

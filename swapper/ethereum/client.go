@@ -29,7 +29,7 @@ type Client interface {
 	InitiateAtomicSwap(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error)
 	RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secret []byte) (string, error)
 	RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secretHash []byte) (string, error)
-	IsFinal(txHash string, waitBlocks uint64) (bool, error)
+	IsFinal(txHash string, waitBlocks uint64) (bool, uint64, error)
 }
 
 type client struct {
@@ -175,19 +175,23 @@ func (client *client) RefundAtomicSwap(contract common.Address, auth *bind.Trans
 	return tx.Hash().Hex(), nil
 }
 
-func (client *client) IsFinal(txHash string, minConf uint64) (bool, error) {
+func (client *client) IsFinal(txHash string, minConf uint64) (bool, uint64, error) {
 	tx, err := client.provider.TransactionReceipt(context.Background(), common.HexToHash(txHash))
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
 	if tx.Status == 0 {
-		return false, nil
+		return false, 0, nil
 	}
 	currentBlock, err := client.GetCurrentBlock()
 	if err != nil {
-		return false, fmt.Errorf("error getting current block %v", err)
+		return false, 0, fmt.Errorf("error getting current block %v", err)
 	}
-	return int64(currentBlock-tx.BlockNumber.Uint64()+1) >= int64(minConf), nil
+	progress := int64(currentBlock) - tx.BlockNumber.Int64()
+	if progress > 0 {
+		return progress >= int64(minConf)-1, uint64(progress), nil
+	}
+	return progress+1 >= int64(minConf), 0, nil
 }
 
 func (client *client) allowance(tokenAddr common.Address, spender common.Address, owner common.Address) (*big.Int, error) {
