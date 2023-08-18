@@ -33,7 +33,7 @@ func NewWatcher(scriptAddr btcutil.Address, waitBlocks int64, minConfirmations, 
 
 func (w *watcher) Expired() (bool, error) {
 	// Check if the swap has been initiated
-	initiated, _, err := w.IsInitiated()
+	initiated, _, _, err := w.IsInitiated()
 	if err != nil {
 		return false, err
 	}
@@ -50,29 +50,32 @@ func (w *watcher) Expired() (bool, error) {
 	return diff >= uint64(w.waitBlocks), nil
 }
 
-func (w *watcher) IsInitiated() (bool, []string, error) {
+func (w *watcher) IsInitiated() (bool, []string, uint64, error) {
 	if w.initiatedBlock != 0 && w.initiatedTxs != nil {
-		return true, w.initiatedTxs, nil
+		return true, w.initiatedTxs, w.minConfirmations, nil
 	}
 
 	// Fetch all utxos
 	utxos, bal, err := w.client.GetUTXOs(w.scriptAddr, 0)
 	if err != nil {
-		return false, nil, fmt.Errorf("failed to get UTXOs: %w", err)
+		return false, nil, 0, fmt.Errorf("failed to get UTXOs: %w", err)
 	}
 
 	// Check all utxos are confirmed and greater than or equal to the required amount
 	if bal >= w.amount && len(utxos) > 0 {
 		latest, err := w.client.GetTipBlockHeight()
 		if err != nil {
-			return false, nil, fmt.Errorf("failed to get tip block: %w", err)
+			return false, nil, 0, fmt.Errorf("failed to get tip block: %w", err)
 		}
 		txHashes := make([]string, len(utxos))
 		lastConfirmedTxBlock := uint64(0)
 		for i, utxo := range utxos {
 			confirmation := latest - utxo.Status.BlockHeight + 1
 			if utxo.Status == nil || !utxo.Status.Confirmed || confirmation < w.minConfirmations {
-				return false, nil, nil
+				if confirmation < w.minConfirmations && utxo.Status.BlockHeight > 0 {
+					return false, nil, confirmation, nil
+				}
+				return false, nil, 0, nil
 			}
 			txHashes[i] = utxo.TxID
 			if utxo.Status.BlockHeight > lastConfirmedTxBlock {
@@ -84,9 +87,9 @@ func (w *watcher) IsInitiated() (bool, []string, error) {
 		w.initiatedBlock = lastConfirmedTxBlock
 		w.initiatedTxs = txHashes
 
-		return true, txHashes, nil
+		return true, txHashes, w.minConfirmations, nil
 	}
-	return false, nil, nil
+	return false, nil, 0, nil
 }
 
 // IsRedeemed checks if the secret has been revealed on-chain.
