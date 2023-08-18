@@ -252,14 +252,15 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 		return "", fmt.Errorf("failed to send transaction: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to send transaction: %s", resp.Status)
-	}
-
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read transaction id: %w", err)
 	}
+	
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to send transaction: %s", data)
+	}
+
 	return string(data), nil
 }
 
