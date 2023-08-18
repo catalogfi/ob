@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/tyler-smith/go-bip32"
 	"github.com/tyler-smith/go-bip39"
+	"go.uber.org/zap"
 )
 
 func getKeys(entropy []byte, chain model.Chain, user uint32, selector []uint32) ([]interface{}, error) {
@@ -135,7 +136,11 @@ func main() {
 	fmt.Println("addr1", addr1.Hex())
 	fmt.Println("addr2", addr2.Hex())
 
-	client, err := ethereum.NewClient("http://localhost:8545")
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	client, err := ethereum.NewClient(logger, "http://localhost:8545")
 	if err != nil {
 		panic(err)
 	}
