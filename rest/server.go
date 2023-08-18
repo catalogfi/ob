@@ -229,12 +229,12 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 			vals := strings.Split(string(message), ":")
 			if vals[0] == "subscribe" {
 				makerOrTaker := strings.ToLower(string(vals[1]))
-				makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0,0.0, 0.0, 0, 0, true)
+				makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
 				if err != nil {
 					socketError = err
 					break
 				}
-				takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0,0.0, 0.0, 0, 0, true)
+				takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
 				if err != nil {
 					socketError = err
 					break
@@ -249,14 +249,14 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 				}
 
 				for {
-					makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0,0.0, 0.0, 0, 0, true)
+					makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
 					if err != nil {
 						ws.WriteJSON(map[string]interface{}{
 							"error": err,
 						})
 						break
 					}
-					takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0,0.0, 0.0, 0, 0, true)
+					takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
 					if err != nil {
 						ws.WriteJSON(map[string]interface{}{
 							"error": err,
@@ -372,7 +372,7 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orderID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode id has to be a number: %v", err.Error())})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode id has to be a number: %v", err.Error())})
 			return
 		}
 		// TODO: extract from auth token
@@ -402,13 +402,13 @@ func (s *Server) GetOrder() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orderID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode id has to be a number: %v", err.Error())})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode id has to be a number: %v", err.Error())})
 			return
 		}
 		order, err := s.store.GetOrder(uint(orderID))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": fmt.Errorf("failed to get order %s", err.Error()),
+				"error": fmt.Sprintf("failed to get order %s", err.Error()),
 			})
 		}
 		c.JSON(http.StatusOK, order)
@@ -426,7 +426,7 @@ func (s *Server) CancelOrder() gin.HandlerFunc {
 
 		orderID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode id has to be a number: %v", err.Error())})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode id has to be a number: %v", err.Error())})
 			return
 		}
 		if err := s.store.CancelOrder(strings.ToLower(maker.(string)), uint(orderID)); err != nil {
@@ -452,53 +452,53 @@ func (s *Server) GetOrders() gin.HandlerFunc {
 
 		verbose, err := strconv.ParseBool(c.DefaultQuery("verbose", "false"))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode verbose has to be a boolean: %v", err.Error())})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode verbose has to be a boolean: %v", err.Error())})
 			return
 		}
 
 		status, err := strconv.Atoi(c.DefaultQuery("status", "0"))
 		if err != nil && status < int(model.Unknown) || status > int(model.OrderFailedSoft) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode status has to be a number between %d and %d", model.Unknown, model.OrderFailedSoft)})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode status has to be a number between %d and %d", model.Unknown, model.OrderFailedSoft)})
 			return
 		}
 
 		minPrice, err := strconv.ParseFloat(c.DefaultQuery("min_price", "0"), 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode minPrice has to be a number: %v", err.Error())})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode minPrice has to be a number: %v", err.Error())})
 			return
 		}
 		maxPrice, err := strconv.ParseFloat(c.DefaultQuery("max_price", "0"), 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode maxPrice has to be a number: %v", err.Error())})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode maxPrice has to be a number: %v", err.Error())})
 			return
 		}
 		page, err := strconv.Atoi(c.DefaultQuery("page", "0"))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode page has to be a number: %v", err.Error())})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode page has to be a number: %v", err.Error())})
 			return
 		}
 		perPage, err := strconv.Atoi(c.DefaultQuery("per_page", "0"))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode per_page has to be a number: %v", err.Error())})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode per_page has to be a number: %v", err.Error())})
 			return
 		}
 
 		minAmount, err := strconv.ParseFloat(c.DefaultQuery("min_amount", "0"), 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode minAmount has to be a number: %v", err.Error())})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode minAmount has to be a number: %v", err.Error())})
 			return
 		}
 
 		maxAmount, err := strconv.ParseFloat(c.DefaultQuery("max_amount", "0"), 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("failed to decode maxAmount has to be a number: %v", err.Error())})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode maxAmount has to be a number: %v", err.Error())})
 			return
 		}
 
 		orders, err := s.store.FilterOrders(maker, taker, orderPair, secretHash, orderBy, model.Status(status), minPrice, maxPrice, minAmount, maxAmount, page, perPage, verbose)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": fmt.Errorf("failed to get orders %s", err.Error()),
+				"error": fmt.Sprintf("failed to get orders %s", err.Error()),
 			})
 			return
 		}
