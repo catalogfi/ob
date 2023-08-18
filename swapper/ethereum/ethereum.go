@@ -175,14 +175,14 @@ func (redeemerSwap *redeemerSwap) Redeem(secret []byte) (string, error) {
 	return redeemerSwap.client.RedeemAtomicSwap(redeemerSwap.atomicSwapAddr, transactor, redeemerSwap.tokenAddr, secret)
 }
 
-func (redeemerSwap *redeemerSwap) IsInitiated() (bool, []string, error) {
+func (redeemerSwap *redeemerSwap) IsInitiated() (bool, []string,uint64, error) {
 	return redeemerSwap.watcher.IsInitiated()
 }
 
 func (redeemerSwap *redeemerSwap) WaitForInitiate() ([]string, error) {
 	defer fmt.Println("Done WaitForInitiate")
 	for {
-		initiated, txHash, err := redeemerSwap.IsInitiated()
+		initiated, txHash,_, err := redeemerSwap.IsInitiated()
 		if initiated {
 			fmt.Printf("Initiation Found on contract : %s : token : %s \n", redeemerSwap.atomicSwapAddr, redeemerSwap.tokenAddr)
 			return txHash, nil
@@ -232,11 +232,11 @@ func (watcher *watcher) Expired() (bool, error) {
 	}
 }
 
-func (watcher *watcher) IsInitiated() (bool, []string, error) {
+func (watcher *watcher) IsInitiated() (bool, []string, uint64, error) {
 	fmt.Println("Checking if initiated")
 	currBlock, err := watcher.client.GetCurrentBlock()
 	if err != nil {
-		return false, []string{}, err
+		return false, []string{},0, err
 	}
 	currentBlock := big.NewInt(int64(currBlock))
 	if currentBlock.Int64() > watcher.lastCheckedBlock.Int64()+MaxQueryBlockRange {
@@ -245,7 +245,7 @@ func (watcher *watcher) IsInitiated() (bool, []string, error) {
 
 	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
 	if err != nil {
-		return false, []string{}, err
+		return false, []string{},0, err
 	}
 
 	initiatedEvent := atomicSwapAbi.Events["Initiated"]
@@ -260,7 +260,7 @@ func (watcher *watcher) IsInitiated() (bool, []string, error) {
 
 	logs, err := watcher.client.GetProvider().FilterLogs(context.Background(), query)
 	if err != nil {
-		return false, []string{}, err
+		return false, []string{},0, err
 	}
 
 	if len(logs) == 0 {
@@ -270,21 +270,21 @@ func (watcher *watcher) IsInitiated() (bool, []string, error) {
 			watcher.lastCheckedBlock = currentBlock
 		}
 		fmt.Println("No logs found")
-		return false, []string{}, err
+		return false, []string{},0, err
 	}
 
 	vLog := logs[0]
 
-	isFinal, err := watcher.client.IsFinal(vLog.TxHash.Hex(), watcher.minConfirmations.Uint64())
+	isFinal,progress, err := watcher.client.IsFinal(vLog.TxHash.Hex(), watcher.minConfirmations.Uint64())
 	if err != nil {
-		return false, []string{}, err
+		return false, []string{},0, err
 	}
 
 	if !isFinal {
-		return false, []string{}, fmt.Errorf("transaction not finalized yet")
+		return false, []string{},progress, nil
 	}
 
-	return true, []string{vLog.TxHash.Hex()}, nil
+	return true, []string{vLog.TxHash.Hex()},watcher.minConfirmations.Uint64(), nil
 }
 
 func (watcher *watcher) IsRedeemed() (bool, []byte, string, error) {

@@ -158,7 +158,7 @@ func (s *redeemerSwap) Redeem(secret []byte) (string, error) {
 
 func (s *redeemerSwap) WaitForInitiate() ([]string, error) {
 	for {
-		initiated, txHashes, err := s.IsInitiated()
+		initiated, txHashes, _, err := s.IsInitiated()
 		if initiated {
 			return txHashes, nil
 		}
@@ -169,6 +169,6 @@ func (s *redeemerSwap) WaitForInitiate() ([]string, error) {
 	}
 }
 
-func (s *redeemerSwap) IsInitiated() (bool, []string, error) {
+func (s *redeemerSwap) IsInitiated() (bool, []string, uint64, error) {
 	return s.watcher.IsInitiated()
 }
