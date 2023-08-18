@@ -76,11 +76,11 @@ func (c *client) FillOrder(orderID uint, sendAddress, receiveAddress string) err
 			c.ReLogin()
 			return c.FillOrder(orderID, sendAddress, receiveAddress)
 		}
-		var errorResponse map[string]string
+		var errorResponse ErrorResponse
 		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
 			return fmt.Errorf("failed to decode error response: %v", err)
 		}
-		return fmt.Errorf("failed to create order: %v", errorResponse["error"])
+		return fmt.Errorf("failed to create order: %v", errorResponse.Error)
 	}
 	return nil
 }
@@ -118,11 +118,11 @@ func (c *client) CreateOrder(sendAddress, receiveAddress, orderPair, sendAmount,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		var errorResponse map[string]string
+		var errorResponse ErrorResponse
 		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
 			return 0, fmt.Errorf("failed to decode error response: %v", err)
 		}
-		return 0, fmt.Errorf("failed to create order: %v", errorResponse["error"])
+		return 0, fmt.Errorf("failed to create order: %v", errorResponse.Error)
 	}
 
 	var orderResponse struct {
@@ -142,11 +142,11 @@ func (c *client) GetOrder(id uint) (model.Order, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errorResponse map[string]string
+		var errorResponse ErrorResponse
 		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
 			return model.Order{}, fmt.Errorf("failed to decode error response: %v", err)
 		}
-		return model.Order{}, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+		return model.Order{}, fmt.Errorf("failed to get orders: %v", errorResponse.Error)
 	}
 
 	var order model.Order
@@ -245,11 +245,12 @@ func (c *client) GetOrders(filter GetOrdersFilter) ([]model.Order, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errorResponse map[string]string
+		var errorResponse ErrorResponse
+		fmt.Println(resp.Body)
 		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
 			return nil, fmt.Errorf("failed to decode error response: %v", err)
 		}
-		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse.Error)
 	}
 
 	var orders []model.Order
@@ -267,11 +268,11 @@ func (c *client) GetFollowerInitiateOrders() ([]model.Order, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errorResponse map[string]string
+		var errorResponse ErrorResponse
 		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
 			return nil, fmt.Errorf("failed to decode error response: %v", err)
 		}
-		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse.Error)
 	}
 
 	var orders []model.Order
@@ -289,11 +290,11 @@ func (c *client) GetFollowerRedeemOrders() ([]model.Order, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errorResponse map[string]string
+		var errorResponse ErrorResponse
 		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
 			return nil, fmt.Errorf("failed to decode error response: %v", err)
 		}
-		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse.Error)
 	}
 
 	var orders []model.Order
@@ -311,11 +312,11 @@ func (c *client) GetInitiatorInitiateOrders() ([]model.Order, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errorResponse map[string]string
+		var errorResponse ErrorResponse
 		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
 			return nil, fmt.Errorf("failed to decode error response: %v", err)
 		}
-		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse.Error)
 	}
 
 	var orders []model.Order
@@ -332,11 +333,11 @@ func (c *client) GetFollowerRefundedOrders() ([]model.Order, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errorResponse map[string]string
+		var errorResponse ErrorResponse
 		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
 			return nil, fmt.Errorf("failed to decode error response: %v", err)
 		}
-		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse.Error)
 	}
 
 	var orders []model.Order
@@ -353,11 +354,11 @@ func (c *client) FollowerWaitForRedeemOrders() ([]model.Order, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errorResponse map[string]string
+		var errorResponse ErrorResponse
 		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
 			return nil, fmt.Errorf("failed to decode error response: %v", err)
 		}
-		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse.Error)
 	}
 
 	var orders []model.Order
@@ -374,11 +375,11 @@ func (c *client) InitiatorWaitForInitiateOrders() ([]model.Order, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errorResponse map[string]string
+		var errorResponse ErrorResponse
 		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
 			return nil, fmt.Errorf("failed to decode error response: %v", err)
 		}
-		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse.Error)
 	}
 
 	var orders []model.Order
@@ -397,11 +398,11 @@ func (c *client) GetInitiatorRedeemOrders() ([]model.Order, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errorResponse map[string]string
+		var errorResponse ErrorResponse
 		if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
 			return nil, fmt.Errorf("failed to decode error response: %v", err)
 		}
-		return nil, fmt.Errorf("failed to get orders: %v", errorResponse["error"])
+		return nil, fmt.Errorf("failed to get orders: %v", errorResponse.Error)
 	}
 
 	var orders []model.Order

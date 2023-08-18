@@ -134,10 +134,12 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
-	fee, err := client.CalculateFee(len(utxosWithoutFee), 2, tx.Version)
+
+	fee, err := client.CalculateTransferFee(len(utxosWithoutFee), 2, tx.Version)
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate fee: %w", err)
 	}
+  
 	utxosWihFee, selectedAmount, err := client.GetUTXOs(fromAddr, amount+fee)
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
@@ -213,7 +215,8 @@ func (client *client) Spend(script []byte, redeemScript wire.TxWitness, spender 
 	if err != nil {
 		return "", fmt.Errorf("failed to create script for address: %w", err)
 	}
-	fee, err := client.CalculateFee(len(tx.TxIn), len(tx.TxOut), tx.Version)
+
+	fee, err := client.CalculateRedeemFee()
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate fee: %w", err)
 	}
@@ -260,18 +263,25 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 	return string(data), nil
 }
 
-// CalculateFee estimates the fees of the bitcoin tx with given number of inputs and outputs.
-func (client *client) CalculateFee(nInputs, nOutputs int, txVersion int32) (uint64, error) {
+func (client *client) GetFeeRates() (FeeRates, error) {
 	var feeRates FeeRates
 	resp, err := http.Get("https://mempool.space/api/v1/fees/recommended")
 	if err != nil {
-		return 0, fmt.Errorf("failed to get fee rates: %w", err)
+		return FeeRates{}, fmt.Errorf("failed to get fee rates: %w", err)
 	}
 	err = json.NewDecoder(resp.Body).Decode(&feeRates)
 	if err != nil {
-		return 0, fmt.Errorf("failed to unmarshal response body: %w", err)
+		return FeeRates{}, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
+	return feeRates, nil
+}
 
+// CalculateFee estimates the fees of the bitcoin tx with given number of inputs and outputs.
+func (client *client) CalculateTransferFee(nInputs, nOutputs int, txVersion int32) (uint64, error) {
+	feeRates, err := client.GetFeeRates()
+	if err != nil {
+		return 0, err
+	}
 	switch txVersion {
 	case 1:
 		// inputs + 1 to account for input that might be used for fee
@@ -282,6 +292,16 @@ func (client *client) CalculateFee(nInputs, nOutputs int, txVersion int32) (uint
 	}
 	return 0, fmt.Errorf("tx type not supported")
 
+}
+
+
+func (client *client) CalculateRedeemFee() (uint64, error) {
+	feeRates, err := client.GetFeeRates()
+	if err != nil {
+		return 0, err
+	}
+	// 141.5 is size in vbytes for the redeem transaction
+	return 150 * uint64(feeRates.FastestFee), nil
 }
 
 type FeeRates struct {

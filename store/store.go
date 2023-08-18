@@ -205,7 +205,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
 	}
 	// check if send amount is not less than 1000
-	if sendAmt.Cmp(big.NewInt(100000)) == -1 || sendAmt.Cmp(big.NewInt(10000000)) == 1 {
+	if sendAmt.Cmp(big.NewInt(10000)) == -1 || sendAmt.Cmp(big.NewInt(10000000)) == 1 {
 		return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
 	}
 
@@ -364,13 +364,17 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 	if orderPair != "" {
 		tx = tx.Where("order_pair = ?", orderPair)
 	}
+	joinAtomicSwaps := false
 	if minAmount != 0 {
-		tx = tx.Joins("JOIN atomic_swaps ON orders.initiator_atomic_swap_id = atomic_swaps.id ")
+		joinAtomicSwaps = true
 		tx = tx.Where("atomic_swaps.amount >= ?", uint(minAmount))
 	}
 	if maxAmount != 0 {
-		tx = tx.Joins("JOIN atomic_swaps ON orders.initiator_atomic_swap_id = atomic_swaps.id")
+		joinAtomicSwaps = true
 		tx = tx.Where("atomic_swaps.amount <= ?", uint(maxAmount))
+	}
+	if joinAtomicSwaps {
+		tx = tx.Joins("JOIN atomic_swaps ON orders.initiator_atomic_swap_id = atomic_swaps.id ")
 	}
 	if minPrice != 0 {
 		tx = tx.Where("price >= ?", minPrice)
