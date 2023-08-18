@@ -63,8 +63,6 @@ func (client *client) GetTransactOpts(privKey *ecdsa.PrivateKey) (*bind.Transact
 	if err != nil {
 		return nil, err
 	}
-	transactor.GasLimit = uint64(3000000) // in units
-	transactor.GasPrice = big.NewInt(20305454254)
 	return transactor, nil
 }
 
