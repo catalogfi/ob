@@ -66,11 +66,11 @@ const (
 )
 
 func NewSecondary(address string) Asset {
-	return Asset("secondary" + address)
+	return Asset(address)
 }
 
 func (a Asset) SecondaryID() string {
-	if string(a) == "primary" || len(a) < 9 || string(a[:9]) != "secondary" {
+	if string(a) == "primary"  {
 		return ""
 	}
 	return string(a[9:])
@@ -224,10 +224,10 @@ func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {
 	if err != nil {
 		return "", "", "", "", err
 	}
-	if err := isWhitelisted(sendChain, strings.Replace(string(sendAsset), "secondary", "", 1)); err != nil {
+	if err := isWhitelisted(sendChain, string(sendAsset)); err != nil {
 		return "", "", "", "", err
 	}
-	if err := isWhitelisted(receiveChain, strings.Replace(string(receiveAsset), "secondary", "", 1)); err != nil {
+	if err := isWhitelisted(receiveChain, string(receiveAsset)); err != nil {
 		return "", "", "", "", err
 	}
 	return sendChain, receiveChain, sendAsset, receiveAsset, nil
