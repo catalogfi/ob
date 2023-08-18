@@ -67,7 +67,7 @@ func main() {
 	price := price.NewPriceChecker(store, envConfig.PRICE_FEED_URL)
 	go price.Run()
 	go watcher.Run()
-	server := rest.NewServer(store, config, "SECRET")
+	server := rest.NewServer(store, config, logger, "SECRET")
 	if err := server.Run(fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}
