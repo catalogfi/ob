@@ -73,7 +73,7 @@ func (a Asset) SecondaryID() string {
 	if string(a) == "primary"  {
 		return ""
 	}
-	return string(a[9:])
+	return string(a)
 }
 
 type Status uint
