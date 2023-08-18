@@ -205,7 +205,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
 	}
 	// check if send amount is not less than 1000
-	if sendAmt.Cmp(big.NewInt(100000)) == -1 || sendAmt.Cmp(big.NewInt(10000000)) == 1 {
+	if sendAmt.Cmp(big.NewInt(10000)) == -1 || sendAmt.Cmp(big.NewInt(10000000)) == 1 {
 		return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
 	}
 
