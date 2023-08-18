@@ -84,6 +84,20 @@ func (c *client) CalculateFee(nInputs, nOutputs int, txType TxType) (uint64, err
 
 }
 
+func (c *client) CalculateRedeemFee() (uint64, error) {
+	var feeRates FeeRates
+	resp, err := http.Get("https://mempool.space/api/v1/fees/recommended")
+	if err != nil {
+		return 0, fmt.Errorf("failed to get fee rates: %w", err)
+	}
+	err = json.NewDecoder(resp.Body).Decode(&feeRates)
+	if err != nil {
+		return 0, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+	// 141.5 is size in vbytes for the redeem transaction
+	return 150 * uint64(feeRates.FastestFee), nil
+}
+
 func NewClient(url string, net *chaincfg.Params) Client {
 	return &client{url: url, net: net}
 }
@@ -270,7 +284,7 @@ func (client *client) Spend(script []byte, redeemScript wire.TxWitness, spender 
 	if err != nil {
 		return "", fmt.Errorf("failed to create script for address: %w", err)
 	}
-	FEE, err := client.CalculateFee(len(tx.TxIn), len(tx.TxOut), SegWit)
+	FEE, err := client.CalculateRedeemFee()
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate fee: %w", err)
 	}
