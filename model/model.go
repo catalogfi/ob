@@ -10,9 +10,8 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"gorm.io/gorm"
-
 	"github.com/catalogfi/wbtc-garden/config"
+	"gorm.io/gorm"
 )
 
 type Config struct {
@@ -125,18 +124,19 @@ type Order struct {
 type AtomicSwap struct {
 	gorm.Model
 
-	InitiatorAddress     string  `json:"initiatorAddress"`
-	RedeemerAddress      string  `json:"redeemerAddress"`
-	Timelock             string  `json:"timelock"`
-	Chain                Chain   `json:"chain"`
-	Asset                Asset   `json:"asset"`
-	Amount               string  `json:"amount"`
-	InitiateTxHash       string  `json:"initiateTxHash" `
-	RedeemTxHash         string  `json:"redeemTxHash" `
-	RefundTxHash         string  `json:"refundTxHash" `
-	PriceByOracle        float64 `json:"priceByOracle"`
-	MinimumConfirmations uint64  `json:"minimumConfirmations"`
-	IsInstantWallet      bool    `json:"-"`
+	InitiatorAddress          string  `json:"initiatorAddress"`
+	RedeemerAddress           string  `json:"redeemerAddress"`
+	Timelock                  string  `json:"timelock"`
+	Chain                     Chain   `json:"chain"`
+	Asset                     Asset   `json:"asset"`
+	Amount                    string  `json:"amount"`
+	InitiateTxHash            string  `json:"initiateTxHash" `
+	RedeemTxHash              string  `json:"redeemTxHash" `
+	RefundTxHash              string  `json:"refundTxHash" `
+	PriceByOracle             float64 `json:"priceByOracle"`
+	MinimumConfirmations      uint64  `json:"minimumConfirmations"`
+	CurrentConfirmationStatus uint64  `json:"currentConfirmationStatus"`
+	IsInstantWallet           bool    `json:"-"`
 }
 
 type LockedAmount struct {
@@ -262,6 +262,9 @@ func CompareOrderSlices(a, b []Order) bool {
 	}
 	for i, v := range a {
 		if v.Status != b[i].Status {
+			return false
+		}
+		if v.FollowerAtomicSwap.CurrentConfirmationStatus != b[i].FollowerAtomicSwap.CurrentConfirmationStatus || v.InitiatorAtomicSwap.CurrentConfirmationStatus != b[i].InitiatorAtomicSwap.CurrentConfirmationStatus {
 			return false
 		}
 	}

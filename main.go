@@ -11,6 +11,7 @@ import (
 	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/catalogfi/wbtc-garden/store"
 	"github.com/catalogfi/wbtc-garden/watcher"
+	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -58,11 +59,15 @@ func main() {
 		},
 	}
 
-	watcher := watcher.NewWatcher(store, config)
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	watcher := watcher.NewWatcher(logger, store, config)
 	price := price.NewPriceChecker(store, envConfig.PRICE_FEED_URL)
 	go price.Run()
 	go watcher.Run()
-	server := rest.NewServer(store, config, "SECRET")
+	server := rest.NewServer(store, config, logger, "SECRET")
 	if err := server.Run(fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}

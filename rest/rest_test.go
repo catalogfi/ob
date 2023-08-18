@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/websocket"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap"
 
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/price"
@@ -172,7 +173,9 @@ func StartServer() {
 				model.EthereumSepolia: "http://localhost:8545",
 			},
 		}
-		s := rest.NewServer(store, config, "PANTHER")
+		logger, err := zap.NewDevelopment()
+		Expect(err).To(BeNil())
+		s := rest.NewServer(store, config, logger, "PANTHER")
 		price := price.NewPriceChecker(store, "https://api.coincap.io/v2/assets/bitcoin")
 		go price.Run()
 		s.Run(":8080")

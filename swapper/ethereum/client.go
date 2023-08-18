@@ -4,17 +4,15 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"log"
 	"math/big"
-	"time"
 
-	// "crypto/rand"
 	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
 	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/ERC20"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"go.uber.org/zap"
 )
 
 var (
@@ -22,79 +20,135 @@ var (
 )
 
 type Client interface {
-	GetTransactOpts(privKey *ecdsa.PrivateKey) *bind.TransactOpts
-	GetCallOpts() *bind.CallOpts
+	GetTransactOpts(privKey *ecdsa.PrivateKey) (*bind.TransactOpts, error)
+	GetCurrentBlock() (uint64, error)
+	GetProvider() *ethclient.Client
+	GetTokenAddress(contractAddr common.Address) (common.Address, error)
+	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
+	ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
 	InitiateAtomicSwap(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error)
 	RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secret []byte) (string, error)
 	RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secretHash []byte) (string, error)
-	GetPublicAddress(privKey *ecdsa.PrivateKey) common.Address
-	GetProvider() *ethclient.Client
-	ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
-	TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
-	GetCurrentBlock() (uint64, error)
-	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
-	GetTokenAddress(contractAddr common.Address) (common.Address, error)
-	IsFinal(txHash string, waitBlocks uint64) (bool, error)
-}
-type client struct {
-	url      string
-	provider *ethclient.Client
+	IsFinal(txHash string, waitBlocks uint64) (bool, uint64, error)
 }
 
-func NewClient(url string) (Client, error) {
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	provider, err := ethclient.DialContext(ctx, url)
+type client struct {
+	logger   *zap.Logger
+	url      string
+	provider *ethclient.Client
+	chainID  *big.Int
+}
+
+func NewClient(logger *zap.Logger, url string) (Client, error) {
+	provider, err := ethclient.Dial(url)
 	if err != nil {
 		return nil, err
 	}
-	return &client{url: url, provider: provider}, nil
-}
-func (client *client) GetTransactOpts(privKey *ecdsa.PrivateKey) *bind.TransactOpts {
-	provider := client.provider
-	chainId, err := provider.ChainID(context.Background())
+	childLogger := logger.With(zap.String("service", "ethClient"))
+	chainID, err := provider.ChainID(context.Background())
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	fromAddress := client.GetPublicAddress(privKey)
-	nonce, err := provider.PendingNonceAt(context.Background(), fromAddress)
-	if err != nil {
-		panic(err)
-	}
-
-	// gasPrice, err := provider.SuggestGasPrice(context.Background())
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	auth, err := bind.NewKeyedTransactorWithChainID(privKey, chainId)
-	if err != nil {
-		panic(err)
-	}
-	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Value = big.NewInt(0)      // in wei
-	auth.GasLimit = uint64(3000000) // in units
-	auth.GasPrice = big.NewInt(20305454254)
-
-	return auth
+	return &client{
+		logger:   childLogger,
+		url:      url,
+		provider: provider,
+		chainID:  chainID,
+	}, nil
 }
 
-func (client *client) GetCallOpts() *bind.CallOpts {
-	var auth *bind.CallOpts = &bind.CallOpts{}
-	auth.Pending = true
-	return auth
+func (client *client) GetTransactOpts(privKey *ecdsa.PrivateKey) (*bind.TransactOpts, error) {
+	transactor, err := bind.NewKeyedTransactorWithChainID(privKey, client.chainID)
+	if err != nil {
+		return nil, err
+	}
+	transactor.GasLimit = uint64(3000000) // in units
+	transactor.GasPrice = big.NewInt(20305454254)
+	return transactor, nil
 }
+
+func (client *client) GetCurrentBlock() (uint64, error) {
+	return client.provider.BlockNumber(context.Background())
+}
+
+func (client *client) GetProvider() *ethclient.Client {
+	return client.provider
+}
+
 func (client *client) GetTokenAddress(contractAddr common.Address) (common.Address, error) {
 	instance, err := AtomicSwap.NewAtomicSwap(contractAddr, client.provider)
 	if err != nil {
 		return common.Address{}, err
 	}
-	tokenAddr, err := instance.Token(client.GetCallOpts())
-	if err != nil {
-		return common.Address{}, err
-	}
-	return tokenAddr, nil
+	return instance.Token(client.callOpts())
 }
+
+func (client *client) GetERC20Balance(tokenAddr common.Address, userAddr common.Address) (*big.Int, error) {
+	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
+	if err != nil {
+		return big.NewInt(0), err
+	}
+	return instance.BalanceOf(client.callOpts(), userAddr)
+}
+
+func (client *client) ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error) {
+	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
+	if err != nil {
+		return "", err
+	}
+	transactor, err := client.GetTransactOpts(privKey)
+	if err != nil {
+		return "", err
+	}
+	tx, err := instance.Approve(transactor, toAddr, amount)
+	if err != nil {
+		return "", err
+	}
+	client.logger.Debug("approve erc20",
+		zap.String("amount", amount.String()),
+		zap.String("token address", tokenAddr.Hex()),
+		zap.String("to address", toAddr.Hex()),
+		zap.String("txHash", tx.Hash().Hex()))
+	receipt, err := bind.WaitMined(context.Background(), client.provider, tx)
+	if err != nil {
+		return "", err
+	}
+	return receipt.TxHash.Hex(), err
+}
+
+func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error) {
+	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
+	if err != nil {
+		return "", err
+	}
+	var hash [32]byte
+	copy(hash[:], secretHash)
+
+	initiatorAddr := crypto.PubkeyToAddress(initiator.PublicKey)
+	val, err := client.allowance(token, contract, initiatorAddr)
+	if err != nil {
+		return "", err
+	}
+	if val.Cmp(amount) < 0 {
+		_, err := client.ApproveERC20(initiator, maxApproval, token, contract)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	transactor, err := client.GetTransactOpts(initiator)
+	if err != nil {
+		return "", err
+	}
+	initTx, err := instance.Initiate(transactor, redeemerAddr, expiry, amount, hash)
+	if err != nil {
+		return "", err
+	}
+	client.logger.Info("initiate swap", zap.String("txHash", initTx.Hash().Hex()))
+	return initTx.Hash().Hex(), nil
+}
+
 func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secret []byte) (string, error) {
 	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
 	if err != nil {
@@ -105,34 +159,6 @@ func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.Trans
 		return "", err
 	}
 	return tx.Hash().Hex(), nil
-}
-func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error) {
-	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
-	if err != nil {
-		return "", err
-	}
-	var hash [32]byte
-	copy(hash[:], secretHash)
-
-	val, err := client.Allowance(token, contract, client.GetPublicAddress(initiator))
-	if err != nil {
-		return "", err
-	}
-	if val.Cmp(amount) <= 0 {
-		_, err := client.ApproveERC20(initiator, maxApproval, token, contract)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	auth := client.GetTransactOpts(initiator)
-	initTx, err := instance.Initiate(auth, redeemerAddr, expiry, amount, hash)
-
-	if err != nil {
-		return "", err
-	}
-	fmt.Println("hash", initTx.Hash().Hex())
-	return initTx.Hash().Hex(), nil
 }
 
 func (client *client) RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secretHash []byte) (string, error) {
@@ -149,88 +175,35 @@ func (client *client) RefundAtomicSwap(contract common.Address, auth *bind.Trans
 	return tx.Hash().Hex(), nil
 }
 
-func (client *client) GetPublicAddress(privKey *ecdsa.PrivateKey) common.Address {
-	publicKey := privKey.Public()
-	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-	if !ok {
-		log.Fatal("cannot assert type: publicKey is not of type *ecdsa.PublicKey")
-	}
-
-	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
-	return fromAddress
-}
-func (client *client) GetProvider() *ethclient.Client {
-	return client.provider
-}
-func (client *client) TransferERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error) {
-	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
-	if err != nil {
-		return "", err
-	}
-	tx, err := instance.Transfer(client.GetTransactOpts(privKey), toAddr, amount)
-	if err != nil {
-		return "", err
-	}
-	fmt.Printf("Transfering %v %s to %s txhash : %s\n", amount, tokenAddr, toAddr, tx.Hash().Hex())
-	return tx.Hash().Hex(), err
-}
-func (client *client) ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error) {
-	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
-	if err != nil {
-		return "", err
-	}
-	tx, err := instance.Approve(client.GetTransactOpts(privKey), toAddr, amount)
-	if err != nil {
-		return "", err
-	}
-	fmt.Printf("Approving %v %s to %s txhash : %s\n", amount, tokenAddr, toAddr, tx.Hash().Hex())
-	bind.WaitMined(context.Background(), client.provider, tx)
-	return tx.Hash().Hex(), err
-}
-func (client *client) Allowance(tokenAddr common.Address, spender common.Address, owner common.Address) (*big.Int, error) {
-	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
-	if err != nil {
-		return nil, err
-	}
-	allowance, err := instance.Allowance(client.GetCallOpts(), owner, spender)
-	if err != nil {
-		return nil, err
-	}
-	return allowance, nil
-
-}
-func (client *client) GetCurrentBlock() (uint64, error) {
-	bn, err := client.provider.BlockNumber(context.Background())
-	return bn, err
-}
-
-func (client *client) GetERC20Balance(tokenAddr common.Address, ofAddr common.Address) (*big.Int, error) {
-	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
-	if err != nil {
-		return big.NewInt(0), err
-	}
-	balance, err := instance.BalanceOf(client.GetCallOpts(), ofAddr)
-	return balance, err
-}
-
-func (client *client) IsFinal(txHash string, waitBlocks uint64) (bool, error) {
+func (client *client) IsFinal(txHash string, minConf uint64) (bool, uint64, error) {
 	tx, err := client.provider.TransactionReceipt(context.Background(), common.HexToHash(txHash))
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
 	if tx.Status == 0 {
-		return false, nil
+		return false, 0, nil
 	}
 	currentBlock, err := client.GetCurrentBlock()
 	if err != nil {
-		return false, fmt.Errorf("error getting current block %v", err)
+		return false, 0, fmt.Errorf("error getting current block %v", err)
 	}
-	if int64(currentBlock-tx.BlockNumber.Uint64()) >= int64(waitBlocks)-1 || waitBlocks == 0 {
-		return true, nil
+	progress := int64(currentBlock) - tx.BlockNumber.Int64()
+	if progress > 0 {
+		return progress >= int64(minConf)-1, uint64(progress), nil
 	}
-	return false, nil
+	return progress+1 >= int64(minConf), 0, nil
 }
 
-func (client *client) FetchOrder(secretHash []byte) {
-	// TODO:
+func (client *client) allowance(tokenAddr common.Address, spender common.Address, owner common.Address) (*big.Int, error) {
+	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
+	if err != nil {
+		return nil, err
+	}
+	return instance.Allowance(client.callOpts(), owner, spender)
+}
+
+func (client *client) callOpts() *bind.CallOpts {
+	return &bind.CallOpts{
+		Pending: true,
+	}
 }
