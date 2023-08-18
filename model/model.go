@@ -264,6 +264,9 @@ func CompareOrderSlices(a, b []Order) bool {
 		if v.Status != b[i].Status {
 			return false
 		}
+		if v.FollowerAtomicSwap.CurrentConfirmationStatus != b[i].FollowerAtomicSwap.CurrentConfirmationStatus || v.InitiatorAtomicSwap.CurrentConfirmationStatus != b[i].InitiatorAtomicSwap.CurrentConfirmationStatus {
+			return false
+		}
 	}
 	return true
 
