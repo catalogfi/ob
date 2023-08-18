@@ -134,10 +134,12 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
+
 	fee, err := client.CalculateTransferFee(len(utxosWithoutFee), 2, tx.Version)
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate fee: %w", err)
 	}
+  
 	utxosWihFee, selectedAmount, err := client.GetUTXOs(fromAddr, amount+fee)
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
@@ -213,6 +215,7 @@ func (client *client) Spend(script []byte, redeemScript wire.TxWitness, spender 
 	if err != nil {
 		return "", fmt.Errorf("failed to create script for address: %w", err)
 	}
+
 	fee, err := client.CalculateRedeemFee()
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate fee: %w", err)
@@ -259,6 +262,7 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 	}
 	return string(data), nil
 }
+
 func (client *client) GetFeeRates() (FeeRates, error) {
 	var feeRates FeeRates
 	resp, err := http.Get("https://mempool.space/api/v1/fees/recommended")
@@ -289,6 +293,7 @@ func (client *client) CalculateTransferFee(nInputs, nOutputs int, txVersion int3
 	return 0, fmt.Errorf("tx type not supported")
 
 }
+
 
 func (client *client) CalculateRedeemFee() (uint64, error) {
 	feeRates, err := client.GetFeeRates()
