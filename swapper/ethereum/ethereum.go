@@ -233,9 +233,9 @@ func (watcher *watcher) IsInitiated() (bool, []string, uint64, error) {
 		return false, []string{}, 0, err
 	}
 	currentBlock := big.NewInt(int64(currBlock))
-	if currentBlock.Int64() > watcher.lastCheckedBlock.Int64()+MaxQueryBlockRange {
-		currentBlock = big.NewInt(0).Add(watcher.lastCheckedBlock, big.NewInt(MaxQueryBlockRange))
-	}
+	// if currentBlock.Int64() > watcher.lastCheckedBlock.Int64()+MaxQueryBlockRange {
+	// 	currentBlock = big.NewInt(0).Add(watcher.lastCheckedBlock, big.NewInt(MaxQueryBlockRange))
+	// }
 
 	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
 	if err != nil {
@@ -259,10 +259,10 @@ func (watcher *watcher) IsInitiated() (bool, []string, uint64, error) {
 
 	if len(logs) == 0 {
 		// Update the last checked block height
-		newLastCheckedBlock := big.NewInt(0).Sub(currentBlock, watcher.minConfirmations)
-		if newLastCheckedBlock.Cmp(watcher.lastCheckedBlock) == 1 {
-			watcher.lastCheckedBlock = currentBlock
-		}
+		// newLastCheckedBlock := big.NewInt(0).Sub(currentBlock, watcher.minConfirmations)
+		// if newLastCheckedBlock.Cmp(watcher.lastCheckedBlock) == 1 {
+		// 	watcher.lastCheckedBlock = currentBlock
+		// }
 		fmt.Println("No logs found")
 		return false, []string{}, 0, err
 	}
@@ -288,9 +288,9 @@ func (watcher *watcher) IsRedeemed() (bool, []byte, string, error) {
 		return false, nil, "", err
 	}
 	currentBlock := big.NewInt(int64(currBlock))
-	if currentBlock.Int64() > watcher.lastCheckedBlock.Int64()+MaxQueryBlockRange {
-		currentBlock = big.NewInt(0).Add(watcher.lastCheckedBlock, big.NewInt(MaxQueryBlockRange))
-	}
+	// if currentBlock.Int64() > watcher.lastCheckedBlock.Int64()+MaxQueryBlockRange {
+	// 	currentBlock = big.NewInt(0).Add(watcher.lastCheckedBlock, big.NewInt(MaxQueryBlockRange))
+	// }
 
 	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
 	if err != nil {
@@ -314,10 +314,10 @@ func (watcher *watcher) IsRedeemed() (bool, []byte, string, error) {
 
 	if len(logs) == 0 {
 		// Update the last checked block height
-		newLastCheckedBlock := big.NewInt(0).Sub(currentBlock, watcher.minConfirmations)
-		if newLastCheckedBlock.Cmp(watcher.lastCheckedBlock) == 1 {
-			watcher.lastCheckedBlock = currentBlock
-		}
+		// newLastCheckedBlock := big.NewInt(0).Sub(currentBlock, watcher.minConfirmations)
+		// if newLastCheckedBlock.Cmp(watcher.lastCheckedBlock) == 1 {
+		// 	watcher.lastCheckedBlock = currentBlock
+		// }
 		fmt.Println("No logs found")
 		return false, nil, "", err
 	}
@@ -338,9 +338,9 @@ func (watcher *watcher) IsRefunded() (bool, string, error) {
 		return false, "", err
 	}
 	currentBlock := big.NewInt(int64(currBlock))
-	if currentBlock.Int64() > watcher.lastCheckedBlock.Int64()+MaxQueryBlockRange {
-		currentBlock = big.NewInt(0).Add(watcher.lastCheckedBlock, big.NewInt(MaxQueryBlockRange))
-	}
+	// if currentBlock.Int64() > watcher.lastCheckedBlock.Int64()+MaxQueryBlockRange {
+	// 	currentBlock = big.NewInt(0).Add(watcher.lastCheckedBlock, big.NewInt(MaxQueryBlockRange))
+	// }
 
 	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
 	if err != nil {
@@ -364,10 +364,10 @@ func (watcher *watcher) IsRefunded() (bool, string, error) {
 
 	if len(logs) == 0 {
 		// Update the last checked block height
-		newLastCheckedBlock := big.NewInt(0).Sub(currentBlock, watcher.minConfirmations)
-		if newLastCheckedBlock.Cmp(watcher.lastCheckedBlock) == 1 {
-			watcher.lastCheckedBlock = currentBlock
-		}
+		// newLastCheckedBlock := big.NewInt(0).Sub(currentBlock, watcher.minConfirmations)
+		// if newLastCheckedBlock.Cmp(watcher.lastCheckedBlock) == 1 {
+		// 	watcher.lastCheckedBlock = currentBlock
+		// }
 		fmt.Println("No logs found")
 		return false, "", err
 	}
