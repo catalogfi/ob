@@ -27,7 +27,7 @@ type initiatorSwap struct {
 // TODO : Naming is very confusing, Bob (Buy BTC/ Sell WBTC) needs to create a initiator swap for WBTC and a redeemer swap
 // for btc ???
 func NewInitiatorSwap(logger *zap.Logger, initiator *btcec.PrivateKey, redeemerAddr btcutil.Address, secretHash []byte, waitBlocks int64, minConfirmations, amount uint64, client Client) (swapper.InitiatorSwap, error) {
-	initiatorAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(initiator.PubKey().SerializeCompressed()), client.Net())
+	initiatorAddr, err := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(initiator.PubKey().SerializeCompressed()), client.Net())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create initiator address: %w", err)
 	}
@@ -114,7 +114,7 @@ type redeemerSwap struct {
 }
 
 func NewRedeemerSwap(logger *zap.Logger, redeemer *btcec.PrivateKey, initiator btcutil.Address, secretHash []byte, waitBlocks int64, minConfirmations, amount uint64, client Client) (swapper.RedeemerSwap, error) {
-	redeemerAddr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(redeemer.PubKey().SerializeCompressed()), client.Net())
+	redeemerAddr, err := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(redeemer.PubKey().SerializeCompressed()), client.Net())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create redeemer address: %w", err)
 	}

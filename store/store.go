@@ -44,7 +44,7 @@ func (s *store) GetValueLocked(config model.Config, chain model.Chain) (*big.Int
 	if err := s.db.Table("atomic_swaps").
 		Select("asset as asset,SUM(amount::bigint) as amount").
 		Joins("JOIN orders ON orders.initiator_atomic_swap_id = atomic_swaps.id").
-		Where("order.status < ? AND atomic_swaps.chain = ?", model.OrderExecuted, chain).
+		Where("orders.status < ? AND atomic_swaps.chain = ?", model.OrderExecuted, chain).
 		Group("asset").
 		Find(&initAmounts).Error; err != nil {
 		return big.NewInt(0), err
@@ -52,7 +52,7 @@ func (s *store) GetValueLocked(config model.Config, chain model.Chain) (*big.Int
 	if err := s.db.Table("atomic_swaps").
 		Select("asset as asset,SUM(amount::bigint) as amount").
 		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
-		Where("order.status < ? AND atomic_swaps.chain = ?", model.OrderExecuted, chain).
+		Where("orders.status < ? AND atomic_swaps.chain = ?", model.OrderExecuted, chain).
 		Group("asset").
 		Find(&followAmounts).Error; err != nil {
 		return big.NewInt(0), err
