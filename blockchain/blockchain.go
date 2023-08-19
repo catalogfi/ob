@@ -117,7 +117,8 @@ func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, config model.Co
 		return bitcoin.NewWatcher(scriptAddr, expiry.Int64(), minConfirmations, amt.Uint64(), client)
 	case ethereum.Client:
 		contractAddr := common.HexToAddress(atomicSwap.Asset.SecondaryID())
-		return ethereum.NewWatcher(contractAddr, secHash, expiry, big.NewInt(int64(minConfirmations)), amt, client)
+		orderId := sha256.Sum256(append(secHash, common.HexToAddress(atomicSwap.InitiatorAddress).Hash().Bytes()...))
+		return ethereum.NewWatcher(contractAddr, secHash, orderId[:], expiry, big.NewInt(int64(minConfirmations)), amt, client)
 	default:
 		return nil, fmt.Errorf("unknown chain: %T", client)
 	}
