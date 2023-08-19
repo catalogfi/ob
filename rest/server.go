@@ -225,67 +225,69 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 			return
 		}
 		defer ws.Close()
-		var socketError error = nil
-		for {
-			// Read Message from client
-			_, message, err := ws.ReadMessage()
+
+		// Read Message from client
+		_, message, err := ws.ReadMessage()
+		if err != nil {
+			s.logger.Debug("failed to read a message", zap.Error(err))
+			err = ws.WriteJSON(map[string]interface{}{
+				"error": fmt.Sprintf("%v", err),
+			})
 			if err != nil {
-				s.logger.Debug("failed to read a message", zap.Error(err))
-				socketError = err
-				break
+				ws.Close()
 			}
-			vals := strings.Split(string(message), ":")
-			if vals[0] == "subscribe" {
-				makerOrTaker := strings.ToLower(string(vals[1]))
-				var orders []model.Order
+		}
+		isFirstMessage := true
+		input := strings.Split(string(message), ":")
+		if input[0] == "subscribe" {
+			makerOrTaker := strings.ToLower(string(input[1]))
+			var orders []model.Order = []model.Order{}
+			ticker := time.NewTicker(time.Second * 60)
+			go func() {
 				for {
-					makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
-					if err != nil {
-						s.logger.Debug("failed to filter maker orders", zap.Error(err))
+					select {
+					case <-ticker.C:
 						ws.WriteJSON(map[string]interface{}{
-							"error": err,
+							"msg": "ping",
 						})
-						break
 					}
-					takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
-					if err != nil {
-						s.logger.Debug("failed to filter taker orders", zap.Error(err))
-						ws.WriteJSON(map[string]interface{}{
-							"error": err,
-						})
-						break
-					}
-					var newOrders []model.Order
-					newOrders = append(newOrders, makerOrders...)
-					newOrders = append(newOrders, takerOrders...)
-
-					if len(orders) == 0 || !model.CompareOrderSlices(newOrders, orders) {
-						if err := ws.WriteJSON(newOrders); err != nil {
-							s.logger.Debug("failed to write updated orders", zap.Error(err))
-							ws.WriteJSON(map[string]interface{}{
-								"error": err,
-							})
-							break
-						}
-						orders = newOrders
-					}
-					time.Sleep(time.Second * 2)
+					time.Sleep(time.Second * 1)
 				}
-			}
+			}()
+			for {
 
-			// Response message to client
-			if socketError != nil {
-				s.logger.Debug("invalid socket connection request", zap.Error(socketError))
-				err = ws.WriteJSON(map[string]interface{}{
-					"error": fmt.Sprintf("%v", socketError),
-				})
+				makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
 				if err != nil {
-					fmt.Println(err)
+					s.logger.Debug("failed to filter maker orders", zap.Error(err))
+					ws.WriteJSON(map[string]interface{}{
+						"error": err,
+					})
 					break
 				}
+				takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
+				if err != nil {
+					s.logger.Debug("failed to filter taker orders", zap.Error(err))
+					ws.WriteJSON(map[string]interface{}{
+						"error": err,
+					})
+					break
+				}
+				var newOrders []model.Order = []model.Order{}
+				newOrders = append(newOrders, makerOrders...)
+				newOrders = append(newOrders, takerOrders...)
+				if !model.CompareOrderSlices(newOrders, orders) || isFirstMessage {
+					if err := ws.WriteJSON(newOrders); err != nil {
+						s.logger.Debug("failed to write updated orders", zap.Error(err))
+						break
+					}
+					orders = newOrders
+				}
+
+				isFirstMessage = false
+				time.Sleep(time.Second * 2)
 			}
-			time.Sleep(time.Second * 2)
 		}
+
 	}
 }
 
