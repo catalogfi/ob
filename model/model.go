@@ -70,7 +70,7 @@ func NewSecondary(address string) Asset {
 }
 
 func (a Asset) SecondaryID() string {
-	if string(a) == "primary"  {
+	if string(a) == "primary" {
 		return ""
 	}
 	return string(a)

@@ -13,7 +13,8 @@ import (
 	"go.uber.org/zap"
 )
 
-const SwapInitiationTimeout = 30 * time.Minute
+const SwapInitiationTimeout = 12 * time.Hour
+const OrderTimeout = 3 * time.Minute
 
 type Store interface {
 	// UpdateOrder updates and order status in the db
@@ -132,10 +133,15 @@ func (w *watcher) watch(order model.Order) error {
 }
 
 func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatcher swapper.Watcher) (model.Order, bool, error) {
-	initiatorMinRefundTime := order.CreatedAt.Add(24 * time.Hour)
-	followerMinRefundTime := order.CreatedAt.Add(12 * time.Hour)
+	initiatorMinRefundTime := order.CreatedAt.Add(48 * time.Hour)
+	followerMinRefundTime := order.CreatedAt.Add(24 * time.Hour)
 
 	switch order.Status {
+	case model.OrderCreated:
+		if time.Since(order.CreatedAt) > OrderTimeout {
+			order.Status = model.OrderCancelled
+			return order, true, nil
+		}
 	case model.OrderFilled:
 		// Initiator swap initiated
 		initiated, txHashes, progress, err := initiatorWatcher.IsInitiated()

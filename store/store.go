@@ -436,7 +436,7 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 
 func (s *store) GetActiveOrders() ([]model.Order, error) {
 	orders := []model.Order{}
-	if tx := s.db.Where("status > ? AND status < ?", model.OrderCreated, model.OrderExecuted).Find(&orders); tx.Error != nil {
+	if tx := s.db.Where("status > ? AND status < ?", model.Unknown, model.OrderExecuted).Find(&orders); tx.Error != nil {
 		return nil, tx.Error
 	}
 	for i := range orders {
