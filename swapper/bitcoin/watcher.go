@@ -94,32 +94,48 @@ func (w *watcher) IsInitiated() (bool, []string, uint64, error) {
 
 // IsRedeemed checks if the secret has been revealed on-chain.
 func (w *watcher) IsRedeemed() (bool, []byte, string, error) {
+	// witness, tx, err := w.client.GetSpendingWitness(w.scriptAddr)
+	// if err != nil {
+	// 	return false, nil, "", fmt.Errorf("failed to get UTXOs: %w", err)
+	// }
+	// if len(witness) == 5 {
+	// 	// Check if the redeem tx is confirmed
+	// 	// latest, err := w.client.GetTipBlockHeight()
+	// 	// if err != nil {
+	// 	// 	return false, nil, "", fmt.Errorf("failed to get tip block: %w", err)
+	// 	// }
+	// 	// if !tx.Status.Confirmed || latest-tx.Status.BlockHeight+1 < w.minConfirmations {
+	// 	// 	return false, nil, "", nil
+	// 	// }
+
+	// 	// inputs are [
+	// 	// 0 : sig,
+	// 	// 1 : spender.PubKey().SerializeCompressed(),
+	// 	// 2 : secret,
+	// 	// 3 :[]byte{0x1},
+	// 	// 4 : script
+	// 	// ]
+	// 	secretBytes, err := hex.DecodeString(witness[2])
+	// 	if err != nil {
+	// 		return false, nil, "", fmt.Errorf("failed to decode secret: %w", err)
+	// 	}
+
+	// 	return true, secretBytes, tx.TxID, nil
+	// }
+	// return false, nil, "", nil
 	witness, tx, err := w.client.GetSpendingWitness(w.scriptAddr)
 	if err != nil {
 		return false, nil, "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
 	if len(witness) == 5 {
-		// Check if the redeem tx is confirmed
-		latest, err := w.client.GetTipBlockHeight()
-		if err != nil {
-			return false, nil, "", fmt.Errorf("failed to get tip block: %w", err)
-		}
-		if !tx.Status.Confirmed || latest-tx.Status.BlockHeight+1 < w.minConfirmations {
-			return false, nil, "", nil
-		}
-
-		// inputs are [
-		// 0 : sig,
-		// 1 : spender.PubKey().SerializeCompressed(),
-		// 2 : secret,
-		// 3 :[]byte{0x1},
-		// 4 : script
-		// ]
-		secretBytes, err := hex.DecodeString(witness[2])
+		// fmt.Println("Redeemed:", witness)
+		// inputs are [ 0 : sig, 1 : spender.PubKey().SerializeCompressed(),2 : secret, 3 :[]byte{0x1}, script]
+		secretString := witness[2]
+		secretBytes := make([]byte, hex.DecodedLen(len(secretString)))
+		_, err := hex.Decode(secretBytes, []byte(secretString))
 		if err != nil {
 			return false, nil, "", fmt.Errorf("failed to decode secret: %w", err)
 		}
-
 		return true, secretBytes, tx.TxID, nil
 	}
 	return false, nil, "", nil
@@ -128,25 +144,40 @@ func (w *watcher) IsRedeemed() (bool, []byte, string, error) {
 // IsRefunded checks if there's any refund tx with the script address. It will return `true` even if the script
 // address is not fully refunded.
 func (w *watcher) IsRefunded() (bool, string, error) {
+	// witness, tx, err := w.client.GetSpendingWitness(w.scriptAddr)
+	// if err != nil {
+	// 	return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
+	// }
+
+	// // Check if the refund tx is confirmed
+	// latest, err := w.client.GetTipBlockHeight()
+	// if err != nil {
+	// 	return false, "", fmt.Errorf("failed to get tip block: %w", err)
+	// }
+	// if !tx.Status.Confirmed || latest-tx.Status.BlockHeight+1 < w.minConfirmations {
+	// 	return false, "", nil
+	// }
+
+	// // inputs are [
+	// // 0 : sig,
+	// // 1 : spender.PubKey().SerializeCompressed(),
+	// // 2 :[]byte{},
+	// // script
+	// // ]
+	// return len(witness) == 4, tx.TxID, nil
+	_, bal, err := w.client.GetUTXOs(w.scriptAddr, 0)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
+	}
 	witness, tx, err := w.client.GetSpendingWitness(w.scriptAddr)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
+	if len(witness) == 4 && bal == 0 {
+		fmt.Println("Refunded:", witness)
+		// inputs are [ 0 : sig, 1 : spender.PubKey().SerializeCompressed(), 2 :[]byte{}, script]
+		return true, tx.TxID, nil
 
-	// Check if the refund tx is confirmed
-	latest, err := w.client.GetTipBlockHeight()
-	if err != nil {
-		return false, "", fmt.Errorf("failed to get tip block: %w", err)
 	}
-	if !tx.Status.Confirmed || latest-tx.Status.BlockHeight+1 < w.minConfirmations {
-		return false, "", nil
-	}
-
-	// inputs are [
-	// 0 : sig,
-	// 1 : spender.PubKey().SerializeCompressed(),
-	// 2 :[]byte{},
-	// script
-	// ]
-	return len(witness) == 4, tx.TxID, nil
+	return false, "", nil
 }
