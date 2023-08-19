@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"strconv"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
@@ -21,21 +20,21 @@ import (
 )
 
 // The function `LoadClient` returns a client for a given blockchain chain and its corresponding URLs(set during config).
-func LoadClient(chain model.Chain, urls map[model.Chain]string) (interface{}, error) {
+func LoadClient(chain model.Chain, config model.Config) (interface{}, error) {
 	if chain.IsBTC() {
-		return bitcoin.NewClient(urls[chain], getParams(chain)), nil
+		return bitcoin.NewClient(config[chain].RPC, getParams(chain)), nil
 	}
 	if chain.IsEVM() {
 		logger, _ := zap.NewDevelopment()
-		return ethereum.NewClient(logger, urls[chain])
+		return ethereum.NewClient(logger, config[chain].RPC)
 	}
 	return nil, fmt.Errorf("invalid chain: %s", chain)
 }
 
 // The function `LoadInitiatorSwap` loads an initiator swap based on the given atomic swap details, private key, secret hash, and URLs.
 // initiateSwap can be used to construct a Swap Object with methods required to handle Atomicswap on initiator side.
-func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interface{}, secretHash string, urls map[model.Chain]string, minConfirmations uint64) (swapper.InitiatorSwap, error) {
-	client, err := LoadClient(atomicSwap.Chain, urls)
+func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interface{}, secretHash string, config model.Config, minConfirmations uint64) (swapper.InitiatorSwap, error) {
+	client, err := LoadClient(atomicSwap.Chain, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
@@ -72,8 +71,8 @@ func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interfac
 	}
 }
 
-func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, urls map[model.Chain]string, minConfirmations uint64) (swapper.Watcher, error) {
-	client, err := LoadClient(atomicSwap.Chain, urls)
+func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, config model.Config, minConfirmations uint64) (swapper.Watcher, error) {
+	client, err := LoadClient(atomicSwap.Chain, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
@@ -124,24 +123,8 @@ func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, urls map[model.
 	}
 }
 
-func CalculateExpiry(chain model.Chain, goingFirst bool, urls map[model.Chain]string) (string, error) {
-	if chain.IsBTC() {
-		expiry := bitcoin.GetExpiry(goingFirst)
-		return strconv.FormatInt(expiry, 10), nil
-	}
-	client, err := LoadClient(chain, urls)
-	if err != nil {
-		return "", err
-	}
-	expiry, err := ethereum.GetExpiry(client.(ethereum.Client), goingFirst)
-	if err != nil {
-		return "", err
-	}
-	return expiry.String(), nil
-}
-
-func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerPrivateKey interface{}, secretHash string, urls map[model.Chain]string, minConfirmations uint64) (swapper.RedeemerSwap, error) {
-	client, err := LoadClient(atomicSwap.Chain, urls)
+func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerPrivateKey interface{}, secretHash string, config model.Config, minConfirmations uint64) (swapper.RedeemerSwap, error) {
+	client, err := LoadClient(atomicSwap.Chain, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
 	}

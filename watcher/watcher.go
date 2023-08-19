@@ -103,11 +103,11 @@ func (w *watcher) watch(order model.Order) error {
 	}
 
 	// Fetch swapper watchers for both parties
-	initiatorWatcher, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config.RPC, order.InitiatorAtomicSwap.MinimumConfirmations)
+	initiatorWatcher, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config, order.InitiatorAtomicSwap.MinimumConfirmations)
 	if err != nil {
 		return fmt.Errorf("load initiator watcher, %w", err)
 	}
-	followerWatcher, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config.RPC, order.FollowerAtomicSwap.MinimumConfirmations)
+	followerWatcher, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config, order.FollowerAtomicSwap.MinimumConfirmations)
 	if err != nil {
 		return fmt.Errorf("load follower watcher, %w", err)
 	}

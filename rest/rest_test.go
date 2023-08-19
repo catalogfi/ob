@@ -168,9 +168,19 @@ func StartServer() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 		config := model.Config{
-			RPC: map[model.Chain]string{
-				model.BitcoinTestnet:  "https://mempool.space/testnet/api",
-				model.EthereumSepolia: "http://localhost:8545",
+			model.BitcoinTestnet: model.NetworkConfig{
+				Assets: map[model.Asset]bool{
+					model.Primary: true,
+				},
+				RPC:    "https://mempool.space/testnet/api",
+				Expiry: 1000,
+			},
+			model.EthereumSepolia: model.NetworkConfig{
+				Assets: map[model.Asset]bool{
+					model.NewSecondary(""): true,
+				},
+				RPC:    "http://localhost:8545",
+				Expiry: 10000,
 			},
 		}
 		logger, err := zap.NewDevelopment()

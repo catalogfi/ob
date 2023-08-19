@@ -17,14 +17,10 @@ import (
 )
 
 type Config struct {
-	PORT             string `binding:"required"`
-	PSQL_DB          string `binding:"required"`
-	PRICE_FEED_URL   string `binding:"required"`
-	BTC_RPC          string
-	ETH_RPC          string
-	BTC_TESTNET_RPC  string
-	ETH_SEPOLIA_RPC  string
-	ETH_OPTIMISM_RPC string
+	PORT           string       `binding:"required"`
+	PSQL_DB        string       `binding:"required"`
+	PRICE_FEED_URL string       `binding:"required"`
+	CONFIG         model.Config `binding:"required"`
 }
 
 func LoadConfiguration(file string) Config {
@@ -38,6 +34,7 @@ func LoadConfiguration(file string) Config {
 	jsonParser.Decode(&config)
 	return config
 }
+
 func main() {
 	// psql db
 	envConfig := LoadConfiguration("./config.json")
@@ -49,25 +46,15 @@ func main() {
 		panic(err)
 	}
 
-	config := model.Config{
-		RPC: map[model.Chain]string{
-			model.BitcoinTestnet:   envConfig.BTC_TESTNET_RPC,
-			model.EthereumSepolia:  envConfig.ETH_SEPOLIA_RPC,
-			model.Ethereum:         envConfig.ETH_RPC,
-			model.Bitcoin:          envConfig.BTC_RPC,
-			model.EthereumOptimism: envConfig.ETH_OPTIMISM_RPC,
-		},
-	}
-
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		panic(err)
 	}
-	watcher := watcher.NewWatcher(logger, store, config)
+	watcher := watcher.NewWatcher(logger, store, envConfig.CONFIG)
 	price := price.NewPriceChecker(store, envConfig.PRICE_FEED_URL)
 	go price.Run()
 	go watcher.Run()
-	server := rest.NewServer(store, config, logger, "SECRET")
+	server := rest.NewServer(store, envConfig.CONFIG, logger, "SECRET")
 	if err := server.Run(fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}

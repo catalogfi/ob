@@ -3,6 +3,7 @@ package ethereum
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/sha256"
 	"fmt"
 	"math/big"
 	"time"
@@ -30,6 +31,7 @@ type initiatorSwap struct {
 	watcher          swapper.Watcher
 }
 type redeemerSwap struct {
+	orderID          [32]byte
 	redeemer         *ecdsa.PrivateKey
 	lastCheckedBlock *big.Int
 	expiryBlock      *big.Int
@@ -39,17 +41,6 @@ type redeemerSwap struct {
 	secretHash       []byte
 	client           Client
 	watcher          swapper.Watcher
-}
-
-func GetExpiry(client Client, goingFirst bool) (*big.Int, error) {
-	blockNumber, err := client.GetProvider().BlockNumber(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	if goingFirst {
-		return new(big.Int).Add(new(big.Int).SetUint64(blockNumber), big.NewInt(11520)), nil
-	}
-	return new(big.Int).Add(new(big.Int).SetUint64(blockNumber), big.NewInt(5760)), nil
 }
 
 func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr common.Address, secretHash []byte, expiryBlock, minConfirmations, amount *big.Int, client Client) (swapper.InitiatorSwap, error) {
@@ -153,6 +144,7 @@ func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr c
 
 	lastCheckedBlock := new(big.Int).Sub(expiryBlock, big.NewInt(12000))
 	return &redeemerSwap{
+		orderID:          sha256.Sum256(append(secretHash, initiatorAddr.Hash().Bytes()...)),
 		redeemer:         redeemer,
 		watcher:          watcher,
 		lastCheckedBlock: lastCheckedBlock,
@@ -172,17 +164,17 @@ func (redeemerSwap *redeemerSwap) Redeem(secret []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return redeemerSwap.client.RedeemAtomicSwap(redeemerSwap.atomicSwapAddr, transactor, redeemerSwap.tokenAddr, secret)
+	return redeemerSwap.client.RedeemAtomicSwap(redeemerSwap.atomicSwapAddr, transactor, redeemerSwap.tokenAddr, redeemerSwap.orderID, secret)
 }
 
-func (redeemerSwap *redeemerSwap) IsInitiated() (bool, []string,uint64, error) {
+func (redeemerSwap *redeemerSwap) IsInitiated() (bool, []string, uint64, error) {
 	return redeemerSwap.watcher.IsInitiated()
 }
 
 func (redeemerSwap *redeemerSwap) WaitForInitiate() ([]string, error) {
 	defer fmt.Println("Done WaitForInitiate")
 	for {
-		initiated, txHash,_, err := redeemerSwap.IsInitiated()
+		initiated, txHash, _, err := redeemerSwap.IsInitiated()
 		if initiated {
 			fmt.Printf("Initiation Found on contract : %s : token : %s \n", redeemerSwap.atomicSwapAddr, redeemerSwap.tokenAddr)
 			return txHash, nil
@@ -236,7 +228,7 @@ func (watcher *watcher) IsInitiated() (bool, []string, uint64, error) {
 	fmt.Println("Checking if initiated")
 	currBlock, err := watcher.client.GetCurrentBlock()
 	if err != nil {
-		return false, []string{},0, err
+		return false, []string{}, 0, err
 	}
 	currentBlock := big.NewInt(int64(currBlock))
 	if currentBlock.Int64() > watcher.lastCheckedBlock.Int64()+MaxQueryBlockRange {
@@ -245,7 +237,7 @@ func (watcher *watcher) IsInitiated() (bool, []string, uint64, error) {
 
 	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
 	if err != nil {
-		return false, []string{},0, err
+		return false, []string{}, 0, err
 	}
 
 	initiatedEvent := atomicSwapAbi.Events["Initiated"]
@@ -260,7 +252,7 @@ func (watcher *watcher) IsInitiated() (bool, []string, uint64, error) {
 
 	logs, err := watcher.client.GetProvider().FilterLogs(context.Background(), query)
 	if err != nil {
-		return false, []string{},0, err
+		return false, []string{}, 0, err
 	}
 
 	if len(logs) == 0 {
@@ -270,21 +262,21 @@ func (watcher *watcher) IsInitiated() (bool, []string, uint64, error) {
 			watcher.lastCheckedBlock = currentBlock
 		}
 		fmt.Println("No logs found")
-		return false, []string{},0, err
+		return false, []string{}, 0, err
 	}
 
 	vLog := logs[0]
 
-	isFinal,progress, err := watcher.client.IsFinal(vLog.TxHash.Hex(), watcher.minConfirmations.Uint64())
+	isFinal, progress, err := watcher.client.IsFinal(vLog.TxHash.Hex(), watcher.minConfirmations.Uint64())
 	if err != nil {
-		return false, []string{},0, err
+		return false, []string{}, 0, err
 	}
 
 	if !isFinal {
-		return false, []string{},progress, nil
+		return false, []string{}, progress, nil
 	}
 
-	return true, []string{vLog.TxHash.Hex()},watcher.minConfirmations.Uint64(), nil
+	return true, []string{vLog.TxHash.Hex()}, watcher.minConfirmations.Uint64(), nil
 }
 
 func (watcher *watcher) IsRedeemed() (bool, []byte, string, error) {
