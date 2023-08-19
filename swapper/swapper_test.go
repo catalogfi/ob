@@ -89,10 +89,8 @@ var _ = Describe("Ethereum to Bitcoin", func() {
 		secret, _ := randomHex(32)
 		secret_hash := sha256.Sum256(secret)
 
-		ethExpiry, err := ethereum.GetExpiry(ethClient, true)
-		Expect(err).To(BeNil())
-
 		btcExpiry := int64(1000)
+		ethExpiry := big.NewInt(100000)
 
 		erc20BalanceOfPK1, _ := ethClient.GetERC20Balance(TOKEN, ethPkAddr1)
 		erc20BalanceOfPK2, _ := ethClient.GetERC20Balance(TOKEN, ethPkAddr2)

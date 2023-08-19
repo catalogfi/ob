@@ -8,8 +8,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/catalogfi/wbtc-garden/config"
 	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum"
+	"github.com/ethereum/go-ethereum/common"
+	"go.uber.org/zap"
 )
 
 type Store interface {
@@ -74,20 +76,28 @@ func (p *PriceChecker) Run() error {
 	// return p.store.SetPrice("bitcoin", "ethereum", float64(30000))
 }
 
-func GetPrice(asset model.Asset, chain model.Chain, amount *big.Int, PriceInUSD *big.Int) *big.Int {
-
+func GetPrice(asset model.Asset, chain model.Chain, config model.Config, amount *big.Int, PriceInUSD *big.Int) (*big.Int, error) {
 	var decimals int64
-	var assetId string
-	if asset == model.Primary {
-		assetId = "primary"
-	} else {
-		assetId = asset.SecondaryID()
-	}
 	if chain.IsEVM() {
-		decimals = int64(config.ConfigMap[string(chain)][assetId].Decimals)
+		logger, err := zap.NewDevelopment()
+		if err != nil {
+			return nil, err
+		}
+		client, err := ethereum.NewClient(logger, config[chain].RPC)
+		if err != nil {
+			return nil, err
+		}
+		token, err := client.GetTokenAddress(common.HexToAddress(asset.SecondaryID()))
+		if err != nil {
+			return nil, err
+		}
+		tokenDecimals, err := client.GetDecimals(token)
+		if err != nil {
+			return nil, err
+		}
+		decimals = int64(tokenDecimals)
 	} else if chain.IsBTC() {
 		decimals = 8
 	}
-
-	return new(big.Int).Div(new(big.Int).Mul(PriceInUSD, amount), new(big.Int).Exp(big.NewInt(10), big.NewInt(decimals), nil))
+	return new(big.Int).Div(new(big.Int).Mul(PriceInUSD, amount), new(big.Int).Exp(big.NewInt(10), big.NewInt(decimals), nil)), nil
 }

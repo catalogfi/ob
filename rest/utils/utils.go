@@ -15,11 +15,11 @@ import (
 func GetEthClientByChainId(chainId int, config model.Config) (*ethclient.Client, error) {
 	switch chainId {
 	case 1:
-		return ethclient.Dial(config.RPC[model.Ethereum])
+		return ethclient.Dial(config[model.Ethereum].RPC)
 	case 11155111:
-		return ethclient.Dial(config.RPC[model.EthereumSepolia])
+		return ethclient.Dial(config[model.EthereumSepolia].RPC)
 	case 10:
-		return ethclient.Dial(config.RPC[model.EthereumOptimism])
+		return ethclient.Dial(config[model.EthereumOptimism].RPC)
 	default:
 		return nil, fmt.Errorf("No RPC url found for chainId")
 

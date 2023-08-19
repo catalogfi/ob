@@ -37,11 +37,11 @@ type Server struct {
 
 type Store interface {
 	// get value locked in the given chain for the given user
-	GetValueLocked(user string, chain model.Chain) (*big.Int, error)
+	GetValueLocked(config model.Config, chain model.Chain) (*big.Int, error)
 	// create order
-	CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userWalletBTCAddress string, urls map[model.Chain]string) (uint, error)
+	CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userWalletBTCAddress string, config model.Config) (uint, error)
 	// fill order
-	FillOrder(orderID uint, filler, sendAddress, receiveAddress string, urls map[model.Chain]string) error
+	FillOrder(orderID uint, filler, sendAddress, receiveAddress string, config model.Config) error
 	// get order by id
 	GetOrder(orderID uint) (*model.Order, error)
 	// cancel order by id
@@ -84,7 +84,8 @@ func (s *Server) Run(addr string) error {
 	s.router.GET("/orders/:id", s.GetOrder())
 	s.router.GET("/orders", s.GetOrders())
 	s.router.GET("/nonce", s.Nonce())
-	s.router.GET("/chains/:chain/value", s.GetValueLockedByChain())
+	s.router.GET("/assets", s.SupportedAssets())
+	s.router.GET("/chains/:chain/value", s.GetValueByChain())
 	s.router.POST("/verify", s.Verify())
 	{
 		authRoutes.POST("/orders", s.PostOrders())
@@ -289,26 +290,15 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 	}
 }
 
-func (s *Server) GetValueLockedByChain() gin.HandlerFunc {
+func (s *Server) GetValueByChain() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user, exists := c.GetQuery("userWallet")
-		if !exists {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "userWallet not provided"})
-			return
-		}
-		user = strings.ToLower(user)
-		asset, exists := c.GetQuery("chainSelector")
-		if !exists {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "chain not provided"})
-			return
-		}
-		chain, err := model.ParseChain(asset)
+		chain, err := model.ParseChain(c.Param("chain"))
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "chain not supported"})
 			return
 		}
 
-		valueLocked, err := s.store.GetValueLocked(user, chain)
+		valueLocked, err := s.store.GetValueLocked(s.config, chain)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error})
 			return
@@ -319,23 +309,16 @@ func (s *Server) GetValueLockedByChain() gin.HandlerFunc {
 	}
 }
 
-func (s *Server) GetValue() gin.HandlerFunc {
+func (s *Server) SupportedAssets() gin.HandlerFunc {
+	assets := map[model.Chain][]model.Asset{}
+	for chain, netConf := range s.config {
+		assets[chain] = []model.Asset{}
+		for asset := range netConf.Assets {
+			assets[chain] = append(assets[chain], asset)
+		}
+	}
 	return func(c *gin.Context) {
-		user := strings.ToLower(c.Param("user"))
-		chain, err := model.ParseChain(c.Param("chain"))
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "chain not supported"})
-			return
-		}
-
-		valueLocked, err := s.store.GetValueLocked(user, chain)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error})
-			return
-		}
-		c.JSON(http.StatusCreated, gin.H{
-			"value": valueLocked,
-		})
+		c.JSON(http.StatusCreated, assets)
 	}
 }
 
@@ -352,7 +335,7 @@ func (s *Server) PostOrders() gin.HandlerFunc {
 			return
 		}
 
-		oid, err := s.store.CreateOrder(strings.ToLower(creator.(string)), req.SendAddress, req.ReceiveAddress, req.OrderPair, req.SendAmount, req.ReceiveAmount, req.SecretHash, req.UserWalletBTCAddress, s.config.RPC)
+		oid, err := s.store.CreateOrder(strings.ToLower(creator.(string)), req.SendAddress, req.ReceiveAddress, req.OrderPair, req.SendAmount, req.ReceiveAmount, req.SecretHash, req.UserWalletBTCAddress, s.config)
 		if err != nil {
 			errorMessage := fmt.Sprintf("failed to create order: %v", err.Error())
 			// fmt.Println(errorMessage, "error")
@@ -393,7 +376,7 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 			return
 		}
 
-		if err := s.store.FillOrder(uint(orderID), strings.ToLower(filler.(string)), req.SendAddress, req.ReceiveAddress, s.config.RPC); err != nil {
+		if err := s.store.FillOrder(uint(orderID), strings.ToLower(filler.(string)), req.SendAddress, req.ReceiveAddress, s.config); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": fmt.Sprintf("failed to fill the Order %v", err.Error()),
 			})

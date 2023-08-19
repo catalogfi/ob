@@ -25,9 +25,10 @@ type Client interface {
 	GetProvider() *ethclient.Client
 	GetTokenAddress(contractAddr common.Address) (common.Address, error)
 	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
+	GetDecimals(tokenAddr common.Address) (uint8, error)
 	ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
 	InitiateAtomicSwap(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error)
-	RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secret []byte) (string, error)
+	RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte, secret []byte) (string, error)
 	RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secretHash []byte) (string, error)
 	IsFinal(txHash string, waitBlocks uint64) (bool, uint64, error)
 }
@@ -89,6 +90,13 @@ func (client *client) GetERC20Balance(tokenAddr common.Address, userAddr common.
 	}
 	return instance.BalanceOf(client.callOpts(), userAddr)
 }
+func (client *client) GetDecimals(tokenAddr common.Address) (uint8, error) {
+	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
+	if err != nil {
+		return 0, err
+	}
+	return instance.Decimals(client.callOpts())
+}
 
 func (client *client) ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error) {
 	instance, err := ERC20.NewERC20(tokenAddr, client.provider)
@@ -147,12 +155,12 @@ func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecd
 	return initTx.Hash().Hex(), nil
 }
 
-func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secret []byte) (string, error) {
+func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte, secret []byte) (string, error) {
 	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
 	if err != nil {
 		return "", err
 	}
-	tx, err := instance.Redeem(auth, secret)
+	tx, err := instance.Redeem(auth, orderID, secret)
 	if err != nil {
 		return "", err
 	}

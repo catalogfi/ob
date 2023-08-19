@@ -3,11 +3,11 @@ package store
 import (
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/catalogfi/wbtc-garden/blockchain"
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/price"
 	"github.com/catalogfi/wbtc-garden/rest"
@@ -39,12 +39,12 @@ func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 	return &store{mu: new(sync.RWMutex), cache: make(map[string]float64), db: db}, nil
 }
 
-func (s *store) GetValueLocked(user string, chain model.Chain) (*big.Int, error) {
+func (s *store) GetValueLocked(config model.Config, chain model.Chain) (*big.Int, error) {
 	var initAmounts, followAmounts []model.LockedAmount
 	if err := s.db.Table("atomic_swaps").
 		Select("asset as asset,SUM(amount::bigint) as amount").
 		Joins("JOIN orders ON orders.initiator_atomic_swap_id = atomic_swaps.id").
-		Where("orders.maker = ? AND (orders.status = ? OR orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.InitiatorAtomicSwapInitiated, model.FollowerAtomicSwapInitiated, model.FollowerAtomicSwapRefunded, chain).
+		Where("order.status < ? AND atomic_swaps.chain = ?", model.OrderExecuted, chain).
 		Group("asset").
 		Find(&initAmounts).Error; err != nil {
 		return big.NewInt(0), err
@@ -52,7 +52,7 @@ func (s *store) GetValueLocked(user string, chain model.Chain) (*big.Int, error)
 	if err := s.db.Table("atomic_swaps").
 		Select("asset as asset,SUM(amount::bigint) as amount").
 		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
-		Where("orders.taker = ? AND (orders.status = ? OR orders.status = ? OR orders.status = ?) AND atomic_swaps.chain = ?", user, model.FollowerAtomicSwapRedeemed, model.FollowerAtomicSwapInitiated, model.InitiatorAtomicSwapRefunded, chain).
+		Where("order.status < ? AND atomic_swaps.chain = ?", model.OrderExecuted, chain).
 		Group("asset").
 		Find(&followAmounts).Error; err != nil {
 		return big.NewInt(0), err
@@ -70,11 +70,13 @@ func (s *store) GetValueLocked(user string, chain model.Chain) (*big.Int, error)
 			if err != nil {
 				return big.NewInt(0), err
 			}
-			sum = new(big.Int).Add(price.GetPrice(model.Asset(tokenAmount.Asset), chain, big.NewInt(tokenAmount.Amount.Int64), big.NewInt(int64(priceInUSD))), sum)
-			// fmt.Println(sum)
+			price, err := price.GetPrice(model.Asset(tokenAmount.Asset), chain, config, big.NewInt(tokenAmount.Amount.Int64), big.NewInt(int64(priceInUSD)))
+			if err != nil {
+				return big.NewInt(0), err
+			}
+			sum = new(big.Int).Add(price, sum)
 		}
 	}
-	//flooring the sum
 	return sum, nil
 }
 
@@ -114,7 +116,7 @@ func (s *store) GetVolumeTraded(user string, chain model.Chain) (*big.Int, error
 	return sum, nil
 }
 
-func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userBtcWalletAddress string, urls map[model.Chain]string) (uint, error) {
+func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userBtcWalletAddress string, config model.Config) (uint, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -162,7 +164,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		return 0, err
 	}
 
-	initiatorLockValue, err := s.GetValueLocked(creator, sendChain)
+	initiatorLockValue, err := s.GetValueLocked(config, sendChain)
 	if err != nil {
 		return 0, err
 	}
@@ -219,13 +221,14 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	if err != nil {
 		return 0, err
 	}
-	if _, err := blockchain.CalculateExpiry(fromChain, true, urls); err != nil {
-
-		return 0, err
+	_, ok = config[fromChain]
+	if !ok {
+		return 0, fmt.Errorf("unsupported from chain")
 	}
-	if _, err := blockchain.CalculateExpiry(toChain, false, urls); err != nil {
 
-		return 0, err
+	_, ok = config[toChain]
+	if !ok {
+		return 0, fmt.Errorf("unsupported to chain")
 	}
 
 	// ignoring accuracy
@@ -259,7 +262,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	return order.ID, nil
 }
 
-func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress string, urls map[model.Chain]string) error {
+func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress string, config model.Config) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -292,15 +295,6 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 		}
 	}
 
-	initiateAtomicSwapTimelock, err := blockchain.CalculateExpiry(fromChain, true, urls)
-	if err != nil {
-		return fmt.Errorf("constraint violation: invalid order pair: %v", err)
-	}
-	followerAtomicSwapTimelock, err := blockchain.CalculateExpiry(toChain, false, urls)
-	if err != nil {
-		return fmt.Errorf("constraint violation: invalid order pair: %v", err)
-	}
-
 	initiateAtomicSwap := &model.AtomicSwap{}
 	if tx := s.db.First(initiateAtomicSwap, order.InitiatorAtomicSwapID); tx.Error != nil {
 		return tx.Error
@@ -314,7 +308,7 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	if err != nil {
 		return err
 	}
-	followerLockedValue, err := s.GetValueLocked(filler, toChain)
+	followerLockedValue, err := s.GetValueLocked(config, toChain)
 	if err != nil {
 		return err
 	}
@@ -323,8 +317,8 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 
 	initiateAtomicSwap.RedeemerAddress = receiveAddress
 	followerAtomicSwap.InitiatorAddress = sendAddress
-	initiateAtomicSwap.Timelock = initiateAtomicSwapTimelock
-	followerAtomicSwap.Timelock = followerAtomicSwapTimelock
+	initiateAtomicSwap.Timelock = strconv.FormatInt(config[fromChain].Expiry*2, 10)
+	followerAtomicSwap.Timelock = strconv.FormatInt(config[toChain].Expiry, 10)
 	followerAtomicSwap.PriceByOracle = priceByOracle
 	followerAtomicSwap.MinimumConfirmations = initiatorMinConfirmations
 	order.Taker = filler
