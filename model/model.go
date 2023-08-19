@@ -10,12 +10,14 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/catalogfi/wbtc-garden/config"
 	"gorm.io/gorm"
 )
 
-type Config struct {
-	RPC map[Chain]string `json:"rpc"`
+type Config map[Chain]NetworkConfig
+type NetworkConfig struct {
+	Assets map[Asset]bool
+	RPC    string
+	Expiry int64
 }
 
 type Chain string
@@ -224,12 +226,6 @@ func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {
 	if err != nil {
 		return "", "", "", "", err
 	}
-	if err := isWhitelisted(sendChain, string(sendAsset)); err != nil {
-		return "", "", "", "", err
-	}
-	if err := isWhitelisted(receiveChain, string(receiveAsset)); err != nil {
-		return "", "", "", "", err
-	}
 	return sendChain, receiveChain, sendAsset, receiveAsset, nil
 }
 
@@ -244,16 +240,11 @@ func ParseChainAsset(chainAsset string) (Chain, Asset, error) {
 	return Chain(chainAndAsset[0]), NewSecondary(chainAndAsset[1]), nil
 }
 
-func isWhitelisted(chain Chain, asset string) error {
-	if chainMap, ok := config.ConfigMap[string(chain)]; ok {
-		if _, ok := chainMap[asset]; ok {
-			return nil
-		}
-		return fmt.Errorf("asset %v is not whitelisted for chain %v", asset, chain)
-	} else {
-		return fmt.Errorf("chain %v is not whitelisted", chain)
+func (conf NetworkConfig) IsSupported(asset Asset) error {
+	if conf.Assets[asset] {
+		return nil
 	}
-
+	return fmt.Errorf("asset %v is not supported", asset)
 }
 
 func CompareOrderSlices(a, b []Order) bool {
