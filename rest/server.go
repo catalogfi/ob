@@ -247,15 +247,19 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 				for {
 					select {
 					case <-ticker.C:
-						ws.WriteJSON(map[string]interface{}{
+						err := ws.WriteJSON(map[string]interface{}{
 							"msg": "ping",
 						})
+						if err != nil {
+							s.logger.Debug("failed to write ping", zap.Error(err))
+							return
+						}
+
 					}
 					time.Sleep(time.Second * 1)
 				}
 			}()
 			for {
-
 				makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
 				if err != nil {
 					s.logger.Debug("failed to filter maker orders", zap.Error(err))
