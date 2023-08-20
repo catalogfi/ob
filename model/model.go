@@ -82,22 +82,23 @@ type Status uint
 
 const (
 	Unknown Status = iota
-	OrderCreated
-	OrderFilled
-	InitiatorAtomicSwapDetected
-	InitiatorAtomicSwapInitiated
-	FollowerAtomicSwapDetected
-	FollowerAtomicSwapInitiated
-	FollowerAtomicSwapRedeemed
-	InitiatorAtomicSwapRedeemed
-	FollowerAtomicSwapExpired
-	FollowerAtomicSwapRefunded
-	InitiatorAtomicSwapExpired
-	InitiatorAtomicSwapRefunded
-	OrderExecuted
-	OrderFailedSoft
-	OrderFailedHard
-	OrderCancelled
+	Created
+	Filled
+	Executed
+	FailedSoft
+	FailedHard
+	Cancelled
+)
+
+type SwapStatus uint
+
+const (
+	NotStarted SwapStatus = iota
+	Detected
+	Initiated
+	Expired
+	Redeemed
+	Refunded
 )
 
 type VerifySiwe struct {
@@ -130,21 +131,23 @@ type Order struct {
 type AtomicSwap struct {
 	gorm.Model
 
-	InitiatorAddress     string  `json:"initiatorAddress"`
-	RedeemerAddress      string  `json:"redeemerAddress"`
-	Timelock             string  `json:"timelock"`
-	Chain                Chain   `json:"chain"`
-	Asset                Asset   `json:"asset"`
-	Amount               string  `json:"amount"`
-	FilledAmount         string  `json:"filledAmount"`
-	InitiateTxHash       string  `json:"initiateTxHash" `
-	RedeemTxHash         string  `json:"redeemTxHash" `
-	RefundTxHash         string  `json:"refundTxHash" `
-	PriceByOracle        float64 `json:"priceByOracle"`
-	MinimumConfirmations uint64  `json:"minimumConfirmations"`
-	CurrentConfirmations uint64  `json:"currentConfirmation"`
-	InitiateBlockNumber  uint64  `json:"initiateBlockNumber"`
-	IsInstantWallet      bool    `json:"-"`
+	Status               SwapStatus `json:"swapStatus"`
+	Secret               string     `json:"secret"`
+	InitiatorAddress     string     `json:"initiatorAddress"`
+	RedeemerAddress      string     `json:"redeemerAddress"`
+	Timelock             string     `json:"timelock"`
+	Chain                Chain      `json:"chain"`
+	Asset                Asset      `json:"asset"`
+	Amount               string     `json:"amount"`
+	FilledAmount         string     `json:"filledAmount"`
+	InitiateTxHash       string     `json:"initiateTxHash" `
+	RedeemTxHash         string     `json:"redeemTxHash" `
+	RefundTxHash         string     `json:"refundTxHash" `
+	PriceByOracle        float64    `json:"priceByOracle"`
+	MinimumConfirmations uint64     `json:"minimumConfirmations"`
+	CurrentConfirmations uint64     `json:"currentConfirmation"`
+	InitiateBlockNumber  uint64     `json:"initiateBlockNumber"`
+	IsInstantWallet      bool       `json:"-"`
 }
 
 type LockedAmount struct {

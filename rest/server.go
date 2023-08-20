@@ -188,7 +188,7 @@ func (s *Server) GetOrderBySocket() gin.HandlerFunc {
 				}
 
 				for {
-					if order.Status >= model.OrderExecuted {
+					if order.Status >= model.Executed {
 						break
 					}
 					order2, err := s.store.GetOrder(uint(val))
@@ -445,8 +445,8 @@ func (s *Server) GetOrders() gin.HandlerFunc {
 		}
 
 		status, err := strconv.Atoi(c.DefaultQuery("status", "0"))
-		if err != nil && status < int(model.Unknown) || status > int(model.OrderFailedSoft) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode status has to be a number between %d and %d", model.Unknown, model.OrderFailedSoft)})
+		if err != nil && status < int(model.Unknown) || status > int(model.FailedSoft) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode status has to be a number between %d and %d", model.Unknown, model.FailedSoft)})
 			return
 		}
 

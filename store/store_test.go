@@ -22,21 +22,19 @@ var _ = Describe("Store", func() {
 	It("should be able to get locked amount", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
-
-		_, err = store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash", "receivebtcAddress", config)
-
+		_, err = store.CreateOrder("17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "ethereum-bitcoin", "100", "200", "17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2daE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
-		_, err = store.CreateOrder("creator", "sendAddress", "receiveAddress", "bitcoin-ethereum", "100", "200", "secretHash", "receivebtcAddress", config)
+		_, err = store.CreateOrder("17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin-ethereum", "100", "200", "17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2daE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
-		initiatorUnfilledOrders, err := store.FilterOrders("creator", "", "ethereum-bitcoin", "", "", model.OrderCreated, 0, 0, 0, 0, 0, 0, true)
+		initiatorUnfilledOrders, err := store.FilterOrders("17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "", "ethereum-bitcoin", "", "", model.Created, 0, 0, 0, 0, 0, 0, true)
 		Expect(err).NotTo(HaveOccurred())
 		order := initiatorUnfilledOrders[0]
-		order.Status = model.InitiatorAtomicSwapInitiated
+		order.Status = model.Filled
 		store.UpdateOrder(&order)
-		followerUnfilledOrders, err := store.FilterOrders("creator", "", "bitcoin-ethereum", "", "", model.Status(1), 0, 0, 0, 0, 0, 0, true)
+		followerUnfilledOrders, err := store.FilterOrders("17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "", "bitcoin-ethereum", "", "", model.Status(1), 0, 0, 0, 0, 0, 0, true)
 		Expect(err).NotTo(HaveOccurred())
 		order = followerUnfilledOrders[0]
-		order.Status = model.InitiatorAtomicSwapRedeemed
+		order.Status = model.Executed
 		store.UpdateOrder(&order)
 		amount, err := store.GetValueLocked(config, model.Ethereum)
 		Expect(err).NotTo(HaveOccurred())
@@ -79,7 +77,7 @@ var _ = Describe("Store", func() {
 		Expect(order.FollowerAtomicSwap.InitiatorAddress).To(Equal("sendFollowerAddress"))
 		Expect(order.InitiatorAtomicSwap.Timelock).To(Equal(uint64(144)))
 		Expect(order.FollowerAtomicSwap.Timelock).To(Equal(uint64(144)))
-		Expect(order.Status).To(Equal(model.OrderFilled))
+		Expect(order.Status).To(Equal(model.Filled))
 		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
 	})
 

@@ -44,7 +44,7 @@ func (s *store) GetValueLocked(config model.Config, chain model.Chain) (*big.Int
 	if err := s.db.Table("atomic_swaps").
 		Select("asset as asset,SUM(amount::bigint) as amount").
 		Joins("JOIN orders ON orders.initiator_atomic_swap_id = atomic_swaps.id").
-		Where("orders.status < ? AND atomic_swaps.chain = ?", model.OrderExecuted, chain).
+		Where("orders.status < ? AND atomic_swaps.chain = ?", model.Executed, chain).
 		Group("asset").
 		Find(&initAmounts).Error; err != nil {
 		return big.NewInt(0), err
@@ -52,7 +52,7 @@ func (s *store) GetValueLocked(config model.Config, chain model.Chain) (*big.Int
 	if err := s.db.Table("atomic_swaps").
 		Select("asset as asset,SUM(amount::bigint) as amount").
 		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
-		Where("orders.status < ? AND atomic_swaps.chain = ?", model.OrderExecuted, chain).
+		Where("orders.status < ? AND atomic_swaps.chain = ?", model.Executed, chain).
 		Group("asset").
 		Find(&followAmounts).Error; err != nil {
 		return big.NewInt(0), err
@@ -243,7 +243,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		FollowerAtomicSwap:    &followerAtomicSwap,
 		Price:                 price,
 		SecretHash:            secretHash,
-		Status:                model.OrderCreated,
+		Status:                model.Created,
 		SecretNonce:           uint64(len(orders)) + 1,
 		UserBtcWalletAddress:  userBtcWalletAddress,
 	}
@@ -251,7 +251,6 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	if tx := s.db.Create(&initiatorAtomicSwap); tx.Error != nil {
 		return 0, tx.Error
 	}
-
 	if tx := s.db.Create(&followerAtomicSwap); tx.Error != nil {
 		return 0, tx.Error
 	}
@@ -270,7 +269,7 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	if tx := s.db.First(order, orderID); tx.Error != nil {
 		return tx.Error
 	}
-	if order.Status != model.OrderCreated {
+	if order.Status != model.Created {
 		return fmt.Errorf("order already filled, current status: %v", order.Status)
 	}
 
@@ -322,7 +321,7 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	followerAtomicSwap.PriceByOracle = priceByOracle
 	followerAtomicSwap.MinimumConfirmations = initiatorMinConfirmations
 	order.Taker = filler
-	order.Status = model.OrderFilled
+	order.Status = model.Filled
 	if tx := s.db.Save(order); tx.Error != nil {
 		return tx.Error
 	}
@@ -343,7 +342,7 @@ func (s *store) CancelOrder(creator string, orderID uint) error {
 	if order.Maker != creator {
 		return fmt.Errorf("order can be cancelled only by its creator")
 	}
-	if order.Status != model.OrderCreated {
+	if order.Status != model.Created {
 		return fmt.Errorf("order can be cancelled only if it is not filled, current status: %v", order.Status)
 	}
 	if tx := s.db.Delete(order); tx.Error != nil {
@@ -430,7 +429,7 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 
 func (s *store) GetActiveOrders() ([]model.Order, error) {
 	orders := []model.Order{}
-	if tx := s.db.Where("status > ? AND status < ?", model.Unknown, model.OrderExecuted).Find(&orders); tx.Error != nil {
+	if tx := s.db.Where("status > ? AND status < ?", model.Unknown, model.Executed).Find(&orders); tx.Error != nil {
 		return nil, tx.Error
 	}
 	for i := range orders {

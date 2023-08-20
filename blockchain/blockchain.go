@@ -202,3 +202,104 @@ func getParams(chain model.Chain) *chaincfg.Params {
 		panic("constraint violation: unknown chain")
 	}
 }
+
+func CheckAddress(chain model.Chain, address string) error {
+	if chain.IsEVM() {
+		if len(common.HexToAddress(address).Bytes()) == 0 {
+			return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
+		}
+	} else if chain.IsBTC() {
+		_, err := btcutil.DecodeAddress(address, getParams(chain))
+		if err != nil {
+			return fmt.Errorf("invalid bitcoin (%v) address: %v", chain, address)
+		}
+	} else {
+		return fmt.Errorf("unknown chain: %v", chain)
+	}
+	return nil
+}
+
+func CheckHash(hash string) error {
+	if has0xPrefix(hash) {
+		hash = hash[2:]
+	}
+	_, err := hex.DecodeString(hash)
+	if err != nil {
+		return fmt.Errorf("not a valid hash %s", hash)
+	}
+	return nil
+}
+
+func has0xPrefix(str string) bool {
+	return len(str) >= 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X')
+}
+
+func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
+	if chain.IsBTC() {
+		switch {
+		case value.Cmp(big.NewInt(10000)) < 1:
+			return 1
+
+		case value.Cmp(big.NewInt(100000)) < 1:
+			return 2
+
+		case value.Cmp(big.NewInt(1000000)) < 1:
+			return 4
+
+		case value.Cmp(big.NewInt(10000000)) < 1:
+			return 6
+
+		case value.Cmp(big.NewInt(100000000)) < 1:
+			return 8
+
+		default:
+			return 12
+		}
+	} else if chain.IsEVM() {
+		switch {
+		case value.Cmp(big.NewInt(10000)) < 1:
+			return 6
+
+		case value.Cmp(big.NewInt(100000)) < 1:
+			return 12
+
+		case value.Cmp(big.NewInt(1000000)) < 1:
+			return 18
+
+		case value.Cmp(big.NewInt(10000000)) < 1:
+			return 24
+
+		case value.Cmp(big.NewInt(100000000)) < 1:
+			return 30
+
+		default:
+			return 100
+		}
+	}
+	return 0
+}
+
+func GetDecimals(chain model.Chain, asset model.Asset, config model.Config) (int64, error) {
+	if chain.IsEVM() {
+		logger, err := zap.NewDevelopment()
+		if err != nil {
+			return -1, err
+		}
+		client, err := ethereum.NewClient(logger, config[chain].RPC)
+		if err != nil {
+			return -1, err
+		}
+		token, err := client.GetTokenAddress(common.HexToAddress(asset.SecondaryID()))
+		if err != nil {
+			return -1, err
+		}
+		tokenDecimals, err := client.GetDecimals(token)
+		if err != nil {
+			return -1, err
+		}
+		return int64(tokenDecimals), nil
+	} else if chain.IsBTC() {
+		return 8, nil
+	}
+	return -1, fmt.Errorf("unsupported chain: %v", chain)
+}
