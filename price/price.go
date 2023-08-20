@@ -41,7 +41,6 @@ func (p *PriceChecker) Run() error {
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		defer resp.Body.Close()
 
 		var apiResponse ApiResponse
 		if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
@@ -49,6 +48,8 @@ func (p *PriceChecker) Run() error {
 			time.Sleep(5 * time.Second)
 			continue
 		}
+
+		resp.Body.Close()
 
 		// Convert priceUsd to float64
 		priceUsdStr, ok := apiResponse.Data["priceUsd"].(string)
