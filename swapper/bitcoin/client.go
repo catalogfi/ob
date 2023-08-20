@@ -37,6 +37,7 @@ type UTXOs []UTXO
 type Client interface {
 	GetSpendingWitness(address btcutil.Address) ([]string, Transaction, error)
 	GetTipBlockHeight() (uint64, error)
+	GetConfirmations(txHash string) (uint64, uint64, error)
 	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
 	Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error)
 	Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error)
@@ -66,6 +67,22 @@ func (client *client) GetTipBlockHeight() (uint64, error) {
 		return 0, fmt.Errorf("failed to read response body: %w", err)
 	}
 	return strconv.ParseUint(string(data), 10, 64)
+}
+
+func (client *client) GetConfirmations(txHash string) (uint64, uint64, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/tx/%s/status", client.url, txHash))
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get transaction: %w", err)
+	}
+	var status Status
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		return 0, 0, fmt.Errorf("failed to decode transaction status: %w", err)
+	}
+	tip, err := client.GetTipBlockHeight()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get tip block height: %w", err)
+	}
+	return status.BlockHeight, tip - status.BlockHeight, nil
 }
 
 func (client *client) GetSpendingWitness(address btcutil.Address) ([]string, Transaction, error) {
@@ -139,7 +156,7 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate fee: %w", err)
 	}
-  
+
 	utxosWihFee, selectedAmount, err := client.GetUTXOs(fromAddr, amount+fee)
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
@@ -256,7 +273,7 @@ func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read transaction id: %w", err)
 	}
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to send transaction: %s", data)
 	}
@@ -294,7 +311,6 @@ func (client *client) CalculateTransferFee(nInputs, nOutputs int, txVersion int3
 	return 0, fmt.Errorf("tx type not supported")
 
 }
-
 
 func (client *client) CalculateRedeemFee() (uint64, error) {
 	feeRates, err := client.GetFeeRates()

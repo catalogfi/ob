@@ -20,13 +20,15 @@ type InitiatorSwap interface {
 
 type RedeemerSwap interface {
 	Redeem(secret []byte) (string, error)
-	IsInitiated() (bool, []string, uint64, error)
-	WaitForInitiate() ([]string, error)
+	IsInitiated() (bool, string, uint64, error)
+	WaitForInitiate() (string, error)
 }
 
 type Watcher interface {
 	Expired() (bool, error)
-	IsInitiated() (bool, []string, uint64, error)
+	Status(initiateTxHash string) (uint64, uint64, error)
+	IsDetected() (bool, string, string, error)
+	IsInitiated() (bool, string, uint64, error)
 	IsRedeemed() (bool, []byte, string, error)
 	IsRefunded() (bool, string, error)
 }
@@ -51,11 +53,9 @@ func ExecuteAtomicSwapFirst(initiator InitiatorSwap, redeemer RedeemerSwap, secr
 }
 
 func ExecuteAtomicSwapSecond(initiator InitiatorSwap, redeemer RedeemerSwap) error {
-	fmt.Println("Waiting for Initiate on:", redeemer)
 	if _, err := redeemer.WaitForInitiate(); err != nil {
 		return err
 	}
-	fmt.Println("Initiating on:", redeemer)
 	if _, err := initiator.Initiate(); err != nil {
 		return err
 	}
