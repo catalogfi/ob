@@ -97,7 +97,11 @@ func (w *watcher) watch(order model.Order) {
 	case order.InitiatorAtomicSwap.RedeemTxHash == "" && order.FollowerAtomicSwap.RedeemTxHash == "" && order.FollowerAtomicSwap.RefundTxHash != "" && order.InitiatorAtomicSwap.RefundTxHash != "":
 		order.Status = model.OrderFailedSoft
 	}
-	if order.Status == model.OrderFailedHard || order.Status == model.OrderFailedSoft {
+	// Follower has not filled the swap before the order timeout
+	if order.Status == model.OrderCreated && time.Since(order.CreatedAt) > OrderTimeout {
+		order.Status = model.OrderCancelled
+	}
+	if order.Status == model.OrderFailedHard || order.Status == model.OrderFailedSoft || order.Status == model.OrderCancelled {
 		if err := w.store.UpdateOrder(&order); err != nil {
 			log.Error("failed to update status", zap.Error(err), zap.Uint("status", uint(order.Status)))
 			return
@@ -139,11 +143,6 @@ func (w *watcher) watch(order model.Order) {
 
 func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatcher swapper.Watcher) (model.Order, bool, error) {
 	switch order.Status {
-	case model.OrderCreated:
-		if time.Since(order.CreatedAt) > OrderTimeout {
-			order.Status = model.OrderCancelled
-			return order, true, nil
-		}
 	case model.OrderFilled:
 		if time.Since(order.CreatedAt) > SwapInitiationTimeout {
 			order.Status = model.OrderCancelled

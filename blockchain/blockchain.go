@@ -79,12 +79,12 @@ func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, config model.Co
 
 	initiatorAddress, err := ParseAddress(client, atomicSwap.InitiatorAddress)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse the initiator address: %s on chain: %v, %w", atomicSwap.InitiatorAddress, atomicSwap.Chain, err)
 	}
 
 	redeemerAddress, err := ParseAddress(client, atomicSwap.RedeemerAddress)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse the redeemer address: %s on chain: %v, %w", atomicSwap.RedeemerAddress, atomicSwap.Chain, err)
 	}
 
 	secHash, err := hex.DecodeString(secretHash)
