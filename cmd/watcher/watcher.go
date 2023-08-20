@@ -5,17 +5,20 @@ import (
 	"os"
 	"time"
 
+	"github.com/catalogfi/wbtc-garden/logger"
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/store"
 	"github.com/catalogfi/wbtc-garden/watcher"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 type Config struct {
-	PSQL_DB string       `binding:"required"`
-	CONFIG  model.Config `binding:"required"`
+	SENTRY_DSN string
+	PSQL_DB    string       `binding:"required"`
+	CONFIG     model.Config `binding:"required"`
 }
 
 func LoadConfiguration(file string) Config {
@@ -38,10 +41,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		panic(err)
+
+	var log *zap.Logger
+	if env.SENTRY_DSN != "" {
+		log = zap.New(logger.NewSentryCore(env.SENTRY_DSN, zapcore.ErrorLevel))
+	} else {
+		log, err = zap.NewDevelopment()
+		if err != nil {
+			panic(err)
+		}
 	}
-	watcher := watcher.NewWatcher(logger, store, env.CONFIG)
+	defer log.Sync()
+
+	watcher := watcher.NewWatcher(log, store, env.CONFIG)
 	watcher.Run()
 }

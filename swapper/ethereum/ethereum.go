@@ -193,6 +193,17 @@ type watcher struct {
 }
 
 func NewWatcher(atomicSwapAddr common.Address, secretHash, orderId []byte, expiry, minConfirmations, amount *big.Int, client Client) (swapper.Watcher, error) {
+	currentBlock, err := client.GetCurrentBlock()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the current block: %v", err)
+	}
+
+	// TODO: we only look at last 100 expiries from the current block, could potentially optimised
+	lastCheckedBlock := new(big.Int).Sub(new(big.Int).SetUint64(currentBlock), new(big.Int).Mul(big.NewInt(100), expiry))
+	if lastCheckedBlock.Cmp(big.NewInt(0)) < 0 {
+		lastCheckedBlock = big.NewInt(0)
+	}
+
 	return &watcher{
 		client:           client,
 		atomicSwapAddr:   atomicSwapAddr,
@@ -200,7 +211,7 @@ func NewWatcher(atomicSwapAddr common.Address, secretHash, orderId []byte, expir
 		amount:           amount,
 		secretHash:       secretHash,
 		minConfirmations: minConfirmations,
-		lastCheckedBlock: big.NewInt(17952837),
+		lastCheckedBlock: lastCheckedBlock,
 		orderId:          orderId,
 	}, nil
 }

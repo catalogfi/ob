@@ -70,13 +70,22 @@ func (client *client) GetTipBlockHeight() (uint64, error) {
 }
 
 func (client *client) GetConfirmations(txHash string) (uint64, uint64, error) {
+	if len(txHash) > 2 && txHash[:2] == "0x" {
+		txHash = txHash[2:]
+	}
 	resp, err := http.Get(fmt.Sprintf("%s/tx/%s/status", client.url, txHash))
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to get transaction: %w", err)
 	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to read transaction id: %w", err)
+	}
+
 	var status Status
-	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-		return 0, 0, fmt.Errorf("failed to decode transaction status: %w", err)
+	if err := json.Unmarshal(data, &status); err != nil {
+		return 0, 0, fmt.Errorf("failed to decode transaction status: %s", data)
 	}
 	tip, err := client.GetTipBlockHeight()
 	if err != nil {

@@ -90,10 +90,10 @@ const (
 	FollowerAtomicSwapInitiated
 	FollowerAtomicSwapRedeemed
 	InitiatorAtomicSwapRedeemed
-	InitiatorAtomicSwapExpired
-	InitiatorAtomicSwapRefunded
 	FollowerAtomicSwapExpired
 	FollowerAtomicSwapRefunded
+	InitiatorAtomicSwapExpired
+	InitiatorAtomicSwapRefunded
 	OrderExecuted
 	OrderFailedSoft
 	OrderFailedHard
