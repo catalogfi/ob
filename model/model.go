@@ -17,6 +17,7 @@ type Config map[Chain]NetworkConfig
 type NetworkConfig struct {
 	Assets map[Asset]bool
 	RPC    string
+	IWRPC  string
 	Expiry int64
 }
 

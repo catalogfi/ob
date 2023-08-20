@@ -41,6 +41,9 @@ type Client interface {
 	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
 	Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error)
 	Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error)
+	// TODO :replace with dynamic calculation
+	CalculateTransferFee(nInputs, nOutputs int, txVersion int32) (uint64, error)
+	CalculateRedeemFee() (uint64, error)
 	Net() *chaincfg.Params
 }
 

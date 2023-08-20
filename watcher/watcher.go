@@ -109,12 +109,12 @@ func (w *watcher) watch(order model.Order) {
 	}
 
 	// Fetch swapper watchers for both parties
-	initiatorWatcher, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config, order.InitiatorAtomicSwap.MinimumConfirmations)
+	initiatorWatcher, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config, order.InitiatorAtomicSwap.MinimumConfirmations, order.InitiatorAtomicSwap.IsInstantWallet)
 	if err != nil {
 		log.Error("failed to load initiator watcher", zap.Error(err))
 		return
 	}
-	followerWatcher, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config, order.FollowerAtomicSwap.MinimumConfirmations)
+	followerWatcher, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config, order.FollowerAtomicSwap.MinimumConfirmations, order.InitiatorAtomicSwap.IsInstantWallet)
 	if err != nil {
 		log.Error("failed to load follower watcher", zap.Error(err))
 		return
@@ -155,7 +155,7 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		}
 		if fullyFilled {
 			// AtomicSwap initiation detected
-			order.Status = model.FollowerAtomicSwapDetected
+			order.Status = model.InitiatorAtomicSwapDetected
 			order.FollowerAtomicSwap.FilledAmount = amount
 			order.FollowerAtomicSwap.InitiateTxHash = txHash
 			return order, true, nil
@@ -169,6 +169,18 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		height, conf, err := initiatorWatcher.Status(order.InitiatorAtomicSwap.InitiateTxHash)
 		if err != nil {
 			return order, false, err
+		}
+
+		if order.InitiatorAtomicSwap.Chain.IsBTC() {
+			isIwTx, err := isBtcIwTxs(w.config[order.InitiatorAtomicSwap.Chain].IWRPC, order.InitiatorAtomicSwap.InitiateTxHash)
+			if err != nil {
+				return order, false, fmt.Errorf("failed to check if txs are instant wallet, %w", err)
+			}
+			if isIwTx {
+				order.InitiatorAtomicSwap.MinimumConfirmations = 0
+				order.Status = model.InitiatorAtomicSwapInitiated
+				return order, true, nil
+			}
 		}
 		if order.InitiatorAtomicSwap.CurrentConfirmations != conf {
 			order.InitiatorAtomicSwap.CurrentConfirmations = conf
@@ -251,6 +263,17 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		height, conf, err := followerWatcher.Status(order.FollowerAtomicSwap.InitiateTxHash)
 		if err != nil {
 			return order, false, err
+		}
+		if order.FollowerAtomicSwap.Chain.IsBTC() {
+			isIwTx, err := isBtcIwTxs(w.config[order.FollowerAtomicSwap.Chain].IWRPC, order.FollowerAtomicSwap.InitiateTxHash)
+			if err != nil {
+				return order, false, fmt.Errorf("failed to check if txs are instant wallet, %w", err)
+			}
+			if isIwTx {
+				order.FollowerAtomicSwap.MinimumConfirmations = 0
+				order.Status = model.FollowerAtomicSwapInitiated
+				return order, true, nil
+			}
 		}
 		if order.FollowerAtomicSwap.CurrentConfirmations != conf {
 			order.FollowerAtomicSwap.CurrentConfirmations = conf
