@@ -84,11 +84,15 @@ const (
 	Unknown Status = iota
 	OrderCreated
 	OrderFilled
+	InitiatorAtomicSwapDetected
 	InitiatorAtomicSwapInitiated
+	FollowerAtomicSwapDetected
 	FollowerAtomicSwapInitiated
 	FollowerAtomicSwapRedeemed
 	InitiatorAtomicSwapRedeemed
+	InitiatorAtomicSwapExpired
 	InitiatorAtomicSwapRefunded
+	FollowerAtomicSwapExpired
 	FollowerAtomicSwapRefunded
 	OrderExecuted
 	OrderFailedSoft
@@ -126,19 +130,21 @@ type Order struct {
 type AtomicSwap struct {
 	gorm.Model
 
-	InitiatorAddress          string  `json:"initiatorAddress"`
-	RedeemerAddress           string  `json:"redeemerAddress"`
-	Timelock                  string  `json:"timelock"`
-	Chain                     Chain   `json:"chain"`
-	Asset                     Asset   `json:"asset"`
-	Amount                    string  `json:"amount"`
-	InitiateTxHash            string  `json:"initiateTxHash" `
-	RedeemTxHash              string  `json:"redeemTxHash" `
-	RefundTxHash              string  `json:"refundTxHash" `
-	PriceByOracle             float64 `json:"priceByOracle"`
-	MinimumConfirmations      uint64  `json:"minimumConfirmations"`
-	CurrentConfirmationStatus uint64  `json:"currentConfirmationStatus"`
-	IsInstantWallet           bool    `json:"-"`
+	InitiatorAddress     string  `json:"initiatorAddress"`
+	RedeemerAddress      string  `json:"redeemerAddress"`
+	Timelock             string  `json:"timelock"`
+	Chain                Chain   `json:"chain"`
+	Asset                Asset   `json:"asset"`
+	Amount               string  `json:"amount"`
+	FilledAmount         string  `json:"filledAmount"`
+	InitiateTxHash       string  `json:"initiateTxHash" `
+	RedeemTxHash         string  `json:"redeemTxHash" `
+	RefundTxHash         string  `json:"refundTxHash" `
+	PriceByOracle        float64 `json:"priceByOracle"`
+	MinimumConfirmations uint64  `json:"minimumConfirmations"`
+	CurrentConfirmations uint64  `json:"currentConfirmation"`
+	InitiateBlockNumber  uint64  `json:"initiateBlockNumber"`
+	IsInstantWallet      bool    `json:"-"`
 }
 
 type LockedAmount struct {
@@ -255,12 +261,14 @@ func CompareOrderSlices(a, b []Order) bool {
 		if v.Status != b[i].Status {
 			return false
 		}
-		if v.FollowerAtomicSwap.CurrentConfirmationStatus != b[i].FollowerAtomicSwap.CurrentConfirmationStatus || v.InitiatorAtomicSwap.CurrentConfirmationStatus != b[i].InitiatorAtomicSwap.CurrentConfirmationStatus {
+		if v.FollowerAtomicSwap.CurrentConfirmations != b[i].FollowerAtomicSwap.CurrentConfirmations || v.InitiatorAtomicSwap.CurrentConfirmations != b[i].InitiatorAtomicSwap.CurrentConfirmations {
+			return false
+		}
+		if v.FollowerAtomicSwap.FilledAmount != b[i].FollowerAtomicSwap.FilledAmount || v.InitiatorAtomicSwap.FilledAmount != b[i].InitiatorAtomicSwap.FilledAmount {
 			return false
 		}
 	}
 	return true
-
 }
 
 func ValidateSecretHash(input string) error {

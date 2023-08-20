@@ -26,6 +26,7 @@ type Client interface {
 	GetTokenAddress(contractAddr common.Address) (common.Address, error)
 	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
 	GetDecimals(tokenAddr common.Address) (uint8, error)
+	GetConfirmations(txHash string) (uint64, uint64, error)
 	ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
 	InitiateAtomicSwap(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error)
 	RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte, secret []byte) (string, error)
@@ -198,6 +199,21 @@ func (client *client) IsFinal(txHash string, minConf uint64) (bool, uint64, erro
 		return progress >= int64(minConf)-1, uint64(progress), nil
 	}
 	return progress+1 >= int64(minConf), 0, nil
+}
+
+func (client *client) GetConfirmations(txHash string) (uint64, uint64, error) {
+	tx, err := client.provider.TransactionReceipt(context.Background(), common.HexToHash(txHash))
+	if err != nil {
+		return 0, 0, err
+	}
+	if tx.Status == 0 {
+		return 0, 0, nil
+	}
+	currentBlock, err := client.GetCurrentBlock()
+	if err != nil {
+		return 0, 0, fmt.Errorf("error getting current block %v", err)
+	}
+	return tx.BlockNumber.Uint64(), uint64(currentBlock) - tx.BlockNumber.Uint64(), nil
 }
 
 func (client *client) allowance(tokenAddr common.Address, spender common.Address, owner common.Address) (*big.Int, error) {

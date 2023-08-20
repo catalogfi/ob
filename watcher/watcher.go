@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/catalogfi/wbtc-garden/blockchain"
@@ -56,9 +55,7 @@ func (w *watcher) Run() {
 	for i := 0; i < w.workers; i++ {
 		go func() {
 			for order := range w.orders {
-				if err := w.watch(order); err != nil {
-					w.logger.Error("update order", zap.Error(err), zap.Uint("orderID", order.ID))
-				}
+				w.watch(order)
 			}
 		}()
 	}
@@ -85,7 +82,8 @@ func (w *watcher) Run() {
 	}
 }
 
-func (w *watcher) watch(order model.Order) error {
+func (w *watcher) watch(order model.Order) {
+	log := w.logger.With(zap.Uint("order id", order.ID))
 
 	// Special cases regardless of order status
 	switch {
@@ -100,17 +98,22 @@ func (w *watcher) watch(order model.Order) error {
 		order.Status = model.OrderFailedSoft
 	}
 	if order.Status == model.OrderFailedHard || order.Status == model.OrderFailedSoft {
-		return w.store.UpdateOrder(&order)
+		if err := w.store.UpdateOrder(&order); err != nil {
+			log.Error("failed to update status", zap.Error(err), zap.Uint("status", uint(order.Status)))
+			return
+		}
 	}
 
 	// Fetch swapper watchers for both parties
 	initiatorWatcher, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config, order.InitiatorAtomicSwap.MinimumConfirmations)
 	if err != nil {
-		return fmt.Errorf("load initiator watcher, %w", err)
+		log.Error("failed to load initiator watcher", zap.Error(err))
+		return
 	}
 	followerWatcher, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config, order.FollowerAtomicSwap.MinimumConfirmations)
 	if err != nil {
-		return fmt.Errorf("load follower watcher, %w", err)
+		log.Error("failed to load follower watcher", zap.Error(err))
+		return
 	}
 
 	// Status update
@@ -119,7 +122,8 @@ func (w *watcher) watch(order model.Order) error {
 		var ctn bool
 		order, ctn, err = w.statusCheck(order, initiatorWatcher, followerWatcher)
 		if err != nil {
-			return fmt.Errorf("check status, %w", err)
+			log.Error("failed to check status", zap.Error(err))
+			return
 		}
 		if !ctn {
 			break
@@ -127,15 +131,13 @@ func (w *watcher) watch(order model.Order) error {
 		orderUpdate = true
 	}
 	if orderUpdate {
-		return w.store.UpdateOrder(&order)
+		if err := w.store.UpdateOrder(&order); err != nil {
+			log.Error("failed to update order", zap.Any("order", order), zap.Error(err))
+		}
 	}
-	return nil
 }
 
 func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatcher swapper.Watcher) (model.Order, bool, error) {
-	initiatorMinRefundTime := order.CreatedAt.Add(48 * time.Hour)
-	followerMinRefundTime := order.CreatedAt.Add(24 * time.Hour)
-
 	switch order.Status {
 	case model.OrderCreated:
 		if time.Since(order.CreatedAt) > OrderTimeout {
@@ -143,81 +145,123 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 			return order, true, nil
 		}
 	case model.OrderFilled:
-		// Initiator swap initiated
-		initiated, txHashes, progress, err := initiatorWatcher.IsInitiated()
-		if err != nil {
-			return order, false, fmt.Errorf("initiator swap initiation, %w", err)
-		}
-		if initiated {
-			order.Status = model.InitiatorAtomicSwapInitiated
-			order.InitiatorAtomicSwap.InitiateTxHash = strings.Join(txHashes, ",")
-			order.InitiatorAtomicSwap.CurrentConfirmationStatus = order.InitiatorAtomicSwap.MinimumConfirmations
-			return order, true, nil
-		} else if order.InitiatorAtomicSwap.CurrentConfirmationStatus < progress {
-			order.InitiatorAtomicSwap.CurrentConfirmationStatus = progress
-			return order, true, nil
-		}
-
-		// Order expired
 		if time.Since(order.CreatedAt) > SwapInitiationTimeout {
 			order.Status = model.OrderCancelled
 			return order, true, nil
 		}
+
+		fullyFilled, txHash, amount, err := initiatorWatcher.IsDetected()
+		if err != nil {
+			return order, false, fmt.Errorf("failed to detect initiator swap, %w", err)
+		}
+		if fullyFilled {
+			// AtomicSwap initiation detected
+			order.Status = model.FollowerAtomicSwapDetected
+			order.FollowerAtomicSwap.FilledAmount = amount
+			order.FollowerAtomicSwap.InitiateTxHash = txHash
+			return order, true, nil
+		} else if txHash != "" && order.FollowerAtomicSwap.FilledAmount != amount {
+			// AtomicSwap partial initiation detected
+			order.FollowerAtomicSwap.FilledAmount = amount
+			order.FollowerAtomicSwap.InitiateTxHash = txHash
+			return order, true, nil
+		}
+	case model.InitiatorAtomicSwapDetected:
+		height, conf, err := initiatorWatcher.Status(order.InitiatorAtomicSwap.InitiateTxHash)
+		if err != nil {
+			return order, false, err
+		}
+		if order.InitiatorAtomicSwap.CurrentConfirmations != conf {
+			order.InitiatorAtomicSwap.CurrentConfirmations = conf
+			order.InitiatorAtomicSwap.InitiateBlockNumber = height
+			if order.InitiatorAtomicSwap.CurrentConfirmations > order.InitiatorAtomicSwap.MinimumConfirmations {
+				order.Status = model.InitiatorAtomicSwapInitiated
+			}
+			return order, true, nil
+		}
 	case model.InitiatorAtomicSwapInitiated:
-		// Initiator swap refunded
-		if time.Now().After(initiatorMinRefundTime) {
-			refunded, txHash, err := initiatorWatcher.IsRefunded()
-			if err != nil {
-				return order, false, fmt.Errorf("initiator swap refund, %w", err)
-			}
-			if refunded {
-				order.Status = model.InitiatorAtomicSwapRefunded
-				order.InitiatorAtomicSwap.RefundTxHash = txHash
-				return order, true, nil
-			}
+		// Follower swap initiated
+		fullyFilled, txHash, amount, err := followerWatcher.IsDetected()
+		if err != nil {
+			return order, false, fmt.Errorf("failed to detect initiator swap, %w", err)
+		}
+		if fullyFilled {
+			// AtomicSwap initiation detected
+			order.Status = model.FollowerAtomicSwapDetected
+			order.FollowerAtomicSwap.FilledAmount = amount
+			order.FollowerAtomicSwap.InitiateTxHash = txHash
+			return order, true, nil
+		} else if txHash != "" && order.FollowerAtomicSwap.FilledAmount != amount {
+			// AtomicSwap partial initiation detected
+			order.FollowerAtomicSwap.FilledAmount = amount
+			order.FollowerAtomicSwap.InitiateTxHash = txHash
+			return order, true, nil
 		}
 
-		// Follower swap initiated
-		initiated, txHashes, progress, err := followerWatcher.IsInitiated()
-		if err != nil {
-			return order, false, fmt.Errorf("follower swap initiation, %w", err)
-		}
-		if initiated {
-			order.Status = model.FollowerAtomicSwapInitiated
-			order.FollowerAtomicSwap.InitiateTxHash = strings.Join(txHashes, ",")
-			order.FollowerAtomicSwap.CurrentConfirmationStatus = order.FollowerAtomicSwap.MinimumConfirmations
-			return order, true, nil
-		} else if order.FollowerAtomicSwap.CurrentConfirmationStatus < progress {
-			order.FollowerAtomicSwap.CurrentConfirmationStatus = progress
+		// Initiateor swap expired
+		expired, err := initiatorWatcher.Expired()
+		if err == nil && expired {
+			order.Status = model.InitiatorAtomicSwapExpired
 			return order, true, nil
 		}
-	case model.FollowerAtomicSwapInitiated:
-		//  Check if follower swap is refunded
-		if time.Now().After(followerMinRefundTime) {
-			refunded, txHash, err := followerWatcher.IsRefunded()
+
+	case model.InitiatorAtomicSwapExpired:
+		if order.FollowerAtomicSwap.InitiateTxHash != "" && order.FollowerAtomicSwap.RefundTxHash == "" {
+			// if initiator swap expires then follower swap should also have expired
+			fRefunded, txHash, err := followerWatcher.IsRefunded()
 			if err != nil {
-				return order, false, fmt.Errorf("follower swap refund, %w", err)
+				return order, false, fmt.Errorf("failed to check refund status %v", err)
 			}
-			if refunded {
+			if fRefunded {
 				order.Status = model.FollowerAtomicSwapRefunded
+				order.FollowerAtomicSwap.RefundTxHash = txHash
+				return order, true, nil
+			}
+
+			fRedeemed, secret, txHash, err := followerWatcher.IsRedeemed()
+			if err != nil {
+				return order, false, fmt.Errorf("failed to check refund status %v", err)
+			}
+			if fRedeemed {
+				order.Secret = hex.EncodeToString(secret)
+				order.Status = model.FollowerAtomicSwapRedeemed
 				order.FollowerAtomicSwap.RefundTxHash = txHash
 				return order, true, nil
 			}
 		}
 
-		//  Check if initiator swap is refunded
-		if time.Now().After(initiatorMinRefundTime) {
-			refunded, txHash, err := initiatorWatcher.IsRefunded()
-			if err != nil {
-				return order, false, fmt.Errorf("initiator swap refund, %w", err)
-			}
-			if refunded {
-				order.Status = model.InitiatorAtomicSwapRefunded
-				order.InitiatorAtomicSwap.RefundTxHash = txHash
-				return order, true, nil
-			}
+		refunded, txHash, err := initiatorWatcher.IsRefunded()
+		if err != nil {
+			return order, false, err
 		}
-
+		if refunded {
+			order.Status = model.InitiatorAtomicSwapRefunded
+			order.InitiatorAtomicSwap.RefundTxHash = txHash
+			return order, true, nil
+		}
+		redeemed, _, txHash, err := initiatorWatcher.IsRedeemed()
+		if err != nil {
+			return order, false, err
+		}
+		if redeemed {
+			order.Status = model.InitiatorAtomicSwapRedeemed
+			order.InitiatorAtomicSwap.RedeemTxHash = txHash
+			return order, true, nil
+		}
+	case model.FollowerAtomicSwapDetected:
+		height, conf, err := followerWatcher.Status(order.FollowerAtomicSwap.InitiateTxHash)
+		if err != nil {
+			return order, false, err
+		}
+		if order.FollowerAtomicSwap.CurrentConfirmations != conf {
+			order.FollowerAtomicSwap.CurrentConfirmations = conf
+			order.FollowerAtomicSwap.InitiateBlockNumber = height
+			if order.FollowerAtomicSwap.CurrentConfirmations > order.FollowerAtomicSwap.MinimumConfirmations {
+				order.Status = model.FollowerAtomicSwapInitiated
+			}
+			return order, true, nil
+		}
+	case model.FollowerAtomicSwapInitiated:
 		// Follower swap redeemed
 		redeemed, secret, txHash, err := followerWatcher.IsRedeemed()
 		if err != nil {
@@ -229,20 +273,26 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 			order.FollowerAtomicSwap.RedeemTxHash = txHash
 			return order, true, nil
 		}
-	case model.FollowerAtomicSwapRedeemed:
-		// Initiator swap refunded
-		if time.Now().After(initiatorMinRefundTime) {
-			refunded, txHash, err := initiatorWatcher.IsRefunded()
-			if err != nil {
-				return order, false, fmt.Errorf("initiator swap refund, %w", err)
-			}
-			if refunded {
-				order.Status = model.InitiatorAtomicSwapRefunded
-				order.InitiatorAtomicSwap.RefundTxHash = txHash
-				return order, true, nil
-			}
+		// Check for expiry on follower swap
+		fExpired, err := followerWatcher.Expired()
+		if err == nil && fExpired {
+			order.Status = model.FollowerAtomicSwapExpired
+			return order, true, nil
+		}
+		if err != nil {
+			return order, false, err
 		}
 
+		// Check for expiry on initiator swap
+		iExpired, err := initiatorWatcher.Expired()
+		if err == nil && iExpired {
+			order.Status = model.InitiatorAtomicSwapExpired
+			return order, true, nil
+		}
+		if err != nil {
+			return order, false, err
+		}
+	case model.FollowerAtomicSwapRedeemed:
 		// Initiator swap redeemed
 		redeemed, _, txHash, err := initiatorWatcher.IsRedeemed()
 		if err != nil {
@@ -253,19 +303,51 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 			order.InitiatorAtomicSwap.RedeemTxHash = txHash
 			return order, true, nil
 		}
+
+		// Check for expiry on initiator swap
+		iExpired, err := initiatorWatcher.Expired()
+		if err != nil {
+			return order, false, err
+		}
+		if iExpired {
+			order.Status = model.InitiatorAtomicSwapExpired
+			return order, true, nil
+		}
+
+	case model.FollowerAtomicSwapExpired:
+		// if initiator swap expires then follower swap should also have expired
+		fRefunded, txHash, err := followerWatcher.IsRefunded()
+		if err != nil {
+			return order, false, fmt.Errorf("failed to check refund status %v", err)
+		}
+		if fRefunded {
+			order.Status = model.FollowerAtomicSwapRefunded
+			order.FollowerAtomicSwap.RefundTxHash = txHash
+			return order, true, nil
+		}
+
+		fRedeemed, secret, txHash, err := followerWatcher.IsRedeemed()
+		if err != nil {
+			return order, false, fmt.Errorf("failed to check refund status %v", err)
+		}
+		if fRedeemed {
+			order.Secret = hex.EncodeToString(secret)
+			order.Status = model.FollowerAtomicSwapRedeemed
+			order.FollowerAtomicSwap.RefundTxHash = txHash
+			return order, true, nil
+		}
 	case model.InitiatorAtomicSwapRedeemed:
 		order.Status = model.OrderExecuted
 		return order, true, nil
 	case model.FollowerAtomicSwapRefunded:
-		if time.Now().After(initiatorMinRefundTime) {
-			refunded, txHash, err := initiatorWatcher.IsRefunded()
-			if err != nil {
-				return order, false, fmt.Errorf("initiator swap refund, %w", err)
-			}
-			if refunded {
-				order.InitiatorAtomicSwap.RefundTxHash = txHash
-				return order, false, nil
-			}
+		// Check for expiry on initiator swap
+		iExpired, err := initiatorWatcher.Expired()
+		if err != nil {
+			return order, false, err
+		}
+		if iExpired {
+			order.Status = model.InitiatorAtomicSwapExpired
+			return order, true, nil
 		}
 	}
 
