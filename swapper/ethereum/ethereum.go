@@ -118,7 +118,7 @@ func (initiatorSwap *initiatorSwap) Refund() (string, error) {
 		return "", err
 	}
 
-	tx, err := initiatorSwap.client.RefundAtomicSwap(initiatorSwap.atomicSwapAddr, transactor, initiatorSwap.tokenAddr, initiatorSwap.secretHash)
+	tx, err := initiatorSwap.client.RefundAtomicSwap(initiatorSwap.atomicSwapAddr, transactor, initiatorSwap.tokenAddr, initiatorSwap.orderID)
 	if err != nil {
 		return "", err
 	}

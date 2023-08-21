@@ -8,6 +8,7 @@ import (
 
 	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
 	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/ERC20"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -30,7 +31,7 @@ type Client interface {
 	ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
 	InitiateAtomicSwap(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error)
 	RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte, secret []byte) (string, error)
-	RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secretHash []byte) (string, error)
+	RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte) (string, error)
 	IsFinal(txHash string, waitBlocks uint64) (bool, uint64, error)
 }
 
@@ -144,6 +145,10 @@ func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecd
 		}
 	}
 
+	if err := client.simulateInitiate(contract, initiatorAddr, redeemerAddr, expiry, amount, secretHash); err != nil {
+		return "", err
+	}
+
 	transactor, err := client.GetTransactOpts(initiator)
 	if err != nil {
 		return "", err
@@ -161,6 +166,9 @@ func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.Trans
 	if err != nil {
 		return "", err
 	}
+	if err := client.simulateRedeem(contract, auth, orderID, secret); err != nil {
+		return "", err
+	}
 	tx, err := instance.Redeem(auth, orderID, secret)
 	if err != nil {
 		return "", err
@@ -168,14 +176,15 @@ func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.Trans
 	return tx.Hash().Hex(), nil
 }
 
-func (client *client) RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secretHash []byte) (string, error) {
+func (client *client) RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte) (string, error) {
 	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
 	if err != nil {
 		return "", err
 	}
-	var hash [32]byte
-	copy(hash[:], secretHash)
-	tx, err := instance.Refund(auth, hash)
+	if err := client.simulateRefund(contract, auth, orderID); err != nil {
+		return "", err
+	}
+	tx, err := instance.Refund(auth, orderID)
 	if err != nil {
 		return "", err
 	}
@@ -228,4 +237,55 @@ func (client *client) callOpts() *bind.CallOpts {
 	return &bind.CallOpts{
 		Pending: true,
 	}
+}
+
+func (client *client) simulateInitiate(contract, initiatorAddr, redeemerAddr common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) error {
+	parsed, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	if err != nil {
+		return err
+	}
+	callData, err := parsed.Pack("initiate", redeemerAddr, expiry, amount, secretHash)
+	if err != nil {
+		return err
+	}
+	_, err = client.provider.EstimateGas(context.Background(), ethereum.CallMsg{
+		To:   &contract,
+		From: initiatorAddr,
+		Data: callData,
+	})
+	return err
+}
+
+func (client *client) simulateRedeem(contract common.Address, auth *bind.TransactOpts, orderID [32]byte, secret []byte) error {
+	parsed, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	if err != nil {
+		return err
+	}
+	callData, err := parsed.Pack("redeem", orderID, secret)
+	if err != nil {
+		return err
+	}
+	_, err = client.provider.EstimateGas(context.Background(), ethereum.CallMsg{
+		To:   &contract,
+		From: auth.From,
+		Data: callData,
+	})
+	return err
+}
+
+func (client *client) simulateRefund(contract common.Address, auth *bind.TransactOpts, orderID [32]byte) error {
+	parsed, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	if err != nil {
+		return err
+	}
+	callData, err := parsed.Pack("refund", orderID)
+	if err != nil {
+		return err
+	}
+	_, err = client.provider.EstimateGas(context.Background(), ethereum.CallMsg{
+		To:   &contract,
+		From: auth.From,
+		Data: callData,
+	})
+	return err
 }
