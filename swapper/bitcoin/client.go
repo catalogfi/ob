@@ -88,7 +88,7 @@ func (client *client) GetConfirmations(txHash string) (uint64, uint64, error) {
 
 	var status Status
 	if err := json.Unmarshal(data, &status); err != nil {
-		return 0, 0, fmt.Errorf("failed to decode transaction status: %s", data)
+		return 0, 0, fmt.Errorf("failed to decode transaction status: %s ,txHash :%s", data, txHash)
 	}
 	tip, err := client.GetTipBlockHeight()
 	if err != nil {

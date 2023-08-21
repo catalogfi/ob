@@ -100,6 +100,7 @@ func (w *watcher) watch(order model.Order) {
 	// Follower has not filled the swap before the order timeout
 	if order.Status == model.OrderCreated && time.Since(order.CreatedAt) > OrderTimeout {
 		order.Status = model.OrderCancelled
+		return
 	}
 	if order.Status == model.OrderFailedHard || order.Status == model.OrderFailedSoft || order.Status == model.OrderCancelled {
 		if err := w.store.UpdateOrder(&order); err != nil {
@@ -124,17 +125,21 @@ func (w *watcher) watch(order model.Order) {
 	var orderUpdate bool
 	for {
 		var ctn bool
+		fmt.Println("before", order.ID, order.Status)
 		order, ctn, err = w.statusCheck(order, initiatorWatcher, followerWatcher)
+		fmt.Println("done", order.ID, order.Status)
 		if err != nil {
 			log.Error("failed to check status", zap.Error(err))
-			return
+			// return
 		}
 		if !ctn {
 			break
 		}
 		orderUpdate = true
 	}
+	fmt.Println(orderUpdate, "right")
 	if orderUpdate {
+		fmt.Println("updated", order.ID, order.Status)
 		if err := w.store.UpdateOrder(&order); err != nil {
 			log.Error("failed to update order", zap.Any("order", order), zap.Error(err))
 		}
@@ -142,6 +147,7 @@ func (w *watcher) watch(order model.Order) {
 }
 
 func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatcher swapper.Watcher) (model.Order, bool, error) {
+	fmt.Println("handleing order", order.ID, order.Status)
 	switch order.Status {
 	case model.OrderFilled:
 		if time.Since(order.CreatedAt) > SwapInitiationTimeout {
@@ -156,8 +162,8 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		if fullyFilled {
 			// AtomicSwap initiation detected
 			order.Status = model.InitiatorAtomicSwapDetected
-			order.FollowerAtomicSwap.FilledAmount = amount
-			order.FollowerAtomicSwap.InitiateTxHash = txHash
+			order.InitiatorAtomicSwap.FilledAmount = amount
+			order.InitiatorAtomicSwap.InitiateTxHash = txHash
 			return order, true, nil
 		} else if txHash != "" && order.FollowerAtomicSwap.FilledAmount != amount {
 			// AtomicSwap partial initiation detected
@@ -166,17 +172,20 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 			return order, true, nil
 		}
 	case model.InitiatorAtomicSwapDetected:
+		fmt.Println(order.InitiatorAtomicSwap.InitiateTxHash)
 		height, conf, err := initiatorWatcher.Status(order.InitiatorAtomicSwap.InitiateTxHash)
 		if err != nil {
 			return order, false, err
 		}
-
 		if order.InitiatorAtomicSwap.Chain.IsBTC() {
 			isIwTx, err := isBtcIwTxs(w.config[order.InitiatorAtomicSwap.Chain].IWRPC, order.InitiatorAtomicSwap.InitiateTxHash)
 			if err != nil {
 				return order, false, fmt.Errorf("failed to check if txs are instant wallet, %w", err)
 			}
 			if isIwTx {
+				order.InitiatorAtomicSwap.CurrentConfirmations = conf
+				order.InitiatorAtomicSwap.InitiateBlockNumber = height
+				order.InitiatorAtomicSwap.IsInstantWallet = true
 				order.InitiatorAtomicSwap.MinimumConfirmations = 0
 				order.Status = model.InitiatorAtomicSwapInitiated
 				return order, true, nil
@@ -236,25 +245,25 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 			if fRedeemed {
 				order.Secret = hex.EncodeToString(secret)
 				order.Status = model.FollowerAtomicSwapRedeemed
-				order.FollowerAtomicSwap.RefundTxHash = txHash
+				order.FollowerAtomicSwap.RedeemTxHash = txHash
 				return order, true, nil
 			}
 		}
 
-		refunded, txHash, err := initiatorWatcher.IsRefunded()
+		iRefunded, txHash, err := initiatorWatcher.IsRefunded()
 		if err != nil {
 			return order, false, err
 		}
-		if refunded {
+		if iRefunded {
 			order.Status = model.InitiatorAtomicSwapRefunded
 			order.InitiatorAtomicSwap.RefundTxHash = txHash
 			return order, true, nil
 		}
-		redeemed, _, txHash, err := initiatorWatcher.IsRedeemed()
+		iRedeemed, _, txHash, err := initiatorWatcher.IsRedeemed()
 		if err != nil {
 			return order, false, err
 		}
-		if redeemed {
+		if iRedeemed {
 			order.Status = model.InitiatorAtomicSwapRedeemed
 			order.InitiatorAtomicSwap.RedeemTxHash = txHash
 			return order, true, nil
@@ -270,6 +279,9 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 				return order, false, fmt.Errorf("failed to check if txs are instant wallet, %w", err)
 			}
 			if isIwTx {
+				order.FollowerAtomicSwap.CurrentConfirmations = conf
+				order.FollowerAtomicSwap.InitiateBlockNumber = height
+				order.FollowerAtomicSwap.IsInstantWallet = true
 				order.FollowerAtomicSwap.MinimumConfirmations = 0
 				order.Status = model.FollowerAtomicSwapInitiated
 				return order, true, nil
@@ -285,11 +297,12 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		}
 	case model.FollowerAtomicSwapInitiated:
 		// Follower swap redeemed
-		redeemed, secret, txHash, err := followerWatcher.IsRedeemed()
+		fRedeemed, secret, txHash, err := followerWatcher.IsRedeemed()
+		fmt.Println(fRedeemed, secret, txHash, err, order.ID, order.FollowerAtomicSwap.Chain)
 		if err != nil {
 			return order, false, fmt.Errorf("follower swap redeeming, %w", err)
 		}
-		if redeemed {
+		if fRedeemed {
 			order.Secret = hex.EncodeToString(secret)
 			order.Status = model.FollowerAtomicSwapRedeemed
 			order.FollowerAtomicSwap.RedeemTxHash = txHash
@@ -316,11 +329,11 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 		}
 	case model.FollowerAtomicSwapRedeemed:
 		// Initiator swap redeemed
-		redeemed, _, txHash, err := initiatorWatcher.IsRedeemed()
+		iRedeemed, _, txHash, err := initiatorWatcher.IsRedeemed()
 		if err != nil {
 			return order, false, fmt.Errorf("initiator swap redeeming, %w", err)
 		}
-		if redeemed {
+		if iRedeemed {
 			order.Status = model.InitiatorAtomicSwapRedeemed
 			order.InitiatorAtomicSwap.RedeemTxHash = txHash
 			return order, true, nil
@@ -371,6 +384,7 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 			order.Status = model.InitiatorAtomicSwapExpired
 			return order, true, nil
 		}
+		// case model.InitiatorAtomicSwapRefunded: ?
 	}
 
 	return order, false, nil
