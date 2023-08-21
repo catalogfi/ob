@@ -5,10 +5,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/catalogfi/wbtc-garden/logger"
+	"github.com/TheZeroSlave/zapsentry"
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/store"
 	"github.com/catalogfi/wbtc-garden/watcher"
+	"github.com/getsentry/sentry-go"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gorm.io/driver/postgres"
@@ -42,15 +43,27 @@ func main() {
 		panic(err)
 	}
 
-	// Initialise the logger
-	logCores := []zapcore.Core{logger.ZapDevelopmentCore()}
-	if env.SENTRY_DSN != "" {
-		logCores = append(logCores, logger.NewSentryCore(env.SENTRY_DSN, zapcore.ErrorLevel))
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
 	}
-	logCore := zapcore.NewTee(logCores...)
-	lg := zap.New(logCore)
-	defer lg.Sync()
 
-	watcher := watcher.NewWatcher(lg, store, env.CONFIG)
+	if env.SENTRY_DSN != "" {
+		client, err := sentry.NewClient(sentry.ClientOptions{Dsn: env.SENTRY_DSN})
+		if err != nil {
+			panic(err)
+		}
+		cfg := zapsentry.Configuration{
+			Level: zapcore.ErrorLevel,
+		}
+		core, err := zapsentry.NewCore(cfg, zapsentry.NewSentryClientFromClient(client))
+		if err != nil {
+			panic(err)
+		}
+		logger = zapsentry.AttachCoreToLogger(core, logger)
+		defer logger.Sync()
+	}
+
+	watcher := watcher.NewWatcher(logger, store, env.CONFIG)
 	watcher.Run()
 }
