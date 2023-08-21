@@ -21,7 +21,7 @@ import (
 
 const (
 	GetOrderMessageRegex  = `^(?P<action>subscribe):(?P<orderID>\d+)$`
-	GetOrdersMessageRegex = `^(?P<action>subscribe):(?P<address>[a-z]+)$`
+	GetOrdersMessageRegex = `^(?P<action>subscribe):(?P<address>0x[a-fA-F0-9]{40})$`
 )
 
 var upgrader = websocket.Upgrader{
