@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -47,8 +48,7 @@ func (core *sentryCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 		event := sentry.NewEvent()
 		event.Level = sentrySeverity(ent.Level)
 		event.Message = ent.Message
-		extras := core.with(fields)
-		event.Extra = extras
+		event.Tags = core.with(fields)
 
 		sentry.CaptureEvent(event)
 	}
@@ -62,7 +62,7 @@ func (core *sentryCore) Sync() error {
 	return nil
 }
 
-func (core *sentryCore) with(fs []zapcore.Field) map[string]interface{} {
+func (core *sentryCore) with(fs []zapcore.Field) map[string]string {
 	enc := zapcore.NewMapObjectEncoder()
 	for _, f := range fs {
 		f.AddTo(enc)
@@ -70,7 +70,11 @@ func (core *sentryCore) with(fs []zapcore.Field) map[string]interface{} {
 	for _, f := range core.tags {
 		f.AddTo(enc)
 	}
-	return enc.Fields
+	tags := map[string]string{}
+	for key, val := range enc.Fields {
+		tags[key] = fmt.Sprintf("%v", val)
+	}
+	return tags
 }
 
 // sentrySeverity converts Zap's log level to Sentry's severity.
