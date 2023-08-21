@@ -37,11 +37,11 @@ type Server struct {
 
 type Store interface {
 	// get value locked in the given chain for the given user
-	GetValueLocked(config model.Config, chain model.Chain) (*big.Int, error)
+	ValueLockedByChain(chain model.Chain, config model.Network) (*big.Int, error)
 	// create order
 	CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userWalletBTCAddress string, config model.Config) (uint, error)
 	// fill order
-	FillOrder(orderID uint, filler, sendAddress, receiveAddress string, config model.Config) error
+	FillOrder(orderID uint, filler, sendAddress, receiveAddress string, config model.Network) error
 	// get order by id
 	GetOrder(orderID uint) (*model.Order, error)
 	// cancel order by id
@@ -57,7 +57,7 @@ func NewServer(store Store, config model.Config, logger *zap.Logger, secret stri
 		store:  store,
 		secret: secret,
 		logger: childLogger,
-		auth:   NewAuth(config),
+		auth:   NewAuth(config.Network),
 		config: config,
 	}
 }
@@ -113,7 +113,7 @@ func (s *Server) authenticateJWT(ctx *gin.Context) {
 	tokenString := ctx.GetHeader("Authorization")
 	if tokenString == "" {
 		s.logger.Debug("authorization failure", zap.Error(fmt.Errorf("missing authorization token")))
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Missing authorization token"})
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "missing authorization token"})
 		ctx.Abort()
 		return
 	}
@@ -121,7 +121,7 @@ func (s *Server) authenticateJWT(ctx *gin.Context) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			s.logger.Debug("authorization failure", zap.Error(fmt.Errorf("invalid signing method")))
-			return nil, fmt.Errorf("Invalid signing method")
+			return nil, fmt.Errorf("invalid signing method")
 		}
 
 		return []byte(s.secret), nil
@@ -139,12 +139,12 @@ func (s *Server) authenticateJWT(ctx *gin.Context) {
 			ctx.Set("userWallet", strings.ToLower(userWallet.(string)))
 		} else {
 			s.logger.Debug("authorization failure", zap.Error(fmt.Errorf("invalid token claims")))
-			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
 			ctx.Abort()
 			return
 		}
 	} else {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
 		ctx.Abort()
 		return
 	}
@@ -188,7 +188,7 @@ func (s *Server) GetOrderBySocket() gin.HandlerFunc {
 				}
 
 				for {
-					if order.Status >= model.OrderExecuted {
+					if order.Status >= model.Executed {
 						break
 					}
 					order2, err := s.store.GetOrder(uint(val))
@@ -226,67 +226,73 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 			return
 		}
 		defer ws.Close()
-		var socketError error = nil
-		for {
-			// Read Message from client
-			_, message, err := ws.ReadMessage()
+
+		// Read Message from client
+		_, message, err := ws.ReadMessage()
+		if err != nil {
+			s.logger.Debug("failed to read a message", zap.Error(err))
+			err = ws.WriteJSON(map[string]interface{}{
+				"error": fmt.Sprintf("%v", err),
+			})
 			if err != nil {
-				s.logger.Debug("failed to read a message", zap.Error(err))
-				socketError = err
-				break
+				ws.Close()
 			}
-			vals := strings.Split(string(message), ":")
-			if vals[0] == "subscribe" {
-				makerOrTaker := strings.ToLower(string(vals[1]))
-				var orders []model.Order
+		}
+		isFirstMessage := true
+		input := strings.Split(string(message), ":")
+		if input[0] == "subscribe" {
+			makerOrTaker := strings.ToLower(string(input[1]))
+			var orders []model.Order = []model.Order{}
+			ticker := time.NewTicker(time.Second * 60)
+			go func() {
 				for {
-					makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
-					if err != nil {
-						s.logger.Debug("failed to filter maker orders", zap.Error(err))
-						ws.WriteJSON(map[string]interface{}{
-							"error": err,
+					select {
+					case <-ticker.C:
+						err := ws.WriteJSON(map[string]interface{}{
+							"msg": "ping",
 						})
-						break
-					}
-					takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
-					if err != nil {
-						s.logger.Debug("failed to filter taker orders", zap.Error(err))
-						ws.WriteJSON(map[string]interface{}{
-							"error": err,
-						})
-						break
-					}
-					var newOrders []model.Order
-					newOrders = append(newOrders, makerOrders...)
-					newOrders = append(newOrders, takerOrders...)
-
-					if len(orders) == 0 || !model.CompareOrderSlices(newOrders, orders) {
-						if err := ws.WriteJSON(newOrders); err != nil {
-							s.logger.Debug("failed to write updated orders", zap.Error(err))
-							ws.WriteJSON(map[string]interface{}{
-								"error": err,
-							})
-							break
+						if err != nil {
+							s.logger.Debug("failed to write ping", zap.Error(err))
+							return
 						}
-						orders = newOrders
-					}
-					time.Sleep(time.Second * 2)
-				}
-			}
 
-			// Response message to client
-			if socketError != nil {
-				s.logger.Debug("invalid socket connection request", zap.Error(socketError))
-				err = ws.WriteJSON(map[string]interface{}{
-					"error": fmt.Sprintf("%v", socketError),
-				})
+					}
+					time.Sleep(time.Second * 1)
+				}
+			}()
+			for {
+				makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
 				if err != nil {
-					fmt.Println(err)
+					s.logger.Debug("failed to filter maker orders", zap.Error(err))
+					ws.WriteJSON(map[string]interface{}{
+						"error": err,
+					})
 					break
 				}
+				takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
+				if err != nil {
+					s.logger.Debug("failed to filter taker orders", zap.Error(err))
+					ws.WriteJSON(map[string]interface{}{
+						"error": err,
+					})
+					break
+				}
+				var newOrders []model.Order = []model.Order{}
+				newOrders = append(newOrders, makerOrders...)
+				newOrders = append(newOrders, takerOrders...)
+				if !model.CompareOrderSlices(newOrders, orders) || isFirstMessage {
+					if err := ws.WriteJSON(newOrders); err != nil {
+						s.logger.Debug("failed to write updated orders", zap.Error(err))
+						break
+					}
+					orders = newOrders
+				}
+
+				isFirstMessage = false
+				time.Sleep(time.Second * 2)
 			}
-			time.Sleep(time.Second * 2)
 		}
+
 	}
 }
 
@@ -298,7 +304,7 @@ func (s *Server) GetValueByChain() gin.HandlerFunc {
 			return
 		}
 
-		valueLocked, err := s.store.GetValueLocked(s.config, chain)
+		valueLocked, err := s.store.ValueLockedByChain(chain, s.config.Network)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error})
 			return
@@ -311,9 +317,9 @@ func (s *Server) GetValueByChain() gin.HandlerFunc {
 
 func (s *Server) SupportedAssets() gin.HandlerFunc {
 	assets := map[model.Chain][]model.Asset{}
-	for chain, netConf := range s.config {
+	for chain, netConf := range s.config.Network {
 		assets[chain] = []model.Asset{}
-		for asset := range netConf.Assets {
+		for asset := range netConf.Oracles {
 			assets[chain] = append(assets[chain], asset)
 		}
 	}
@@ -376,7 +382,7 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 			return
 		}
 
-		if err := s.store.FillOrder(uint(orderID), strings.ToLower(filler.(string)), req.SendAddress, req.ReceiveAddress, s.config); err != nil {
+		if err := s.store.FillOrder(uint(orderID), strings.ToLower(filler.(string)), req.SendAddress, req.ReceiveAddress, s.config.Network); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": fmt.Sprintf("failed to fill the Order %v", err.Error()),
 			})
@@ -445,8 +451,8 @@ func (s *Server) GetOrders() gin.HandlerFunc {
 		}
 
 		status, err := strconv.Atoi(c.DefaultQuery("status", "0"))
-		if err != nil && status < int(model.Unknown) || status > int(model.OrderFailedSoft) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode status has to be a number between %d and %d", model.Unknown, model.OrderFailedSoft)})
+		if err != nil && status < int(model.Unknown) || status > int(model.FailedSoft) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode status has to be a number between %d and %d", model.Unknown, model.FailedSoft)})
 			return
 		}
 

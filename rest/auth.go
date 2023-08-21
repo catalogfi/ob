@@ -15,7 +15,7 @@ import (
 )
 
 type auth struct {
-	config model.Config
+	config model.Network
 }
 
 type Claims struct {
@@ -23,7 +23,7 @@ type Claims struct {
 	jwt.StandardClaims
 }
 
-func NewAuth(config model.Config) Auth {
+func NewAuth(config model.Network) Auth {
 	return &auth{
 		config: config,
 	}

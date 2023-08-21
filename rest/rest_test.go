@@ -12,7 +12,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/catalogfi/wbtc-garden/model"
-	"github.com/catalogfi/wbtc-garden/price"
 	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/catalogfi/wbtc-garden/store"
 	"gorm.io/driver/sqlite"
@@ -168,26 +167,27 @@ func StartServer() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 		config := model.Config{
-			model.BitcoinTestnet: model.NetworkConfig{
-				Assets: map[model.Asset]bool{
-					model.Primary: true,
+			Network: model.Network{
+				model.BitcoinTestnet: model.NetworkConfig{
+					Oracles: map[model.Asset]string{
+						model.Primary: "https://api.coincap.io/v2/assets/bitcoin",
+					},
+					RPC:    "https://mempool.space/testnet/api",
+					Expiry: 1000,
 				},
-				RPC:    "https://mempool.space/testnet/api",
-				Expiry: 1000,
-			},
-			model.EthereumSepolia: model.NetworkConfig{
-				Assets: map[model.Asset]bool{
-					model.NewSecondary(""): true,
+				model.EthereumSepolia: model.NetworkConfig{
+					Oracles: map[model.Asset]string{
+						model.NewSecondary(""): "https://api.coincap.io/v2/assets/bitcoin",
+					},
+					RPC:    "http://localhost:8545",
+					Expiry: 10000,
 				},
-				RPC:    "http://localhost:8545",
-				Expiry: 10000,
 			},
 		}
+
 		logger, err := zap.NewDevelopment()
 		Expect(err).To(BeNil())
 		s := rest.NewServer(store, config, logger, "PANTHER")
-		price := price.NewPriceChecker(store, "https://api.coincap.io/v2/assets/bitcoin")
-		go price.Run()
 		s.Run(":8080")
 	}()
 }

@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/catalogfi/wbtc-garden/model"
-	"github.com/catalogfi/wbtc-garden/price"
 	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/catalogfi/wbtc-garden/store"
 	"github.com/catalogfi/wbtc-garden/watcher"
@@ -22,25 +21,25 @@ func main() {
 		panic(err)
 	}
 
-	config := model.Config{
+	config := model.Network{
 		model.BitcoinTestnet: {
 			RPC: "https://mempool.space/testnet/api",
-			Assets: map[model.Asset]bool{
-				model.Primary: true,
+			Oracles: map[model.Asset]string{
+				model.Primary: "https://api.coincap.io/v2/assets/bitcoin",
 			},
 			Expiry: 144,
 		},
 		model.EthereumSepolia: {
 			RPC: "https://gateway.tenderly.co/public/sepolia",
-			Assets: map[model.Asset]bool{
-				model.NewSecondary(""): true,
+			Oracles: map[model.Asset]string{
+				model.NewSecondary(""): "https://api.coincap.io/v2/assets/bitcoin",
 			},
 			Expiry: 6542,
 		},
 		model.EthereumOptimism: {
 			RPC: "https://opt-mainnet.g.alchemy.com/v2/lM_wORHU7fDVp_SSYJPCCO-erSffgpX9",
-			Assets: map[model.Asset]bool{
-				model.NewSecondary(""): true,
+			Oracles: map[model.Asset]string{
+				model.NewSecondary(""): "https://api.coincap.io/v2/assets/bitcoin",
 			},
 			Expiry: 10000,
 		},
@@ -51,10 +50,8 @@ func main() {
 		panic(err)
 	}
 	watcher := watcher.NewWatcher(logger, store, config)
-	price := price.NewPriceChecker(store, "https://api.coincap.io/v2/assets/bitcoin")
-	go price.Run()
 	go watcher.Run()
-	server := rest.NewServer(store, config, logger, "SECRET")
+	server := rest.NewServer(store, model.Config{Network: config}, logger, "SECRET")
 	if err := server.Run(":8080"); err != nil {
 		panic(err)
 	}

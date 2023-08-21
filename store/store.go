@@ -8,24 +8,22 @@ import (
 	"sync"
 	"time"
 
+	"github.com/catalogfi/wbtc-garden/blockchain"
 	"github.com/catalogfi/wbtc-garden/model"
-	"github.com/catalogfi/wbtc-garden/price"
 	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/catalogfi/wbtc-garden/watcher"
 	"gorm.io/gorm"
 )
 
+type store struct {
+	mu    *sync.RWMutex
+	db    *gorm.DB
+	cache map[string]blockchain.Price
+}
+
 type Store interface {
 	rest.Store
 	watcher.Store
-	price.Store
-}
-
-type store struct {
-	mu    *sync.RWMutex
-	cache map[string]float64
-
-	db *gorm.DB
 }
 
 func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
@@ -36,178 +34,138 @@ func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 	if err := db.AutoMigrate(&model.Order{}, &model.AtomicSwap{}); err != nil {
 		return nil, err
 	}
-	return &store{mu: new(sync.RWMutex), cache: make(map[string]float64), db: db}, nil
+	return &store{mu: new(sync.RWMutex), cache: make(map[string]blockchain.Price), db: db}, nil
 }
 
-func (s *store) GetValueLocked(config model.Config, chain model.Chain) (*big.Int, error) {
-	var initAmounts, followAmounts []model.LockedAmount
-	if err := s.db.Table("atomic_swaps").
-		Select("asset as asset,SUM(amount::bigint) as amount").
-		Joins("JOIN orders ON orders.initiator_atomic_swap_id = atomic_swaps.id").
-		Where("orders.status < ? AND atomic_swaps.chain = ?", model.OrderExecuted, chain).
-		Group("asset").
-		Find(&initAmounts).Error; err != nil {
-		return big.NewInt(0), err
+// maintain a cache for the price and refresh it at the TTL interval
+func (s *store) price(chain model.Chain, asset model.Asset, config model.Config) (blockchain.Price, error) {
+	_, ok := config.Network[chain]
+	if !ok {
+		return blockchain.Price{}, fmt.Errorf("unsupported chain: %s", chain)
 	}
-	if err := s.db.Table("atomic_swaps").
-		Select("asset as asset,SUM(amount::bigint) as amount").
-		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
-		Where("orders.status < ? AND atomic_swaps.chain = ?", model.OrderExecuted, chain).
-		Group("asset").
-		Find(&followAmounts).Error; err != nil {
-		return big.NewInt(0), err
+	_, ok = config.Network[chain].Oracles[asset]
+	if !ok {
+		return blockchain.Price{}, fmt.Errorf("unsupported asset: %s", asset)
 	}
-	combinedArray := model.CombineAndAddAmount(initAmounts, followAmounts)
 
-	if len(combinedArray) == 0 {
+	priceObj, ok := s.cache[config.Network[chain].Oracles[asset]]
+	if !ok || time.Now().Unix()-priceObj.Timestamp > config.PriceTTL {
+		updatedPrice, err := blockchain.GetPrice(config.Network[chain].Oracles[asset])
+		if err != nil {
+			return blockchain.Price{}, err
+		}
+		s.cache[config.Network[chain].Oracles[asset]] = updatedPrice
+		priceObj = updatedPrice
+	}
+	return priceObj, nil
+}
+
+// total amount of funds that are currently locked in active atomic swaps related to this system
+func (s *store) ValueLockedByChain(chain model.Chain, config model.Network) (*big.Int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	swaps := []model.AtomicSwap{}
+	if tx := s.db.Where("chain = ? AND status > ? AND status < ?", chain, model.NotStarted, model.Redeemed).Find(&swaps); tx.Error != nil {
+		return nil, tx.Error
+	}
+	return s.usdValue(swaps, config)
+}
+
+// total amount of value traded by the user in the last 24 hrs in USD
+func (s *store) ValueTradedByUserYesterday(user string, config model.Network) (*big.Int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	yesterday := time.Now().Add(-24 * time.Hour).UTC()
+	orders := []model.Order{}
+	if tx := s.db.Where("(maker = ? OR taker = ?) AND status > ? AND status < ? AND created_at >= ?", user, user, model.Created, model.FailedSoft, yesterday).Find(&orders); tx.Error != nil {
+		return nil, tx.Error
+	}
+	if len(orders) == 0 {
 		return big.NewInt(0), nil
 	}
-	sum := big.NewInt(0)
-	for _, tokenAmount := range combinedArray {
 
-		if tokenAmount.Amount.Valid {
-			priceInUSD, err := s.Price("bitcoin", "ethereum")
-			if err != nil {
-				return big.NewInt(0), err
-			}
-			price, err := price.GetPrice(model.Asset(tokenAmount.Asset), chain, config, big.NewInt(tokenAmount.Amount.Int64), big.NewInt(int64(priceInUSD)))
-			if err != nil {
-				return big.NewInt(0), err
-			}
-			sum = new(big.Int).Add(price, sum)
+	swaps := make([]model.AtomicSwap, len(orders))
+	for i, order := range orders {
+		swaps[i] = *order.InitiatorAtomicSwap
+		if order.Taker == user {
+			swaps[i] = *order.FollowerAtomicSwap
 		}
 	}
-	return sum, nil
+	return s.usdValue(swaps, config)
 }
 
-func (s *store) GetVolumeTraded(user string, chain model.Chain) (*big.Int, error) {
-	var initAmounts, followAmounts []model.LockedAmount
-	validateTime := time.Now().Add(-24 * time.Hour).UTC()
-	if err := s.db.Table("atomic_swaps").
-		Select("asset as asset,SUM(amount::bigint) as amount").
-		Joins("JOIN orders ON orders.initiator_atomic_swap_id = atomic_swaps.id").
-		Where("orders.created_at >= ? AND orders.maker = ? AND atomic_swaps.chain = ?", validateTime, user, chain).
-		Group("asset").
-		Find(&initAmounts).Error; err != nil {
-		return big.NewInt(0), err
-	}
-	if err := s.db.Table("atomic_swaps").
-		Select("asset as asset,SUM(amount::bigint) as amount").
-		Joins("JOIN orders ON orders.follower_atomic_swap_id = atomic_swaps.id").
-		Where("orders.created_at >= ? AND orders.taker = ? AND atomic_swaps.chain = ?", validateTime, user, chain).
-		Group("asset").
-		Find(&followAmounts).Error; err != nil {
-		return big.NewInt(0), err
-	}
-	combinedArray := model.CombineAndAddAmount(initAmounts, followAmounts)
+// calculates the cummulative usd value of all the given swaps
+func (s *store) usdValue(swaps []model.AtomicSwap, config model.Network) (*big.Int, error) {
+	tvlF := big.NewFloat(0)
 
-	if len(combinedArray) == 0 {
-		return big.NewInt(0), nil
-	}
-	sum := big.NewInt(0)
-	for _, tokenAmount := range combinedArray {
-		if tokenAmount.Amount.Valid {
-			amt := big.NewInt(tokenAmount.Amount.Int64)
-			sum = new(big.Int).Add(amt, sum)
-			// fmt.Println(sum)
+	// scoping the cache
+	{
+		cacheNormalisers := map[model.Asset]*big.Int{}
+		for _, swap := range swaps {
+			swapAmount, ok := new(big.Int).SetString(swap.FilledAmount, 10)
+			if !ok {
+				return nil, fmt.Errorf("currupted value stored for filled amount: %v", swap.FilledAmount)
+			}
+			normaliser, ok := cacheNormalisers[swap.Asset]
+			if !ok {
+				decimals, err := blockchain.GetDecimals(swap.Chain, swap.Asset, config)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get decimals for %v on %v: %v", swap.Chain, swap.Asset, err)
+				}
+				normaliser = new(big.Int).Exp(big.NewInt(10), big.NewInt(decimals), nil)
+				cacheNormalisers[swap.Asset] = normaliser
+			}
+			normalisedLockedAmount := new(big.Float).Quo(new(big.Float).SetInt(swapAmount), new(big.Float).SetInt(normaliser))
+			lockedAmountValue := new(big.Float).Mul(big.NewFloat(swap.PriceByOracle), normalisedLockedAmount)
+			tvlF.Add(lockedAmountValue, tvlF)
 		}
 	}
-	// flooring the sum
-	return sum, nil
+
+	// ignoring accuracy
+	tvl, _ := tvlF.Int(nil)
+	return tvl, nil
 }
 
+// create a new order with the given details
 func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userBtcWalletAddress string, config model.Config) (uint, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// check if creator_addr is valid eth address
-	if err := model.ValidateEthereumAddress(creator); err != nil {
+	// check if creatorAddress is valid eth address
+	if err := blockchain.CheckAddress(model.Ethereum, creator); err != nil {
 		return 0, err
 	}
 	sendChain, receiveChain, sendAsset, receiveAsset, err := model.ParseOrderPair(orderPair)
 	if err != nil {
 		return 0, err
 	}
+	_, ok := config.Network[sendChain]
+	if !ok {
+		return 0, fmt.Errorf("unsupported send chain")
+	}
+	_, ok = config.Network[receiveChain]
+	if !ok {
+		return 0, fmt.Errorf("unsupported recieve chain")
+	}
 
 	// check if send address and receive address are proper addresses for respective chains
-	if sendChain.IsBTC() {
-		if err := model.ValidateBitcoinAddress(sendAddress, sendChain); err != nil {
-			return 0, err
-		}
-		// fmt.Println("1" , sendAddress , receiveAddress)
-		if err := model.ValidateBitcoinAddress(userBtcWalletAddress, sendChain); err != nil {
-			return 0, err
-		}
-		if err := model.ValidateEthereumAddress(receiveAddress); err != nil {
-			return 0, err
-		}
-	} else {
-		if err := model.ValidateEthereumAddress(sendAddress); err != nil {
-			return 0, err
-		}
-		if err := model.ValidateBitcoinAddress(receiveAddress, receiveChain); err != nil {
-			return 0, err
-		}
-		if err := model.ValidateBitcoinAddress(userBtcWalletAddress, receiveChain); err != nil {
-			return 0, err
-		}
+	if err := blockchain.CheckAddress(receiveChain, receiveAddress); err != nil {
+		return 0, fmt.Errorf("invalid recieve address: %v", err)
 	}
+	if err := blockchain.CheckAddress(sendChain, sendAddress); err != nil {
+		return 0, fmt.Errorf("invalid send address: %v", err)
+	}
+
+	// TODO: can we make this more generic userBtcWalletAddress
 
 	// validate secretHash
-	if err := model.ValidateSecretHash(secretHash); err != nil {
-		return 0, err
-	}
-
-	//fetch current price of btc from chain [for analytics]
-	priceByOracle, err := s.Price("bitcoin", "ethereum")
-	if err != nil {
-		return 0, err
-	}
-
-	initiatorLockValue, err := s.GetValueLocked(config, sendChain)
-	if err != nil {
-		return 0, err
-	}
-
-	VolumeTraded, err := s.GetVolumeTraded(creator, sendChain)
-	if err != nil {
-		return 0, err
-	}
-	// fmt.Println("ValueLocked", VolumeTraded)
-	if VolumeTraded.Cmp(big.NewInt(100000000)) == 1 {
-		return 0, fmt.Errorf("Reached limits to Trade on %s chain", sendChain)
-	}
-
-	// initiatorLockValue := big.NewInt(0)
-	initiatorMinConfirmations := GetMinConfirmations(initiatorLockValue, sendChain)
-
-	initiatorAtomicSwap := model.AtomicSwap{
-		InitiatorAddress:     sendAddress,
-		Chain:                sendChain,
-		Asset:                sendAsset,
-		Amount:               sendAmount,
-		PriceByOracle:        priceByOracle,
-		MinimumConfirmations: initiatorMinConfirmations, // TODO: add custom confirmation by users
-	}
-
-	followerAtomicSwap := model.AtomicSwap{
-		RedeemerAddress: receiveAddress,
-		Chain:           receiveChain,
-		Asset:           receiveAsset,
-		Amount:          receiveAmount,
-	}
-
-	orders, err := s.FilterOrders(creator, "", "", "", "", 0, 0, 0, 0, 0, 0, 0, false)
-	if err != nil {
+	if err := blockchain.CheckHash(secretHash); err != nil {
 		return 0, err
 	}
 
 	sendAmt, ok := new(big.Int).SetString(sendAmount, 10)
 	if !ok {
-		return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
-	}
-	// check if send amount is not less than 1000
-	if sendAmt.Cmp(big.NewInt(10000)) == -1 || sendAmt.Cmp(big.NewInt(10000000)) == 1 {
 		return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
 	}
 
@@ -216,23 +174,93 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		return 0, fmt.Errorf("invalid receive amount: %s", receiveAmount)
 	}
 
-	// validate orderpair
-	fromChain, toChain, _, _, err := model.ParseOrderPair(orderPair)
-	if err != nil {
-		return 0, err
-	}
-	_, ok = config[fromChain]
-	if !ok {
-		return 0, fmt.Errorf("unsupported from chain")
+	if config.DailyLimit != "" {
+		// get the total amount traded by the user in the last 24 hrs for limit checks
+		tradedValue, err := s.ValueTradedByUserYesterday(creator, config.Network)
+		if err != nil {
+			return 0, err
+		}
+
+		dailyLimit, ok := new(big.Int).SetString(config.DailyLimit, 10)
+		if !ok {
+			return 0, fmt.Errorf("invalid daily limit: %v", err)
+		}
+
+		if tradedValue.Cmp(dailyLimit) >= 0 {
+			return 0, fmt.Errorf("reached daily limit")
+		}
 	}
 
-	_, ok = config[toChain]
-	if !ok {
-		return 0, fmt.Errorf("unsupported to chain")
+	initiatorSwapPrice, err := s.price(sendChain, sendAsset, config)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get price for %s: %v", sendAsset, err)
+	}
+
+	followerSwapPrice, err := s.price(receiveChain, receiveAsset, config)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get price for %s: %v", receiveAsset, err)
+	}
+
+	// get the number of orders to calculate user specific nonce
+	orders, err := s.FilterOrders(creator, "", "", "", "", 0, 0, 0, 0, 0, 0, 0, false)
+	if err != nil {
+		return 0, err
 	}
 
 	// ignoring accuracy
 	price, _ := new(big.Float).Quo(new(big.Float).SetInt(sendAmt), new(big.Float).SetInt(receiveAmt)).Float64()
+
+	initiatorAtomicSwap := model.AtomicSwap{
+		InitiatorAddress: sendAddress,
+		Chain:            sendChain,
+		Asset:            sendAsset,
+		Amount:           sendAmount,
+		PriceByOracle:    initiatorSwapPrice.Price,
+	}
+
+	sendValue, err := s.usdValue([]model.AtomicSwap{initiatorAtomicSwap}, config.Network)
+	if err != nil {
+		return 0, fmt.Errorf("invalid send value: %v", err)
+	}
+
+	if config.MinTxLimit != "" {
+		// check if send amount is less than MinTxLimit
+		minTxLimit, ok := new(big.Int).SetString(config.MinTxLimit, 10)
+		if !ok {
+			return 0, fmt.Errorf("invalid daily limit: %v", err)
+		}
+
+		if sendValue.Cmp(minTxLimit) == -1 {
+			return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
+		}
+	}
+
+	if config.MaxTxLimit != "" {
+		// check if send amount is less than MinTxLimit
+		maxTxLimit, ok := new(big.Int).SetString(config.MaxTxLimit, 10)
+		if !ok {
+			return 0, fmt.Errorf("invalid daily limit: %v", err)
+		}
+
+		if sendValue.Cmp(maxTxLimit) == 1 {
+			return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
+		}
+	}
+
+	followerAtomicSwap := model.AtomicSwap{
+		RedeemerAddress: receiveAddress,
+		Chain:           receiveChain,
+		Asset:           receiveAsset,
+		Amount:          receiveAmount,
+		PriceByOracle:   followerSwapPrice.Price,
+	}
+
+	if tx := s.db.Create(&initiatorAtomicSwap); tx.Error != nil {
+		return 0, tx.Error
+	}
+	if tx := s.db.Create(&followerAtomicSwap); tx.Error != nil {
+		return 0, tx.Error
+	}
 
 	order := model.Order{
 		Maker:                 creator,
@@ -243,17 +271,9 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		FollowerAtomicSwap:    &followerAtomicSwap,
 		Price:                 price,
 		SecretHash:            secretHash,
-		Status:                model.OrderCreated,
+		Status:                model.Created,
 		SecretNonce:           uint64(len(orders)) + 1,
 		UserBtcWalletAddress:  userBtcWalletAddress,
-	}
-
-	if tx := s.db.Create(&initiatorAtomicSwap); tx.Error != nil {
-		return 0, tx.Error
-	}
-
-	if tx := s.db.Create(&followerAtomicSwap); tx.Error != nil {
-		return 0, tx.Error
 	}
 	if tx := s.db.Create(&order); tx.Error != nil {
 		return 0, tx.Error
@@ -262,7 +282,8 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	return order.ID, nil
 }
 
-func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress string, config model.Config) error {
+// fill an existing order by filling the required details for both the atomic swaps
+func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress string, config model.Network) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -270,29 +291,21 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	if tx := s.db.First(order, orderID); tx.Error != nil {
 		return tx.Error
 	}
-	if order.Status != model.OrderCreated {
+	if order.Status != model.Created {
 		return fmt.Errorf("order already filled, current status: %v", order.Status)
 	}
 
 	fromChain, toChain, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
-		return fmt.Errorf("constraint violation: invalid order pair: %v", err)
+		return fmt.Errorf("constraint violation: corrupted order pair: %v", err)
 	}
 
-	if fromChain.IsBTC() {
-		if err := model.ValidateBitcoinAddress(receiveAddress, fromChain); err != nil {
-			return err
-		}
-		if err := model.ValidateEthereumAddress(sendAddress); err != nil {
-			return err
-		}
-	} else {
-		if err := model.ValidateEthereumAddress(receiveAddress); err != nil {
-			return err
-		}
-		if err := model.ValidateBitcoinAddress(sendAddress, toChain); err != nil {
-			return err
-		}
+	if err := blockchain.CheckAddress(fromChain, receiveAddress); err != nil {
+		return fmt.Errorf("invalid recieve address: %v", err)
+	}
+
+	if err := blockchain.CheckAddress(toChain, sendAddress); err != nil {
+		return fmt.Errorf("invalid send address: %v", err)
 	}
 
 	initiateAtomicSwap := &model.AtomicSwap{}
@@ -304,25 +317,26 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 		return tx.Error
 	}
 
-	priceByOracle, err := s.Price("bitcoin", "ethereum")
+	toChainAmount, err := s.ValueLockedByChain(toChain, config)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to calculate value locked on %s: %v", toChain, err)
 	}
-	followerLockedValue, err := s.GetValueLocked(config, toChain)
+
+	fromChainAmount, err := s.ValueLockedByChain(fromChain, config)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to calculate value locked on %s: %v", toChain, err)
 	}
-	// followerLockedValue := big.NewInt(0)
-	initiatorMinConfirmations := GetMinConfirmations(followerLockedValue, toChain)
 
 	initiateAtomicSwap.RedeemerAddress = receiveAddress
-	followerAtomicSwap.InitiatorAddress = sendAddress
 	initiateAtomicSwap.Timelock = strconv.FormatInt(config[fromChain].Expiry*2, 10)
+	initiateAtomicSwap.MinimumConfirmations = blockchain.GetMinConfirmations(fromChainAmount, fromChain)
+
+	followerAtomicSwap.InitiatorAddress = sendAddress
 	followerAtomicSwap.Timelock = strconv.FormatInt(config[toChain].Expiry, 10)
-	followerAtomicSwap.PriceByOracle = priceByOracle
-	followerAtomicSwap.MinimumConfirmations = initiatorMinConfirmations
+	followerAtomicSwap.MinimumConfirmations = blockchain.GetMinConfirmations(toChainAmount, toChain)
+
 	order.Taker = filler
-	order.Status = model.OrderFilled
+	order.Status = model.Filled
 	if tx := s.db.Save(order); tx.Error != nil {
 		return tx.Error
 	}
@@ -335,6 +349,7 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	return nil
 }
 
+// delete the given user's order if it is not filled
 func (s *store) CancelOrder(creator string, orderID uint) error {
 	order := &model.Order{}
 	if tx := s.db.First(order, orderID); tx.Error != nil {
@@ -343,7 +358,7 @@ func (s *store) CancelOrder(creator string, orderID uint) error {
 	if order.Maker != creator {
 		return fmt.Errorf("order can be cancelled only by its creator")
 	}
-	if order.Status != model.OrderCreated {
+	if order.Status != model.Created {
 		return fmt.Errorf("order can be cancelled only if it is not filled, current status: %v", order.Status)
 	}
 	if tx := s.db.Delete(order); tx.Error != nil {
@@ -352,6 +367,7 @@ func (s *store) CancelOrder(creator string, orderID uint) error {
 	return nil
 }
 
+// filter the orders based on the given query parameters
 func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, status model.Status, minPrice, maxPrice float64, minAmount, maxAmount float64, page, perPage int, verbose bool) ([]model.Order, error) {
 	orders := []model.Order{}
 	tx := s.db.Table("orders")
@@ -428,9 +444,10 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 	return orders, nil
 }
 
+// get all the orders with active atomic swaps
 func (s *store) GetActiveOrders() ([]model.Order, error) {
 	orders := []model.Order{}
-	if tx := s.db.Where("status > ? AND status < ?", model.Unknown, model.OrderExecuted).Find(&orders); tx.Error != nil {
+	if tx := s.db.Where("status > ? AND status < ?", model.Unknown, model.Executed).Find(&orders); tx.Error != nil {
 		return nil, tx.Error
 	}
 	for i := range orders {
@@ -441,6 +458,7 @@ func (s *store) GetActiveOrders() ([]model.Order, error) {
 	return orders, nil
 }
 
+// get the order with the given order id
 func (s *store) GetOrder(orderID uint) (*model.Order, error) {
 	order := &model.Order{
 		InitiatorAtomicSwap: &model.AtomicSwap{},
@@ -452,6 +470,8 @@ func (s *store) GetOrder(orderID uint) (*model.Order, error) {
 	return order, s.fillSwapDetails(order)
 }
 
+// update the given order and the internal atomic swap objects on the db
+// @dev should only be used internally and cannot be called by an end user
 func (s *store) UpdateOrder(order *model.Order) error {
 	if tx := s.db.Save(order.FollowerAtomicSwap); tx.Error != nil {
 		return tx.Error
@@ -465,6 +485,7 @@ func (s *store) UpdateOrder(order *model.Order) error {
 	return nil
 }
 
+// fills the atomic swap objects in the given order
 func (s *store) fillSwapDetails(order *model.Order) error {
 	order.FollowerAtomicSwap = &model.AtomicSwap{}
 	order.InitiatorAtomicSwap = &model.AtomicSwap{}
@@ -476,85 +497,3 @@ func (s *store) fillSwapDetails(order *model.Order) error {
 	}
 	return nil
 }
-
-func (s *store) SetPrice(fromChain string, toChain string, price float64) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.cache[fromChain+toChain] = price
-	return nil
-}
-func (s *store) Price(fromChain string, toChain string) (float64, error) {
-	// s.mu.RLock()
-	// defer s.mu.RUnlock()
-
-	price, ok := s.cache[fromChain+toChain]
-	if !ok {
-		return 0, fmt.Errorf("price not found, please try later")
-	}
-	return price, nil
-}
-
-func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
-	if chain.IsBTC() {
-		switch {
-		case value.Cmp(big.NewInt(10000)) < 1:
-			return 1
-
-		case value.Cmp(big.NewInt(100000)) < 1:
-			return 2
-
-		case value.Cmp(big.NewInt(1000000)) < 1:
-			return 4
-
-		case value.Cmp(big.NewInt(10000000)) < 1:
-			return 6
-
-		case value.Cmp(big.NewInt(100000000)) < 1:
-			return 8
-
-		default:
-			return 12
-		}
-	} else if chain.IsEVM() {
-		switch {
-		case value.Cmp(big.NewInt(10000)) < 1:
-			return 6
-
-		case value.Cmp(big.NewInt(100000)) < 1:
-			return 12
-
-		case value.Cmp(big.NewInt(1000000)) < 1:
-			return 18
-
-		case value.Cmp(big.NewInt(10000000)) < 1:
-			return 24
-
-		case value.Cmp(big.NewInt(100000000)) < 1:
-			return 30
-
-		default:
-			return 100
-		}
-	}
-	return 0
-}
-
-// func secretHashAlreadyExists(orderPair string, secretHash string) (bool, error) {
-// 	fromChain, toChain, fromAsset, ToAsset, err := model.ParseOrderPair(orderPair)
-// 	if err != nil {
-// 		return false, err
-// 	}
-// 	if model.Chain(fromChain).IsEVM() {
-// 		queryChainForsecretHash(string(fromAsset), secretHash)
-// 	} else if model.Chain(toChain).IsEVM() {
-// 		queryChainForsecretHash(string(ToAsset), secretHash)
-// 	}
-// 	// TODO:
-// 	return false, nil
-// }
-
-// func queryChainForsecretHash(asset string, secretHash string) (string, error) {
-// 	// TODO: need to do a change in smart contract to complete this function
-// 	return "", nil
-// }
