@@ -276,13 +276,9 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 					}
 					for _, order := range append(makerOrders, takerOrders...) {
 						exist, ok := orders[order.ID]
-						if (!ok && order.Status < model.Executed) || (ok && !model.CompareOrder(exist, order)) {
+						if !ok || !model.CompareOrder(exist, order) {
 							if err := ws.WriteJSON(order); err != nil {
 								return
-							}
-							if order.Status >= model.Executed {
-								delete(orders, order.ID)
-								continue
 							}
 							orders[order.ID] = order
 
