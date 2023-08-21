@@ -37,11 +37,11 @@ type Server struct {
 
 type Store interface {
 	// get value locked in the given chain for the given user
-	GetValueLocked(config model.Config, chain model.Chain) (*big.Int, error)
+	ValueLockedByChain(chain model.Chain, config model.Network) (*big.Int, error)
 	// create order
 	CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userWalletBTCAddress string, config model.Config) (uint, error)
 	// fill order
-	FillOrder(orderID uint, filler, sendAddress, receiveAddress string, config model.Config) error
+	FillOrder(orderID uint, filler, sendAddress, receiveAddress string, config model.Network) error
 	// get order by id
 	GetOrder(orderID uint) (*model.Order, error)
 	// cancel order by id
@@ -57,7 +57,7 @@ func NewServer(store Store, config model.Config, logger *zap.Logger, secret stri
 		store:  store,
 		secret: secret,
 		logger: childLogger,
-		auth:   NewAuth(config),
+		auth:   NewAuth(config.Network),
 		config: config,
 	}
 }
@@ -298,7 +298,7 @@ func (s *Server) GetValueByChain() gin.HandlerFunc {
 			return
 		}
 
-		valueLocked, err := s.store.GetValueLocked(s.config, chain)
+		valueLocked, err := s.store.ValueLockedByChain(chain, s.config.Network)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error})
 			return
@@ -311,9 +311,9 @@ func (s *Server) GetValueByChain() gin.HandlerFunc {
 
 func (s *Server) SupportedAssets() gin.HandlerFunc {
 	assets := map[model.Chain][]model.Asset{}
-	for chain, netConf := range s.config {
+	for chain, netConf := range s.config.Network {
 		assets[chain] = []model.Asset{}
-		for asset := range netConf.Assets {
+		for asset := range netConf.Oracles {
 			assets[chain] = append(assets[chain], asset)
 		}
 	}
@@ -376,7 +376,7 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 			return
 		}
 
-		if err := s.store.FillOrder(uint(orderID), strings.ToLower(filler.(string)), req.SendAddress, req.ReceiveAddress, s.config); err != nil {
+		if err := s.store.FillOrder(uint(orderID), strings.ToLower(filler.(string)), req.SendAddress, req.ReceiveAddress, s.config.Network); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": fmt.Sprintf("failed to fill the Order %v", err.Error()),
 			})

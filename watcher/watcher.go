@@ -30,13 +30,13 @@ type Watcher interface {
 type watcher struct {
 	logger  *zap.Logger
 	store   Store
-	config  model.Config
+	config  model.Network
 	workers int
 	orders  chan model.Order
 }
 
 // NewWatcher returns a new Watcher
-func NewWatcher(logger *zap.Logger, store Store, config model.Config) Watcher {
+func NewWatcher(logger *zap.Logger, store Store, config model.Network) Watcher {
 	workers := runtime.NumCPU() * 4
 	if workers == 0 {
 		workers = 4

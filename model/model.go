@@ -1,23 +1,26 @@
 package model
 
 import (
-	"database/sql"
 	"database/sql/driver"
-	"encoding/hex"
-	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
 	"gorm.io/gorm"
 )
 
-type Config map[Chain]NetworkConfig
+type Network map[Chain]NetworkConfig
 type NetworkConfig struct {
-	Assets map[Asset]bool
-	RPC    string
-	Expiry int64
+	Oracles map[Asset]string
+	RPC     string
+	Expiry  int64
+}
+
+type Config struct {
+	Network    Network
+	MinTxLimit string
+	MaxTxLimit string
+	DailyLimit string
+	PriceTTL   int64
 }
 
 type Chain string
@@ -59,6 +62,10 @@ func (c Chain) IsEVM() bool {
 
 func (c Chain) IsBTC() bool {
 	return c == Bitcoin || c == BitcoinTestnet || c == BitcoinRegtest
+}
+
+func (c Chain) IsTestnet() bool {
+	return c == EthereumSepolia || c == EthereumLocalnet || c == BitcoinTestnet || c == BitcoinRegtest
 }
 
 type Asset string
@@ -150,54 +157,6 @@ type AtomicSwap struct {
 	IsInstantWallet      bool       `json:"-"`
 }
 
-type LockedAmount struct {
-	Asset  string
-	Amount sql.NullInt64
-}
-
-func CombineAndAddAmount(arr1, arr2 []LockedAmount) []LockedAmount {
-	combinedMap := make(map[string]sql.NullInt64)
-
-	if len(arr1) == 0 {
-		return arr2
-	} else if len(arr2) == 0 {
-		return arr1
-	} else if len(arr1) == 0 && len(arr2) == 0 {
-		return nil
-	}
-	for _, item := range arr1 {
-		if _, ok := combinedMap[item.Asset]; ok {
-			combinedMap[item.Asset] = sql.NullInt64{
-				Int64: combinedMap[item.Asset].Int64 + item.Amount.Int64,
-				Valid: true,
-			}
-		} else {
-			combinedMap[item.Asset] = item.Amount
-		}
-	}
-
-	for _, item := range arr2 {
-		if _, ok := combinedMap[item.Asset]; ok {
-			combinedMap[item.Asset] = sql.NullInt64{
-				Int64: combinedMap[item.Asset].Int64 + item.Amount.Int64,
-				Valid: true,
-			}
-		} else {
-			combinedMap[item.Asset] = item.Amount
-		}
-	}
-
-	var combinedArray []LockedAmount
-	for asset, amount := range combinedMap {
-		combinedArray = append(combinedArray, LockedAmount{
-			Asset:  asset,
-			Amount: amount,
-		})
-	}
-
-	return combinedArray
-}
-
 type StringArray []string
 
 func (sa StringArray) Value() (driver.Value, error) {
@@ -250,7 +209,7 @@ func ParseChainAsset(chainAsset string) (Chain, Asset, error) {
 }
 
 func (conf NetworkConfig) IsSupported(asset Asset) error {
-	if conf.Assets[asset] {
+	if _, ok := conf.Oracles[asset]; ok {
 		return nil
 	}
 	return fmt.Errorf("asset %v is not supported", asset)
@@ -272,53 +231,4 @@ func CompareOrderSlices(a, b []Order) bool {
 		}
 	}
 	return true
-}
-
-func ValidateSecretHash(input string) error {
-	decoded, err := hex.DecodeString(input)
-	if err != nil {
-		return errors.New("wrong secret hash: not a valid hexadecimal string")
-	}
-	if len(decoded) != 32 {
-		return errors.New("wrong secret hash: length should be 32 bytes (64 characters)")
-	}
-
-	return nil
-}
-
-func ValidateEthereumAddress(input string) error {
-	if len(input) > 2 && input[:2] == "0x" {
-		input = input[2:]
-	}
-	if len(input) != 40 {
-		return errors.New("wrong ethereum address: length should be 40 bytes")
-	}
-	_, err := hex.DecodeString(input)
-	// fmt.Println("IsEthereumAddress", len(input))
-	if err != nil {
-		return errors.New("wrong ethereum address: not a valid hexadecimal string")
-	}
-	return nil
-}
-
-func ValidateBitcoinAddress(address string, chain Chain) error {
-	chaincfg, err := GetParams(chain)
-	if err != nil {
-		return err
-	}
-	_, err = btcutil.DecodeAddress(address, chaincfg)
-	return err
-}
-
-func GetParams(chain Chain) (*chaincfg.Params, error) {
-	switch chain {
-	case Bitcoin:
-		return &chaincfg.MainNetParams, nil
-	case BitcoinTestnet:
-		return &chaincfg.TestNet3Params, nil
-	case BitcoinRegtest:
-		return &chaincfg.RegressionNetParams, nil
-	default:
-		return nil, errors.New("constraint violation: unknown chain")
-	}
 }

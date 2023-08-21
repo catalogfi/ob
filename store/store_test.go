@@ -36,7 +36,7 @@ var _ = Describe("Store", func() {
 		order = followerUnfilledOrders[0]
 		order.Status = model.Executed
 		store.UpdateOrder(&order)
-		amount, err := store.GetValueLocked(config, model.Ethereum)
+		amount, err := store.ValueLockedByChain(model.Ethereum, config.Network)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(amount).To(Equal(int64(300)))
 		// Expect(os.Remove("test.db")).NotTo(HaveOccurred())
@@ -66,9 +66,9 @@ var _ = Describe("Store", func() {
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash", "receivebtcAddress", config)
 		Expect(err).NotTo(HaveOccurred())
-		err = store.FillOrder(id, "filler", "sendFollowerAddress", "reciveFollowerAddress", config)
+		err = store.FillOrder(id, "filler", "sendFollowerAddress", "reciveFollowerAddress", config.Network)
 		Expect(err).NotTo(HaveOccurred())
-		err = store.FillOrder(id, "filler2", "sendFollowerAddress2", "reciveFollowerAddress2", config)
+		err = store.FillOrder(id, "filler2", "sendFollowerAddress2", "reciveFollowerAddress2", config.Network)
 		Expect(err).To(HaveOccurred())
 		order, err := store.GetOrder(id)
 		Expect(err).NotTo(HaveOccurred())
@@ -101,7 +101,7 @@ var _ = Describe("Store", func() {
 		Expect(err).NotTo(HaveOccurred())
 		cid, err := store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash", "receivebtcAddress", config)
 		Expect(err).NotTo(HaveOccurred())
-		err = store.FillOrder(cid, "filler", "sendFollowerAddress", "reciveFollowerAddress", config)
+		err = store.FillOrder(cid, "filler", "sendFollowerAddress", "reciveFollowerAddress", config.Network)
 		Expect(err).NotTo(HaveOccurred())
 		order, err := store.GetOrder(cid)
 		Expect(err).NotTo(HaveOccurred())
@@ -130,21 +130,21 @@ var _ = Describe("Store", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(orders)).To(Equal(0))
 
-		err = store.FillOrder(cid1, "filler", "sendFollowerAddress", "reciveFollowerAddress", config)
+		err = store.FillOrder(cid1, "filler", "sendFollowerAddress", "reciveFollowerAddress", config.Network)
 		Expect(err).NotTo(HaveOccurred())
 
 		orders, err = store.GetActiveOrders()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(orders)).To(Equal(1))
 
-		err = store.FillOrder(cid2, "filler", "sendFollowerAddress", "reciveFollowerAddress", config)
+		err = store.FillOrder(cid2, "filler", "sendFollowerAddress", "reciveFollowerAddress", config.Network)
 		Expect(err).NotTo(HaveOccurred())
 
 		orders, err = store.GetActiveOrders()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(orders)).To(Equal(2))
 
-		err = store.FillOrder(cid3, "filler", "sendFollowerAddress", "reciveFollowerAddress", config)
+		err = store.FillOrder(cid3, "filler", "sendFollowerAddress", "reciveFollowerAddress", config.Network)
 		Expect(err).NotTo(HaveOccurred())
 
 		// 	orders, err = store.GetActiveOrders()

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/catalogfi/wbtc-garden/model"
-	"github.com/catalogfi/wbtc-garden/price"
 	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/catalogfi/wbtc-garden/store"
 	"github.com/catalogfi/wbtc-garden/watcher"
@@ -50,9 +49,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	watcher := watcher.NewWatcher(logger, store, envConfig.CONFIG)
-	price := price.NewPriceChecker(store, envConfig.PRICE_FEED_URL)
-	go price.Run()
+	watcher := watcher.NewWatcher(logger, store, envConfig.CONFIG.Network)
 	go watcher.Run()
 	server := rest.NewServer(store, envConfig.CONFIG, logger, "SECRET")
 	if err := server.Run(fmt.Sprintf(":%s", envConfig.PORT)); err != nil {

@@ -17,8 +17,8 @@ import (
 
 type Config struct {
 	SENTRY_DSN string
-	PSQL_DB    string       `binding:"required"`
-	CONFIG     model.Config `binding:"required"`
+	PSQL_DB    string        `binding:"required"`
+	CONFIG     model.Network `binding:"required"`
 }
 
 func LoadConfiguration(file string) Config {

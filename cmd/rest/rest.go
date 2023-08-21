@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/catalogfi/wbtc-garden/model"
-	"github.com/catalogfi/wbtc-garden/price"
 	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/catalogfi/wbtc-garden/store"
 	"go.uber.org/zap"
@@ -16,11 +15,10 @@ import (
 )
 
 type Config struct {
-	PORT           string       `binding:"required"`
-	PSQL_DB        string       `binding:"required"`
-	PRICE_FEED_URL string       `binding:"required"`
-	SERVER_SECRET  string       `binding:"required"`
-	CONFIG         model.Config `binding:"required"`
+	PORT          string       `binding:"required"`
+	PSQL_DB       string       `binding:"required"`
+	SERVER_SECRET string       `binding:"required"`
+	CONFIG        model.Config `binding:"required"`
 }
 
 func LoadConfiguration(file string) Config {
@@ -50,9 +48,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	price := price.NewPriceChecker(store, envConfig.PRICE_FEED_URL)
-	go price.Run()
-	server := rest.NewServer(store, envConfig.CONFIG, logger, "SECRET")
+	server := rest.NewServer(store, envConfig.CONFIG, logger, envConfig.SERVER_SECRET)
 	if err := server.Run(fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}
