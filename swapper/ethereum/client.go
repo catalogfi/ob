@@ -8,11 +8,11 @@ import (
 
 	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
 	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/ERC20"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"go.uber.org/zap"
 )
 
 var (
@@ -30,30 +30,27 @@ type Client interface {
 	ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
 	InitiateAtomicSwap(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error)
 	RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte, secret []byte) (string, error)
-	RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secretHash []byte) (string, error)
+	RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte) (string, error)
 	IsFinal(txHash string, waitBlocks uint64) (bool, uint64, error)
 }
 
 type client struct {
-	logger   *zap.Logger
 	url      string
 	provider *ethclient.Client
 	chainID  *big.Int
 }
 
-func NewClient(logger *zap.Logger, url string) (Client, error) {
+func NewClient(url string) (Client, error) {
 	provider, err := ethclient.Dial(url)
 	if err != nil {
 		return nil, err
 	}
-	childLogger := logger.With(zap.String("service", "ethClient"))
 	chainID, err := provider.ChainID(context.Background())
 	if err != nil {
 		return nil, err
 	}
 
 	return &client{
-		logger:   childLogger,
 		url:      url,
 		provider: provider,
 		chainID:  chainID,
@@ -112,11 +109,6 @@ func (client *client) ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, t
 	if err != nil {
 		return "", err
 	}
-	client.logger.Debug("approve erc20",
-		zap.String("amount", amount.String()),
-		zap.String("token address", tokenAddr.Hex()),
-		zap.String("to address", toAddr.Hex()),
-		zap.String("txHash", tx.Hash().Hex()))
 	receipt, err := bind.WaitMined(context.Background(), client.provider, tx)
 	if err != nil {
 		return "", err
@@ -144,6 +136,10 @@ func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecd
 		}
 	}
 
+	if err := client.simulateInitiate(contract, initiatorAddr, redeemerAddr, expiry, amount, secretHash); err != nil {
+		return "", err
+	}
+
 	transactor, err := client.GetTransactOpts(initiator)
 	if err != nil {
 		return "", err
@@ -152,13 +148,15 @@ func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecd
 	if err != nil {
 		return "", err
 	}
-	client.logger.Info("initiate swap", zap.String("txHash", initTx.Hash().Hex()))
 	return initTx.Hash().Hex(), nil
 }
 
 func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte, secret []byte) (string, error) {
 	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
 	if err != nil {
+		return "", err
+	}
+	if err := client.simulateRedeem(contract, auth, orderID, secret); err != nil {
 		return "", err
 	}
 	tx, err := instance.Redeem(auth, orderID, secret)
@@ -168,14 +166,15 @@ func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.Trans
 	return tx.Hash().Hex(), nil
 }
 
-func (client *client) RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, secretHash []byte) (string, error) {
+func (client *client) RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte) (string, error) {
 	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
 	if err != nil {
 		return "", err
 	}
-	var hash [32]byte
-	copy(hash[:], secretHash)
-	tx, err := instance.Refund(auth, hash)
+	if err := client.simulateRefund(contract, auth, orderID); err != nil {
+		return "", err
+	}
+	tx, err := instance.Refund(auth, orderID)
 	if err != nil {
 		return "", err
 	}
@@ -228,4 +227,55 @@ func (client *client) callOpts() *bind.CallOpts {
 	return &bind.CallOpts{
 		Pending: true,
 	}
+}
+
+func (client *client) simulateInitiate(contract, initiatorAddr, redeemerAddr common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) error {
+	parsed, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	if err != nil {
+		return err
+	}
+	callData, err := parsed.Pack("initiate", redeemerAddr, expiry, amount, secretHash)
+	if err != nil {
+		return err
+	}
+	_, err = client.provider.EstimateGas(context.Background(), ethereum.CallMsg{
+		To:   &contract,
+		From: initiatorAddr,
+		Data: callData,
+	})
+	return err
+}
+
+func (client *client) simulateRedeem(contract common.Address, auth *bind.TransactOpts, orderID [32]byte, secret []byte) error {
+	parsed, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	if err != nil {
+		return err
+	}
+	callData, err := parsed.Pack("redeem", orderID, secret)
+	if err != nil {
+		return err
+	}
+	_, err = client.provider.EstimateGas(context.Background(), ethereum.CallMsg{
+		To:   &contract,
+		From: auth.From,
+		Data: callData,
+	})
+	return err
+}
+
+func (client *client) simulateRefund(contract common.Address, auth *bind.TransactOpts, orderID [32]byte) error {
+	parsed, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	if err != nil {
+		return err
+	}
+	callData, err := parsed.Pack("refund", orderID)
+	if err != nil {
+		return err
+	}
+	_, err = client.provider.EstimateGas(context.Background(), ethereum.CallMsg{
+		To:   &contract,
+		From: auth.From,
+		Data: callData,
+	})
+	return err
 }

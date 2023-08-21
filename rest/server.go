@@ -43,11 +43,11 @@ type Server struct {
 
 type Store interface {
 	// get value locked in the given chain for the given user
-	GetValueLocked(config model.Config, chain model.Chain) (*big.Int, error)
+	ValueLockedByChain(chain model.Chain, config model.Network) (*big.Int, error)
 	// create order
 	CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userWalletBTCAddress string, config model.Config) (uint, error)
 	// fill order
-	FillOrder(orderID uint, filler, sendAddress, receiveAddress string, config model.Config) error
+	FillOrder(orderID uint, filler, sendAddress, receiveAddress string, config model.Network) error
 	// get order by id
 	GetOrder(orderID uint) (*model.Order, error)
 	// cancel order by id
@@ -63,7 +63,7 @@ func NewServer(store Store, config model.Config, logger *zap.Logger, secret stri
 		store:  store,
 		secret: secret,
 		logger: childLogger,
-		auth:   NewAuth(config),
+		auth:   NewAuth(config.Network),
 		config: config,
 	}
 }
@@ -119,7 +119,7 @@ func (s *Server) authenticateJWT(ctx *gin.Context) {
 	tokenString := ctx.GetHeader("Authorization")
 	if tokenString == "" {
 		s.logger.Debug("authorization failure", zap.Error(fmt.Errorf("missing authorization token")))
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Missing authorization token"})
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "missing authorization token"})
 		ctx.Abort()
 		return
 	}
@@ -127,7 +127,7 @@ func (s *Server) authenticateJWT(ctx *gin.Context) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			s.logger.Debug("authorization failure", zap.Error(fmt.Errorf("invalid signing method")))
-			return nil, fmt.Errorf("Invalid signing method")
+			return nil, fmt.Errorf("invalid signing method")
 		}
 
 		return []byte(s.secret), nil
@@ -145,12 +145,12 @@ func (s *Server) authenticateJWT(ctx *gin.Context) {
 			ctx.Set("userWallet", strings.ToLower(userWallet.(string)))
 		} else {
 			s.logger.Debug("authorization failure", zap.Error(fmt.Errorf("invalid token claims")))
-			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
 			ctx.Abort()
 			return
 		}
 	} else {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
 		ctx.Abort()
 		return
 	}
@@ -263,7 +263,7 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 				// Check the order status periodically and write updates to client
 				ticker := time.NewTicker(5 * time.Second)
 
-				for ; true; <-ticker.C {
+				for first := true; true; <-ticker.C {
 					makerOrders, err := s.store.FilterOrders(userAddr, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
 					if err != nil {
 						s.logger.Error("load maker orders", zap.Error(err))
@@ -274,21 +274,32 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 						s.logger.Error("load taker orders", zap.Error(err))
 						continue
 					}
-					for _, order := range append(makerOrders, takerOrders...) {
-						exist, ok := orders[order.ID]
-						if !ok || !model.CompareOrder(exist, order) {
-							if err := ws.WriteJSON(order); err != nil {
-								return
-							}
-							orders[order.ID] = order
+					newOrders := append(makerOrders, takerOrders...)
 
+					// Remove unchanged orders
+					for i := 0; i < len(newOrders); i++ {
+						exist, ok := orders[newOrders[i].ID]
+						if !ok || !model.CompareOrder(exist, newOrders[i]) {
+							orders[newOrders[i].ID] = newOrders[i]
+						} else {
+							newOrders = append(newOrders[:i], newOrders[i+1:]...)
+							i--
 						}
+					}
+
+					// Write all orders which has new updates (or the initial message after connection)
+					if len(newOrders) != 0 || first {
+						if err := ws.WriteJSON(newOrders); err != nil {
+							return
+						}
+						first = false
 					}
 				}
 			default:
 				// ignore all unknown actions
 			}
 		}
+
 	}
 }
 
@@ -300,7 +311,7 @@ func (s *Server) GetValueByChain() gin.HandlerFunc {
 			return
 		}
 
-		valueLocked, err := s.store.GetValueLocked(s.config, chain)
+		valueLocked, err := s.store.ValueLockedByChain(chain, s.config.Network)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error})
 			return
@@ -313,9 +324,9 @@ func (s *Server) GetValueByChain() gin.HandlerFunc {
 
 func (s *Server) SupportedAssets() gin.HandlerFunc {
 	assets := map[model.Chain][]model.Asset{}
-	for chain, netConf := range s.config {
+	for chain, netConf := range s.config.Network {
 		assets[chain] = []model.Asset{}
-		for asset := range netConf.Assets {
+		for asset := range netConf.Oracles {
 			assets[chain] = append(assets[chain], asset)
 		}
 	}
@@ -378,7 +389,7 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 			return
 		}
 
-		if err := s.store.FillOrder(uint(orderID), strings.ToLower(filler.(string)), req.SendAddress, req.ReceiveAddress, s.config); err != nil {
+		if err := s.store.FillOrder(uint(orderID), strings.ToLower(filler.(string)), req.SendAddress, req.ReceiveAddress, s.config.Network); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": fmt.Sprintf("failed to fill the Order %v", err.Error()),
 			})

@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-func GetEthClientByChainId(chainId int, config model.Config) (*ethclient.Client, error) {
+func GetEthClientByChainId(chainId int, config model.Network) (*ethclient.Client, error) {
 	switch chainId {
 	case 1:
 		return ethclient.Dial(config[model.Ethereum].RPC)
@@ -40,7 +40,7 @@ func GetEIP191SigHash(msg string) common.Hash {
 /*
 Checks if the given signature is valid or not according to ERC1271.
 */
-func CheckERC1271Sig(sigHash common.Hash, signature []byte, verifyingContract common.Address, chainId int, config model.Config) (*common.Address, error) {
+func CheckERC1271Sig(sigHash common.Hash, signature []byte, verifyingContract common.Address, chainId int, config model.Network) (*common.Address, error) {
 	conn, err := GetEthClientByChainId(chainId, config)
 	if err != nil {
 		return nil, err

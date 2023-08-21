@@ -5,10 +5,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/catalogfi/wbtc-garden/logger"
+	"github.com/TheZeroSlave/zapsentry"
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/store"
 	"github.com/catalogfi/wbtc-garden/watcher"
+	"github.com/getsentry/sentry-go"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gorm.io/driver/postgres"
@@ -17,8 +18,8 @@ import (
 
 type Config struct {
 	SENTRY_DSN string
-	PSQL_DB    string       `binding:"required"`
-	CONFIG     model.Config `binding:"required"`
+	PSQL_DB    string        `binding:"required"`
+	CONFIG     model.Network `binding:"required"`
 }
 
 func LoadConfiguration(file string) Config {
@@ -42,17 +43,27 @@ func main() {
 		panic(err)
 	}
 
-	var log *zap.Logger
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+
 	if env.SENTRY_DSN != "" {
-		log = zap.New(logger.NewSentryCore(env.SENTRY_DSN, zapcore.ErrorLevel))
-	} else {
-		log, err = zap.NewDevelopment()
+		client, err := sentry.NewClient(sentry.ClientOptions{Dsn: env.SENTRY_DSN})
 		if err != nil {
 			panic(err)
 		}
+		cfg := zapsentry.Configuration{
+			Level: zapcore.ErrorLevel,
+		}
+		core, err := zapsentry.NewCore(cfg, zapsentry.NewSentryClientFromClient(client))
+		if err != nil {
+			panic(err)
+		}
+		logger = zapsentry.AttachCoreToLogger(core, logger)
+		defer logger.Sync()
 	}
-	defer log.Sync()
 
-	watcher := watcher.NewWatcher(log, store, env.CONFIG)
+	watcher := watcher.NewWatcher(logger, store, env.CONFIG)
 	watcher.Run()
 }

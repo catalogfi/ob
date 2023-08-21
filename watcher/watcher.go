@@ -30,13 +30,13 @@ type Watcher interface {
 type watcher struct {
 	logger  *zap.Logger
 	store   Store
-	config  model.Config
+	config  model.Network
 	workers int
 	orders  chan model.Order
 }
 
 // NewWatcher returns a new Watcher
-func NewWatcher(logger *zap.Logger, store Store, config model.Config) Watcher {
+func NewWatcher(logger *zap.Logger, store Store, config model.Network) Watcher {
 	workers := runtime.NumCPU() * 4
 	if workers == 0 {
 		workers = 4
@@ -89,19 +89,24 @@ func (w *watcher) watch(order model.Order) {
 	switch {
 	// Redeem and refund happens at the same time which should not happen. Defensive check.
 	case (order.InitiatorAtomicSwap.RedeemTxHash != "" || order.FollowerAtomicSwap.RedeemTxHash != "") && (order.FollowerAtomicSwap.RefundTxHash != "" || order.InitiatorAtomicSwap.RefundTxHash != ""):
+		log.Error("atomic swap hard failed as someone both redeemed and refunded")
 		order.Status = model.FailedHard
 	// Follower swap never gets initiated and Initiator swap is initiated and refunded
 	case order.InitiatorAtomicSwap.RefundTxHash != "" && order.FollowerAtomicSwap.InitiateTxHash == "" && order.InitiatorAtomicSwap.RedeemTxHash == "":
+		log.Error("atomic swap soft failed due to initiator refunding")
 		order.Status = model.FailedSoft
 	// Follower swap not been redeemed and both swap been refunded
 	case order.InitiatorAtomicSwap.RedeemTxHash == "" && order.FollowerAtomicSwap.RedeemTxHash == "" && order.FollowerAtomicSwap.RefundTxHash != "" && order.InitiatorAtomicSwap.RefundTxHash != "":
+		log.Error("atomic swap soft failed due to both parties refunding")
 		order.Status = model.FailedSoft
 	}
 	// Follower has not filled the swap before the order timeout
 	if order.Status == model.Created && time.Since(order.CreatedAt) > OrderTimeout {
+		log.Info("atomic swap cancelled due to fill timeout")
 		order.Status = model.Cancelled
 	}
 	if order.Status == model.Filled && time.Since(order.CreatedAt) > SwapInitiationTimeout && order.InitiatorAtomicSwap.Status == model.NotStarted {
+		log.Error("atomic swap cancelled due to initiator failing to initiate before timeout")
 		order.Status = model.Cancelled
 	}
 
@@ -132,7 +137,7 @@ func (w *watcher) watch(order model.Order) {
 	var orderUpdate bool
 	for {
 		var ctn bool
-		order, ctn, err = w.statusCheck(order, initiatorWatcher, followerWatcher)
+		order, ctn, err = w.statusCheck(log, order, initiatorWatcher, followerWatcher)
 		if err != nil {
 			log.Error("failed to check status", zap.Error(err))
 			return
@@ -149,7 +154,7 @@ func (w *watcher) watch(order model.Order) {
 	}
 }
 
-func (w *watcher) swapStatusCheck(swap model.AtomicSwap, watcher swapper.Watcher) (model.AtomicSwap, bool, error) {
+func (w *watcher) swapStatusCheck(log *zap.Logger, swap model.AtomicSwap, watcher swapper.Watcher) (model.AtomicSwap, bool, error) {
 	switch swap.Status {
 	case model.NotStarted:
 		fullyFilled, txHash, amount, err := watcher.IsDetected()
@@ -161,6 +166,7 @@ func (w *watcher) swapStatusCheck(swap model.AtomicSwap, watcher swapper.Watcher
 			swap.Status = model.Detected
 			swap.FilledAmount = amount
 			swap.InitiateTxHash = txHash
+			log.Info("atomic swap detected", zap.Uint("swap id", swap.ID), zap.String("txhash", txHash), zap.String("amount", amount))
 			return swap, true, nil
 		} else if txHash != "" && swap.FilledAmount != amount {
 			// AtomicSwap partial initiation detected
@@ -174,9 +180,13 @@ func (w *watcher) swapStatusCheck(swap model.AtomicSwap, watcher swapper.Watcher
 			return swap, false, err
 		}
 		if swap.CurrentConfirmations != conf {
+			if conf > swap.MinimumConfirmations {
+				conf = swap.MinimumConfirmations
+			}
 			swap.CurrentConfirmations = conf
 			swap.InitiateBlockNumber = height
-			if swap.CurrentConfirmations > swap.MinimumConfirmations {
+			if swap.CurrentConfirmations == swap.MinimumConfirmations {
+				log.Info("atomic swap initiated", zap.Uint("swap id", swap.ID), zap.Uint64("confirmations", conf), zap.Uint64("height", height))
 				swap.Status = model.Initiated
 			}
 			return swap, true, nil
@@ -188,6 +198,7 @@ func (w *watcher) swapStatusCheck(swap model.AtomicSwap, watcher swapper.Watcher
 			return swap, false, fmt.Errorf("follower swap redeeming, %w", err)
 		}
 		if redeemed {
+			log.Info("atomic swap redeemed", zap.Uint("swap id", swap.ID), zap.String("tx hash", txHash))
 			swap.Secret = hex.EncodeToString(secret)
 			swap.Status = model.Redeemed
 			swap.RedeemTxHash = txHash
@@ -201,6 +212,7 @@ func (w *watcher) swapStatusCheck(swap model.AtomicSwap, watcher swapper.Watcher
 			return swap, false, err
 		}
 		if expired {
+			log.Info("atomic swap expired", zap.Uint("swap id", swap.ID))
 			swap.Status = model.Expired
 			return swap, true, nil
 		}
@@ -212,6 +224,7 @@ func (w *watcher) swapStatusCheck(swap model.AtomicSwap, watcher swapper.Watcher
 			return swap, false, fmt.Errorf("failed to check refund status %v", err)
 		}
 		if refunded {
+			log.Info("atomic swap expired", zap.Uint("swap id", swap.ID), zap.String("tx hash", txHash))
 			swap.Status = model.Refunded
 			swap.RefundTxHash = txHash
 			return swap, true, nil
@@ -220,12 +233,12 @@ func (w *watcher) swapStatusCheck(swap model.AtomicSwap, watcher swapper.Watcher
 	return swap, false, nil
 }
 
-func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatcher swapper.Watcher) (model.Order, bool, error) {
-	initiatorSwap, ictn, ierr := w.swapStatusCheck(*order.InitiatorAtomicSwap, initiatorWatcher)
+func (w *watcher) statusCheck(log *zap.Logger, order model.Order, initiatorWatcher, followerWatcher swapper.Watcher) (model.Order, bool, error) {
+	initiatorSwap, ictn, ierr := w.swapStatusCheck(log, *order.InitiatorAtomicSwap, initiatorWatcher)
 	if ierr != nil {
 		return order, false, ierr
 	}
-	followerSwap, fctn, ferr := w.swapStatusCheck(*order.FollowerAtomicSwap, followerWatcher)
+	followerSwap, fctn, ferr := w.swapStatusCheck(log, *order.FollowerAtomicSwap, followerWatcher)
 	if ferr != nil {
 		return order, false, ferr
 	}
@@ -234,6 +247,7 @@ func (w *watcher) statusCheck(order model.Order, initiatorWatcher, followerWatch
 			order.Secret = followerSwap.Secret
 		}
 		if initiatorSwap.Status == model.Redeemed && followerSwap.Status == model.Redeemed {
+			log.Info("atomic swap executed", zap.Uint("order id", order.ID))
 			order.Status = model.Executed
 		}
 		order.InitiatorAtomicSwap = &initiatorSwap
