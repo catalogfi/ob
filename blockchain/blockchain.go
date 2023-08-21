@@ -4,8 +4,10 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"strconv"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -21,21 +23,21 @@ import (
 )
 
 // The function `LoadClient` returns a client for a given blockchain chain and its corresponding URLs(set during config).
-func LoadClient(chain model.Chain, urls map[model.Chain]string) (interface{}, error) {
+func LoadClient(chain model.Chain, config model.Network) (interface{}, error) {
 	if chain.IsBTC() {
-		return bitcoin.NewClient(urls[chain], getParams(chain)), nil
+		return bitcoin.NewClient(config[chain].RPC, getParams(chain)), nil
 	}
 	if chain.IsEVM() {
 		logger, _ := zap.NewDevelopment()
-		return ethereum.NewClient(logger, urls[chain])
+		return ethereum.NewClient(logger, config[chain].RPC)
 	}
 	return nil, fmt.Errorf("invalid chain: %s", chain)
 }
 
 // The function `LoadInitiatorSwap` loads an initiator swap based on the given atomic swap details, private key, secret hash, and URLs.
 // initiateSwap can be used to construct a Swap Object with methods required to handle Atomicswap on initiator side.
-func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interface{}, secretHash string, urls map[model.Chain]string, minConfirmations uint64) (swapper.InitiatorSwap, error) {
-	client, err := LoadClient(atomicSwap.Chain, urls)
+func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interface{}, secretHash string, config model.Network, minConfirmations uint64) (swapper.InitiatorSwap, error) {
+	client, err := LoadClient(atomicSwap.Chain, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
@@ -72,20 +74,20 @@ func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interfac
 	}
 }
 
-func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, urls map[model.Chain]string, minConfirmations uint64) (swapper.Watcher, error) {
-	client, err := LoadClient(atomicSwap.Chain, urls)
+func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, config model.Network, minConfirmations uint64) (swapper.Watcher, error) {
+	client, err := LoadClient(atomicSwap.Chain, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
 
 	initiatorAddress, err := ParseAddress(client, atomicSwap.InitiatorAddress)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse the initiator address: %s on chain: %v, %w", atomicSwap.InitiatorAddress, atomicSwap.Chain, err)
 	}
 
 	redeemerAddress, err := ParseAddress(client, atomicSwap.RedeemerAddress)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse the redeemer address: %s on chain: %v, %w", atomicSwap.RedeemerAddress, atomicSwap.Chain, err)
 	}
 
 	secHash, err := hex.DecodeString(secretHash)
@@ -118,30 +120,15 @@ func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, urls map[model.
 		return bitcoin.NewWatcher(scriptAddr, expiry.Int64(), minConfirmations, amt.Uint64(), client)
 	case ethereum.Client:
 		contractAddr := common.HexToAddress(atomicSwap.Asset.SecondaryID())
-		return ethereum.NewWatcher(contractAddr, secHash, expiry, big.NewInt(int64(minConfirmations)), amt, client)
+		orderId := sha256.Sum256(append(secHash, common.HexToAddress(atomicSwap.InitiatorAddress).Hash().Bytes()...))
+		return ethereum.NewWatcher(contractAddr, secHash, orderId[:], expiry, big.NewInt(int64(minConfirmations)), amt, client)
 	default:
 		return nil, fmt.Errorf("unknown chain: %T", client)
 	}
 }
 
-func CalculateExpiry(chain model.Chain, goingFirst bool, urls map[model.Chain]string) (string, error) {
-	if chain.IsBTC() {
-		expiry := bitcoin.GetExpiry(goingFirst)
-		return strconv.FormatInt(expiry, 10), nil
-	}
-	client, err := LoadClient(chain, urls)
-	if err != nil {
-		return "", err
-	}
-	expiry, err := ethereum.GetExpiry(client.(ethereum.Client), goingFirst)
-	if err != nil {
-		return "", err
-	}
-	return expiry.String(), nil
-}
-
-func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerPrivateKey interface{}, secretHash string, urls map[model.Chain]string, minConfirmations uint64) (swapper.RedeemerSwap, error) {
-	client, err := LoadClient(atomicSwap.Chain, urls)
+func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerPrivateKey interface{}, secretHash string, config model.Network, minConfirmations uint64) (swapper.RedeemerSwap, error) {
+	client, err := LoadClient(atomicSwap.Chain, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
@@ -217,4 +204,135 @@ func getParams(chain model.Chain) *chaincfg.Params {
 	default:
 		panic("constraint violation: unknown chain")
 	}
+}
+
+func CheckAddress(chain model.Chain, address string) error {
+	if chain.IsEVM() {
+		if len(common.HexToAddress(address).Bytes()) == 0 {
+			return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
+		}
+	} else if chain.IsBTC() {
+		_, err := btcutil.DecodeAddress(address, getParams(chain))
+		if err != nil {
+			return fmt.Errorf("invalid bitcoin (%v) address: %v", chain, address)
+		}
+	} else {
+		return fmt.Errorf("unknown chain: %v", chain)
+	}
+	return nil
+}
+
+func CheckHash(hash string) error {
+	if len(hash) >= 2 && hash[0] == '0' && (hash[1] == 'x' || hash[1] == 'X') {
+		hash = hash[2:]
+	}
+	_, err := hex.DecodeString(hash)
+	if err != nil {
+		return fmt.Errorf("not a valid hash %s", hash)
+	}
+	return nil
+}
+
+// value is in USD
+func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
+	if chain.IsTestnet() {
+		return 0
+	}
+	if chain.IsBTC() {
+		switch {
+		case value.Cmp(big.NewInt(10000)) < 1:
+			return 1
+
+		case value.Cmp(big.NewInt(100000)) < 1:
+			return 2
+
+		case value.Cmp(big.NewInt(1000000)) < 1:
+			return 4
+
+		case value.Cmp(big.NewInt(10000000)) < 1:
+			return 6
+
+		case value.Cmp(big.NewInt(100000000)) < 1:
+			return 8
+
+		default:
+			return 12
+		}
+	} else if chain.IsEVM() {
+		switch {
+		case value.Cmp(big.NewInt(10000)) < 1:
+			return 6
+
+		case value.Cmp(big.NewInt(100000)) < 1:
+			return 12
+
+		case value.Cmp(big.NewInt(1000000)) < 1:
+			return 18
+
+		case value.Cmp(big.NewInt(10000000)) < 1:
+			return 24
+
+		case value.Cmp(big.NewInt(100000000)) < 1:
+			return 30
+
+		default:
+			return 100
+		}
+	}
+	return 0
+}
+
+func GetDecimals(chain model.Chain, asset model.Asset, config model.Network) (int64, error) {
+	if chain.IsEVM() {
+		logger, err := zap.NewDevelopment()
+		if err != nil {
+			return -1, err
+		}
+		client, err := ethereum.NewClient(logger, config[chain].RPC)
+		if err != nil {
+			return -1, err
+		}
+		token, err := client.GetTokenAddress(common.HexToAddress(asset.SecondaryID()))
+		if err != nil {
+			return -1, err
+		}
+		tokenDecimals, err := client.GetDecimals(token)
+		if err != nil {
+			return -1, err
+		}
+		return int64(tokenDecimals), nil
+	} else if chain.IsBTC() {
+		return 8, nil
+	}
+	return -1, fmt.Errorf("unsupported chain: %v", chain)
+}
+
+type Price struct {
+	Price     float64
+	Timestamp int64
+}
+
+func GetPrice(oracle string) (Price, error) {
+	resp, err := http.Get(oracle)
+	if err != nil {
+		return Price{}, fmt.Errorf("failed to build get request: %v", err)
+	}
+	defer resp.Body.Close()
+	var apiResponse struct {
+		Data      map[string]interface{} `json:"data"`
+		Timestamp int64                  `json:"timestamp"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
+		return Price{}, fmt.Errorf("failed to decode response: %v", err)
+	}
+	priceUsdStr, ok := apiResponse.Data["priceUsd"].(string)
+	if !ok {
+		return Price{}, fmt.Errorf("failed to parse price from: %v", apiResponse.Data)
+	}
+	priceUsd, err := strconv.ParseFloat(priceUsdStr, 64)
+	if err != nil {
+		return Price{}, fmt.Errorf("failed to convert priceUsd to float64: %v", err)
+	}
+	return Price{priceUsd, apiResponse.Timestamp}, nil
 }

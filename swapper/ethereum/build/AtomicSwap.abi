@@ -16,8 +16,20 @@
         {
           "indexed": true,
           "internalType": "bytes32",
-          "name": "secrectHash",
+          "name": "orderId",
           "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "secretHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "initiatedAt",
+          "type": "uint256"
         },
         {
           "indexed": false,
@@ -35,13 +47,19 @@
         {
           "indexed": true,
           "internalType": "bytes32",
+          "name": "orderId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
           "name": "secrectHash",
           "type": "bytes32"
         },
         {
           "indexed": false,
           "internalType": "bytes",
-          "name": "_secret",
+          "name": "secret",
           "type": "bytes"
         }
       ],
@@ -54,7 +72,7 @@
         {
           "indexed": true,
           "internalType": "bytes32",
-          "name": "secrectHash",
+          "name": "orderId",
           "type": "bytes32"
         }
       ],
@@ -84,6 +102,11 @@
         {
           "internalType": "uint256",
           "name": "expiry",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "initiatedAt",
           "type": "uint256"
         },
         {
@@ -131,6 +154,11 @@
     {
       "inputs": [
         {
+          "internalType": "bytes32",
+          "name": "_orderId",
+          "type": "bytes32"
+        },
+        {
           "internalType": "bytes",
           "name": "_secret",
           "type": "bytes"
@@ -145,7 +173,7 @@
       "inputs": [
         {
           "internalType": "bytes32",
-          "name": "_secretHash",
+          "name": "_orderId",
           "type": "bytes32"
         }
       ],

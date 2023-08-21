@@ -12,14 +12,14 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-func GetEthClientByChainId(chainId int, config model.Config) (*ethclient.Client, error) {
+func GetEthClientByChainId(chainId int, config model.Network) (*ethclient.Client, error) {
 	switch chainId {
 	case 1:
-		return ethclient.Dial(config.RPC[model.Ethereum])
+		return ethclient.Dial(config[model.Ethereum].RPC)
 	case 11155111:
-		return ethclient.Dial(config.RPC[model.EthereumSepolia])
+		return ethclient.Dial(config[model.EthereumSepolia].RPC)
 	case 10:
-		return ethclient.Dial(config.RPC[model.EthereumOptimism])
+		return ethclient.Dial(config[model.EthereumOptimism].RPC)
 	default:
 		return nil, fmt.Errorf("No RPC url found for chainId")
 
@@ -40,7 +40,7 @@ func GetEIP191SigHash(msg string) common.Hash {
 /*
 Checks if the given signature is valid or not according to ERC1271.
 */
-func CheckERC1271Sig(sigHash common.Hash, signature []byte, verifyingContract common.Address, chainId int, config model.Config) (*common.Address, error) {
+func CheckERC1271Sig(sigHash common.Hash, signature []byte, verifyingContract common.Address, chainId int, config model.Network) (*common.Address, error) {
 	conn, err := GetEthClientByChainId(chainId, config)
 	if err != nil {
 		return nil, err

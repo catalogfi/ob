@@ -1,21 +1,26 @@
 package model
 
 import (
-	"database/sql"
 	"database/sql/driver"
-	"encoding/hex"
-	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/catalogfi/wbtc-garden/config"
 	"gorm.io/gorm"
 )
 
+type Network map[Chain]NetworkConfig
+type NetworkConfig struct {
+	Oracles map[Asset]string
+	RPC     string
+	Expiry  int64
+}
+
 type Config struct {
-	RPC map[Chain]string `json:"rpc"`
+	Network    Network
+	MinTxLimit string
+	MaxTxLimit string
+	DailyLimit string
+	PriceTTL   int64
 }
 
 type Chain string
@@ -59,6 +64,10 @@ func (c Chain) IsBTC() bool {
 	return c == Bitcoin || c == BitcoinTestnet || c == BitcoinRegtest
 }
 
+func (c Chain) IsTestnet() bool {
+	return c == EthereumSepolia || c == EthereumLocalnet || c == BitcoinTestnet || c == BitcoinRegtest
+}
+
 type Asset string
 
 const (
@@ -70,7 +79,7 @@ func NewSecondary(address string) Asset {
 }
 
 func (a Asset) SecondaryID() string {
-	if string(a) == "primary"  {
+	if string(a) == "primary" {
 		return ""
 	}
 	return string(a)
@@ -80,18 +89,23 @@ type Status uint
 
 const (
 	Unknown Status = iota
-	OrderCreated
-	OrderFilled
-	InitiatorAtomicSwapInitiated
-	FollowerAtomicSwapInitiated
-	FollowerAtomicSwapRedeemed
-	InitiatorAtomicSwapRedeemed
-	InitiatorAtomicSwapRefunded
-	FollowerAtomicSwapRefunded
-	OrderExecuted
-	OrderFailedSoft
-	OrderFailedHard
-	OrderCancelled
+	Created
+	Filled
+	Executed
+	FailedSoft
+	FailedHard
+	Cancelled
+)
+
+type SwapStatus uint
+
+const (
+	NotStarted SwapStatus = iota
+	Detected
+	Initiated
+	Expired
+	Redeemed
+	Refunded
 )
 
 type VerifySiwe struct {
@@ -124,67 +138,23 @@ type Order struct {
 type AtomicSwap struct {
 	gorm.Model
 
-	InitiatorAddress          string  `json:"initiatorAddress"`
-	RedeemerAddress           string  `json:"redeemerAddress"`
-	Timelock                  string  `json:"timelock"`
-	Chain                     Chain   `json:"chain"`
-	Asset                     Asset   `json:"asset"`
-	Amount                    string  `json:"amount"`
-	InitiateTxHash            string  `json:"initiateTxHash" `
-	RedeemTxHash              string  `json:"redeemTxHash" `
-	RefundTxHash              string  `json:"refundTxHash" `
-	PriceByOracle             float64 `json:"priceByOracle"`
-	MinimumConfirmations      uint64  `json:"minimumConfirmations"`
-	CurrentConfirmationStatus uint64  `json:"currentConfirmationStatus"`
-	IsInstantWallet           bool    `json:"-"`
-}
-
-type LockedAmount struct {
-	Asset  string
-	Amount sql.NullInt64
-}
-
-func CombineAndAddAmount(arr1, arr2 []LockedAmount) []LockedAmount {
-	combinedMap := make(map[string]sql.NullInt64)
-
-	if len(arr1) == 0 {
-		return arr2
-	} else if len(arr2) == 0 {
-		return arr1
-	} else if len(arr1) == 0 && len(arr2) == 0 {
-		return nil
-	}
-	for _, item := range arr1 {
-		if _, ok := combinedMap[item.Asset]; ok {
-			combinedMap[item.Asset] = sql.NullInt64{
-				Int64: combinedMap[item.Asset].Int64 + item.Amount.Int64,
-				Valid: true,
-			}
-		} else {
-			combinedMap[item.Asset] = item.Amount
-		}
-	}
-
-	for _, item := range arr2 {
-		if _, ok := combinedMap[item.Asset]; ok {
-			combinedMap[item.Asset] = sql.NullInt64{
-				Int64: combinedMap[item.Asset].Int64 + item.Amount.Int64,
-				Valid: true,
-			}
-		} else {
-			combinedMap[item.Asset] = item.Amount
-		}
-	}
-
-	var combinedArray []LockedAmount
-	for asset, amount := range combinedMap {
-		combinedArray = append(combinedArray, LockedAmount{
-			Asset:  asset,
-			Amount: amount,
-		})
-	}
-
-	return combinedArray
+	Status               SwapStatus `json:"swapStatus"`
+	Secret               string     `json:"secret"`
+	InitiatorAddress     string     `json:"initiatorAddress"`
+	RedeemerAddress      string     `json:"redeemerAddress"`
+	Timelock             string     `json:"timelock"`
+	Chain                Chain      `json:"chain"`
+	Asset                Asset      `json:"asset"`
+	Amount               string     `json:"amount"`
+	FilledAmount         string     `json:"filledAmount"`
+	InitiateTxHash       string     `json:"initiateTxHash" `
+	RedeemTxHash         string     `json:"redeemTxHash" `
+	RefundTxHash         string     `json:"refundTxHash" `
+	PriceByOracle        float64    `json:"priceByOracle"`
+	MinimumConfirmations uint64     `json:"minimumConfirmations"`
+	CurrentConfirmations uint64     `json:"currentConfirmation"`
+	InitiateBlockNumber  uint64     `json:"initiateBlockNumber"`
+	IsInstantWallet      bool       `json:"-"`
 }
 
 type StringArray []string
@@ -224,12 +194,6 @@ func ParseOrderPair(orderPair string) (Chain, Chain, Asset, Asset, error) {
 	if err != nil {
 		return "", "", "", "", err
 	}
-	if err := isWhitelisted(sendChain, string(sendAsset)); err != nil {
-		return "", "", "", "", err
-	}
-	if err := isWhitelisted(receiveChain, string(receiveAsset)); err != nil {
-		return "", "", "", "", err
-	}
 	return sendChain, receiveChain, sendAsset, receiveAsset, nil
 }
 
@@ -244,16 +208,11 @@ func ParseChainAsset(chainAsset string) (Chain, Asset, error) {
 	return Chain(chainAndAsset[0]), NewSecondary(chainAndAsset[1]), nil
 }
 
-func isWhitelisted(chain Chain, asset string) error {
-	if chainMap, ok := config.ConfigMap[string(chain)]; ok {
-		if _, ok := chainMap[asset]; ok {
-			return nil
-		}
-		return fmt.Errorf("asset %v is not whitelisted for chain %v", asset, chain)
-	} else {
-		return fmt.Errorf("chain %v is not whitelisted", chain)
+func (conf NetworkConfig) IsSupported(asset Asset) error {
+	if _, ok := conf.Oracles[asset]; ok {
+		return nil
 	}
-
+	return fmt.Errorf("asset %v is not supported", asset)
 }
 
 func CompareOrderSlices(a, b []Order) bool {
@@ -264,59 +223,12 @@ func CompareOrderSlices(a, b []Order) bool {
 		if v.Status != b[i].Status {
 			return false
 		}
-		if v.FollowerAtomicSwap.CurrentConfirmationStatus != b[i].FollowerAtomicSwap.CurrentConfirmationStatus || v.InitiatorAtomicSwap.CurrentConfirmationStatus != b[i].InitiatorAtomicSwap.CurrentConfirmationStatus {
+		if v.FollowerAtomicSwap.CurrentConfirmations != b[i].FollowerAtomicSwap.CurrentConfirmations || v.InitiatorAtomicSwap.CurrentConfirmations != b[i].InitiatorAtomicSwap.CurrentConfirmations {
+			return false
+		}
+		if v.FollowerAtomicSwap.FilledAmount != b[i].FollowerAtomicSwap.FilledAmount || v.InitiatorAtomicSwap.FilledAmount != b[i].InitiatorAtomicSwap.FilledAmount {
 			return false
 		}
 	}
 	return true
-
-}
-
-func ValidateSecretHash(input string) error {
-	decoded, err := hex.DecodeString(input)
-	if err != nil {
-		return errors.New("wrong secret hash: not a valid hexadecimal string")
-	}
-	if len(decoded) != 32 {
-		return errors.New("wrong secret hash: length should be 32 bytes (64 characters)")
-	}
-
-	return nil
-}
-
-func ValidateEthereumAddress(input string) error {
-	if len(input) > 2 && input[:2] == "0x" {
-		input = input[2:]
-	}
-	if len(input) != 40 {
-		return errors.New("wrong ethereum address: length should be 40 bytes")
-	}
-	_, err := hex.DecodeString(input)
-	// fmt.Println("IsEthereumAddress", len(input))
-	if err != nil {
-		return errors.New("wrong ethereum address: not a valid hexadecimal string")
-	}
-	return nil
-}
-
-func ValidateBitcoinAddress(address string, chain Chain) error {
-	chaincfg, err := GetParams(chain)
-	if err != nil {
-		return err
-	}
-	_, err = btcutil.DecodeAddress(address, chaincfg)
-	return err
-}
-
-func GetParams(chain Chain) (*chaincfg.Params, error) {
-	switch chain {
-	case Bitcoin:
-		return &chaincfg.MainNetParams, nil
-	case BitcoinTestnet:
-		return &chaincfg.TestNet3Params, nil
-	case BitcoinRegtest:
-		return &chaincfg.RegressionNetParams, nil
-	default:
-		return nil, errors.New("constraint violation: unknown chain")
-	}
 }

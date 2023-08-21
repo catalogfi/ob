@@ -6,13 +6,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-func GetExpiry(goingFirst bool) int64 {
-	if goingFirst {
-		return 288
-	}
-	return 144
-}
-
 // NewHTLCScript builds a bitcoin script following BIP-199 (https://github.com/bitcoin/bips/blob/master/bip-0199.mediawiki#summary)
 func NewHTLCScript(initiatorAddress, redeemerAddress btcutil.Address, secretHash []byte, waitTime int64) ([]byte, error) {
 	return txscript.NewScriptBuilder().

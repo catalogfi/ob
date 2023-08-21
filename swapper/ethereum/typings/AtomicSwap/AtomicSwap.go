@@ -30,8 +30,8 @@ var (
 
 // AtomicSwapMetaData contains all meta data concerning the AtomicSwap contract.
 var AtomicSwapMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"secrectHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Initiated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"secrectHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"_secret\",\"type\":\"bytes\"}],\"name\":\"Redeemed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"secrectHash\",\"type\":\"bytes32\"}],\"name\":\"Refunded\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"atomicSwapOrders\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"redeemer\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"initiator\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"expiry\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"isFulfilled\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_redeemer\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_expiry\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"_secretHash\",\"type\":\"bytes32\"}],\"name\":\"initiate\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"_secret\",\"type\":\"bytes\"}],\"name\":\"redeem\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"_secretHash\",\"type\":\"bytes32\"}],\"name\":\"refund\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"token\",\"outputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
-	Bin: "0x60a060405234801561001057600080fd5b50604051610d91380380610d9183398101604081905261002f91610040565b6001600160a01b0316608052610070565b60006020828403121561005257600080fd5b81516001600160a01b038116811461006957600080fd5b9392505050565b608051610cf16100a06000396000818161012201528181610290015281816105ec015261077d0152610cf16000f3fe608060405234801561001057600080fd5b50600436106100575760003560e01c80633f7b9c381461005c5780637249fbb6146100e257806397ffc7ae146100f75780639945e3d31461010a578063fc0c546a1461011d575b600080fd5b6100a861006a366004610ab2565b600060208190529081526040902080546001820154600283015460038401546004909401546001600160a01b03938416949390921692909160ff1685565b604080516001600160a01b0396871681529590941660208601529284019190915260608301521515608082015260a0015b60405180910390f35b6100f56100f0366004610ab2565b61015c565b005b6100f5610105366004610acb565b6102be565b6100f5610118366004610b12565b610622565b6101447f000000000000000000000000000000000000000000000000000000000000000081565b6040516001600160a01b0390911681526020016100d9565b600081815260208190526040902080546001600160a01b03166101c65760405162461bcd60e51b815260206004820152601e60248201527f41746f6d6963537761703a206f72646572206e6f7420696e697461746564000060448201526064015b60405180910390fd5b600481015460ff16156101eb5760405162461bcd60e51b81526004016101bd90610b84565b8060020154431161023e5760405162461bcd60e51b815260206004820152601d60248201527f41746f6d6963537761703a206f72646572206e6f74206578706972656400000060448201526064016101bd565b60048101805460ff1916600117905560405182907ffe509803c09416b28ff3d8f690c8b0c61462a892c46d5430c8fb20abe472daf090600090a2600181015460038201546102ba916001600160a01b037f00000000000000000000000000000000000000000000000000000000000000008116929116906107ad565b5050565b833384846001600160a01b0384166103245760405162461bcd60e51b8152602060048201526024808201527f41746f6d6963537761703a20696e76616c69642072656465656d6572206164646044820152637265737360e01b60648201526084016101bd565b836001600160a01b0316836001600160a01b0316036103a35760405162461bcd60e51b815260206004820152603560248201527f41746f6d6963537761703a2072656465656d657220616e6420696e69746961746044820152746f722063616e6e6f74206265207468652073616d6560581b60648201526084016101bd565b4382116104105760405162461bcd60e51b815260206004820152603560248201527f41746f6d6963537761703a206578706972792063616e6e6f74206265206c6f776044820152746572207468616e2063757272656e7420626c6f636b60581b60648201526084016101bd565b6000811161046a5760405162461bcd60e51b815260206004820152602160248201527f41746f6d6963537761703a20616d6f756e742063616e6e6f74206265207a65726044820152606f60f81b60648201526084016101bd565b60008581526020818152604091829020825160a08101845281546001600160a01b03908116808352600184015490911693820193909352600282015493810193909352600381015460608401526004015460ff1615156080830152156105125760405162461bcd60e51b815260206004820181905260248201527f41746f6d6963537761703a20696e73656375726520736563726574206861736860448201526064016101bd565b6040805160a0810182526001600160a01b038b811682523360208084019182528385018d8152606085018d81526000608087018181528e825281855290889020875181546001600160a01b0319908116918916919091178255955160018201805490971697169690961790945590516002850155516003840181905591516004909301805460ff1916931515939093179092559251928352909188917fbd7231421af354010a8dc99d32bc090722c773f05c06893cafffbdc19d9b5a89910160405180910390a26060810151610616906001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000169033903090610815565b50505050505050505050565b600060028383604051610636929190610bc7565b602060405180830381855afa158015610653573d6000803e3d6000fd5b5050506040513d601f19601f820116820180604052508101906106769190610bd7565b60008181526020819052604090208054919250906001600160a01b03166106f85760405162461bcd60e51b815260206004820152603060248201527f41746f6d6963537761703a206f72646572206e6f7420696e697461746564206f60448201526f1c881a5b9d985b1a59081cd958dc995d60821b60648201526084016101bd565b600481015460ff161561071d5760405162461bcd60e51b81526004016101bd90610b84565b60048101805460ff1916600117905560405182907f866c33f43c7dda3105124ae616b2a42ff25811f48048edbb4ab215c59563b1e6906107609087908790610bf0565b60405180910390a2805460038201546107a7916001600160a01b037f00000000000000000000000000000000000000000000000000000000000000008116929116906107ad565b50505050565b6040516001600160a01b03831660248201526044810182905261081090849063a9059cbb60e01b906064015b60408051601f198184030181529190526020810180516001600160e01b03166001600160e01b03199093169290921790915261084d565b505050565b6040516001600160a01b03808516602483015283166044820152606481018290526107a79085906323b872dd60e01b906084016107d9565b60006108a2826040518060400160405280602081526020017f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c6564815250856001600160a01b03166109229092919063ffffffff16565b90508051600014806108c35750808060200190518101906108c39190610c1f565b6108105760405162461bcd60e51b815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e6044820152691bdd081cdd58d8d9595960b21b60648201526084016101bd565b60606109318484600085610939565b949350505050565b60608247101561099a5760405162461bcd60e51b815260206004820152602660248201527f416464726573733a20696e73756666696369656e742062616c616e636520666f6044820152651c8818d85b1b60d21b60648201526084016101bd565b600080866001600160a01b031685876040516109b69190610c6c565b60006040518083038185875af1925050503d80600081146109f3576040519150601f19603f3d011682016040523d82523d6000602084013e6109f8565b606091505b5091509150610a0987838387610a14565b979650505050505050565b60608315610a83578251600003610a7c576001600160a01b0385163b610a7c5760405162461bcd60e51b815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e747261637400000060448201526064016101bd565b5081610931565b6109318383815115610a985781518083602001fd5b8060405162461bcd60e51b81526004016101bd9190610c88565b600060208284031215610ac457600080fd5b5035919050565b60008060008060808587031215610ae157600080fd5b84356001600160a01b0381168114610af857600080fd5b966020860135965060408601359560600135945092505050565b60008060208385031215610b2557600080fd5b823567ffffffffffffffff80821115610b3d57600080fd5b818501915085601f830112610b5157600080fd5b813581811115610b6057600080fd5b866020828501011115610b7257600080fd5b60209290920196919550909350505050565b60208082526023908201527f41746f6d6963537761703a206f7264657220616c72656164792066756c66696c6040820152621b195960ea1b606082015260800190565b8183823760009101908152919050565b600060208284031215610be957600080fd5b5051919050565b60208152816020820152818360408301376000818301604090810191909152601f909201601f19160101919050565b600060208284031215610c3157600080fd5b81518015158114610c4157600080fd5b9392505050565b60005b83811015610c63578181015183820152602001610c4b565b50506000910152565b60008251610c7e818460208701610c48565b9190910192915050565b6020815260008251806020840152610ca7816040850160208701610c48565b601f01601f1916919091016040019291505056fea26469706673582212205beadf509f2580cb545f090628bbe51cddd6001ff45b34938a17c361c9da047564736f6c63430008120033",
+	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"orderId\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"secretHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"initiatedAt\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Initiated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"orderId\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"secrectHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"secret\",\"type\":\"bytes\"}],\"name\":\"Redeemed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"orderId\",\"type\":\"bytes32\"}],\"name\":\"Refunded\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"atomicSwapOrders\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"redeemer\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"initiator\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"expiry\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"initiatedAt\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"isFulfilled\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_redeemer\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_expiry\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"_secretHash\",\"type\":\"bytes32\"}],\"name\":\"initiate\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"_orderId\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"_secret\",\"type\":\"bytes\"}],\"name\":\"redeem\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"_orderId\",\"type\":\"bytes32\"}],\"name\":\"refund\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"token\",\"outputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	Bin: "0x60a060405234801561001057600080fd5b50604051610f3c380380610f3c83398101604081905261002f91610040565b6001600160a01b0316608052610070565b60006020828403121561005257600080fd5b81516001600160a01b038116811461006957600080fd5b9392505050565b608051610e9c6100a06000396000818161012e015281816102ab015281816106a801526108f00152610e9c6000f3fe608060405234801561001057600080fd5b50600436106100575760003560e01c80633f7b9c381461005c5780637249fbb6146100ee57806397ffc7ae14610103578063f7ff720714610116578063fc0c546a14610129575b600080fd5b6100af61006a366004610c2c565b6000602081905290815260409020805460018201546002830154600384015460048501546005909501546001600160a01b039485169593909416939192909160ff1686565b604080516001600160a01b0397881681529690951660208701529385019290925260608401526080830152151560a082015260c0015b60405180910390f35b6101016100fc366004610c2c565b610168565b005b610101610111366004610c45565b6102d9565b610101610124366004610c8c565b6106df565b6101507f000000000000000000000000000000000000000000000000000000000000000081565b6040516001600160a01b0390911681526020016100e5565b600081815260208190526040902080546001600160a01b03166101d25760405162461bcd60e51b815260206004820152601e60248201527f41746f6d6963537761703a206f72646572206e6f7420696e697461746564000060448201526064015b60405180910390fd5b600581015460ff16156101f75760405162461bcd60e51b81526004016101c990610d08565b438160020154826003015461020c9190610d4b565b106102595760405162461bcd60e51b815260206004820152601d60248201527f41746f6d6963537761703a206f72646572206e6f74206578706972656400000060448201526064016101c9565b60058101805460ff1916600117905560405182907ffe509803c09416b28ff3d8f690c8b0c61462a892c46d5430c8fb20abe472daf090600090a2600181015460048201546102d5916001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000811692911690610921565b5050565b833384846001600160a01b03841661033f5760405162461bcd60e51b8152602060048201526024808201527f41746f6d6963537761703a20696e76616c69642072656465656d6572206164646044820152637265737360e01b60648201526084016101c9565b836001600160a01b0316836001600160a01b0316036103be5760405162461bcd60e51b815260206004820152603560248201527f41746f6d6963537761703a2072656465656d657220616e6420696e69746961746044820152746f722063616e6e6f74206265207468652073616d6560581b60648201526084016101c9565b600082116104255760405162461bcd60e51b815260206004820152602e60248201527f41746f6d6963537761703a206578706972792073686f756c642062652067726560448201526d61746572207468616e207a65726f60901b60648201526084016101c9565b6000811161047f5760405162461bcd60e51b815260206004820152602160248201527f41746f6d6963537761703a20616d6f756e742063616e6e6f74206265207a65726044820152606f60f81b60648201526084016101c9565b6000600286336040516020016104a89291909182526001600160a01b0316602082015260400190565b60408051601f19818403018152908290526104c291610d96565b602060405180830381855afa1580156104df573d6000803e3d6000fd5b5050506040513d601f19601f820116820180604052508101906105029190610db2565b60008181526020818152604091829020825160c08101845281546001600160a01b0390811680835260018401549091169382019390935260028201549381019390935260038101546060840152600481015460808401526005015460ff16151560a083015291925090156105b85760405162461bcd60e51b815260206004820152601b60248201527f41746f6d6963537761703a206475706c6963617465206f72646572000000000060448201526064016101c9565b6040805160c0810182526001600160a01b038c811682523360208084019182528385018e81524360608601908152608086018f8152600060a088018181528b825281865290899020885181546001600160a01b0319908116918a16919091178255965160018201805490981698169790971790955591516002860155516003850181905590516004850181905592516005909401805460ff19169415159490941790935584519283528201529091899185917f3dd1f59c2a4b236fc1e76892b9a4b62de617c6a44a56ed208a3ba79c589823ab910160405180910390a360808101516106d2906001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000169033903090610989565b5050505050505050505050565b600083815260208190526040902080546001600160a01b03166107445760405162461bcd60e51b815260206004820152601e60248201527f41746f6d6963537761703a206f72646572206e6f7420696e697461746564000060448201526064016101c9565b600581015460ff16156107695760405162461bcd60e51b81526004016101c990610d08565b60006002848460405161077d929190610dcb565b602060405180830381855afa15801561079a573d6000803e3d6000fd5b5050506040513d601f19601f820116820180604052508101906107bd9190610db2565b600183015460408051602081018490526001600160a01b0390921690820152909150859060029060600160408051601f198184030181529082905261080191610d96565b602060405180830381855afa15801561081e573d6000803e3d6000fd5b5050506040513d601f19601f820116820180604052508101906108419190610db2565b1461088e5760405162461bcd60e51b815260206004820152601a60248201527f41746f6d6963537761703a20696e76616c69642073656372657400000000000060448201526064016101c9565b60058201805460ff19166001179055604051819086907f4c9a044220477b4e94dbb0d07ff6ff4ac30d443bef59098c4541b006954778e2906108d39088908890610ddb565b60405180910390a38154600483015461091a916001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000811692911690610921565b5050505050565b6040516001600160a01b03831660248201526044810182905261098490849063a9059cbb60e01b906064015b60408051601f198184030181529190526020810180516001600160e01b03166001600160e01b0319909316929092179091526109c7565b505050565b6040516001600160a01b03808516602483015283166044820152606481018290526109c19085906323b872dd60e01b9060840161094d565b50505050565b6000610a1c826040518060400160405280602081526020017f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c6564815250856001600160a01b0316610a9c9092919063ffffffff16565b9050805160001480610a3d575080806020019051810190610a3d9190610e0a565b6109845760405162461bcd60e51b815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e6044820152691bdd081cdd58d8d9595960b21b60648201526084016101c9565b6060610aab8484600085610ab3565b949350505050565b606082471015610b145760405162461bcd60e51b815260206004820152602660248201527f416464726573733a20696e73756666696369656e742062616c616e636520666f6044820152651c8818d85b1b60d21b60648201526084016101c9565b600080866001600160a01b03168587604051610b309190610d96565b60006040518083038185875af1925050503d8060008114610b6d576040519150601f19603f3d011682016040523d82523d6000602084013e610b72565b606091505b5091509150610b8387838387610b8e565b979650505050505050565b60608315610bfd578251600003610bf6576001600160a01b0385163b610bf65760405162461bcd60e51b815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e747261637400000060448201526064016101c9565b5081610aab565b610aab8383815115610c125781518083602001fd5b8060405162461bcd60e51b81526004016101c99190610e33565b600060208284031215610c3e57600080fd5b5035919050565b60008060008060808587031215610c5b57600080fd5b84356001600160a01b0381168114610c7257600080fd5b966020860135965060408601359560600135945092505050565b600080600060408486031215610ca157600080fd5b83359250602084013567ffffffffffffffff80821115610cc057600080fd5b818601915086601f830112610cd457600080fd5b813581811115610ce357600080fd5b876020828501011115610cf557600080fd5b6020830194508093505050509250925092565b60208082526023908201527f41746f6d6963537761703a206f7264657220616c72656164792066756c66696c6040820152621b195960ea1b606082015260800190565b80820180821115610d6c57634e487b7160e01b600052601160045260246000fd5b92915050565b60005b83811015610d8d578181015183820152602001610d75565b50506000910152565b60008251610da8818460208701610d72565b9190910192915050565b600060208284031215610dc457600080fd5b5051919050565b8183823760009101908152919050565b60208152816020820152818360408301376000818301604090810191909152601f909201601f19160101919050565b600060208284031215610e1c57600080fd5b81518015158114610e2c57600080fd5b9392505050565b6020815260008251806020840152610e52816040850160208701610d72565b601f01601f1916919091016040019291505056fea264697066735822122083a334bcafdce1a49fe2cff587175a99496fe0ce5cdcb963bad8cf57e85424bc64736f6c63430008120033",
 }
 
 // AtomicSwapABI is the input ABI used to generate the binding from.
@@ -203,11 +203,12 @@ func (_AtomicSwap *AtomicSwapTransactorRaw) Transact(opts *bind.TransactOpts, me
 
 // AtomicSwapOrders is a free data retrieval call binding the contract method 0x3f7b9c38.
 //
-// Solidity: function atomicSwapOrders(bytes32 ) view returns(address redeemer, address initiator, uint256 expiry, uint256 amount, bool isFulfilled)
+// Solidity: function atomicSwapOrders(bytes32 ) view returns(address redeemer, address initiator, uint256 expiry, uint256 initiatedAt, uint256 amount, bool isFulfilled)
 func (_AtomicSwap *AtomicSwapCaller) AtomicSwapOrders(opts *bind.CallOpts, arg0 [32]byte) (struct {
 	Redeemer    common.Address
 	Initiator   common.Address
 	Expiry      *big.Int
+	InitiatedAt *big.Int
 	Amount      *big.Int
 	IsFulfilled bool
 }, error) {
@@ -218,6 +219,7 @@ func (_AtomicSwap *AtomicSwapCaller) AtomicSwapOrders(opts *bind.CallOpts, arg0 
 		Redeemer    common.Address
 		Initiator   common.Address
 		Expiry      *big.Int
+		InitiatedAt *big.Int
 		Amount      *big.Int
 		IsFulfilled bool
 	})
@@ -228,8 +230,9 @@ func (_AtomicSwap *AtomicSwapCaller) AtomicSwapOrders(opts *bind.CallOpts, arg0 
 	outstruct.Redeemer = *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 	outstruct.Initiator = *abi.ConvertType(out[1], new(common.Address)).(*common.Address)
 	outstruct.Expiry = *abi.ConvertType(out[2], new(*big.Int)).(**big.Int)
-	outstruct.Amount = *abi.ConvertType(out[3], new(*big.Int)).(**big.Int)
-	outstruct.IsFulfilled = *abi.ConvertType(out[4], new(bool)).(*bool)
+	outstruct.InitiatedAt = *abi.ConvertType(out[3], new(*big.Int)).(**big.Int)
+	outstruct.Amount = *abi.ConvertType(out[4], new(*big.Int)).(**big.Int)
+	outstruct.IsFulfilled = *abi.ConvertType(out[5], new(bool)).(*bool)
 
 	return *outstruct, err
 
@@ -237,11 +240,12 @@ func (_AtomicSwap *AtomicSwapCaller) AtomicSwapOrders(opts *bind.CallOpts, arg0 
 
 // AtomicSwapOrders is a free data retrieval call binding the contract method 0x3f7b9c38.
 //
-// Solidity: function atomicSwapOrders(bytes32 ) view returns(address redeemer, address initiator, uint256 expiry, uint256 amount, bool isFulfilled)
+// Solidity: function atomicSwapOrders(bytes32 ) view returns(address redeemer, address initiator, uint256 expiry, uint256 initiatedAt, uint256 amount, bool isFulfilled)
 func (_AtomicSwap *AtomicSwapSession) AtomicSwapOrders(arg0 [32]byte) (struct {
 	Redeemer    common.Address
 	Initiator   common.Address
 	Expiry      *big.Int
+	InitiatedAt *big.Int
 	Amount      *big.Int
 	IsFulfilled bool
 }, error) {
@@ -250,11 +254,12 @@ func (_AtomicSwap *AtomicSwapSession) AtomicSwapOrders(arg0 [32]byte) (struct {
 
 // AtomicSwapOrders is a free data retrieval call binding the contract method 0x3f7b9c38.
 //
-// Solidity: function atomicSwapOrders(bytes32 ) view returns(address redeemer, address initiator, uint256 expiry, uint256 amount, bool isFulfilled)
+// Solidity: function atomicSwapOrders(bytes32 ) view returns(address redeemer, address initiator, uint256 expiry, uint256 initiatedAt, uint256 amount, bool isFulfilled)
 func (_AtomicSwap *AtomicSwapCallerSession) AtomicSwapOrders(arg0 [32]byte) (struct {
 	Redeemer    common.Address
 	Initiator   common.Address
 	Expiry      *big.Int
+	InitiatedAt *big.Int
 	Amount      *big.Int
 	IsFulfilled bool
 }, error) {
@@ -313,46 +318,46 @@ func (_AtomicSwap *AtomicSwapTransactorSession) Initiate(_redeemer common.Addres
 	return _AtomicSwap.Contract.Initiate(&_AtomicSwap.TransactOpts, _redeemer, _expiry, _amount, _secretHash)
 }
 
-// Redeem is a paid mutator transaction binding the contract method 0x9945e3d3.
+// Redeem is a paid mutator transaction binding the contract method 0xf7ff7207.
 //
-// Solidity: function redeem(bytes _secret) returns()
-func (_AtomicSwap *AtomicSwapTransactor) Redeem(opts *bind.TransactOpts, _secret []byte) (*types.Transaction, error) {
-	return _AtomicSwap.contract.Transact(opts, "redeem", _secret)
+// Solidity: function redeem(bytes32 _orderId, bytes _secret) returns()
+func (_AtomicSwap *AtomicSwapTransactor) Redeem(opts *bind.TransactOpts, _orderId [32]byte, _secret []byte) (*types.Transaction, error) {
+	return _AtomicSwap.contract.Transact(opts, "redeem", _orderId, _secret)
 }
 
-// Redeem is a paid mutator transaction binding the contract method 0x9945e3d3.
+// Redeem is a paid mutator transaction binding the contract method 0xf7ff7207.
 //
-// Solidity: function redeem(bytes _secret) returns()
-func (_AtomicSwap *AtomicSwapSession) Redeem(_secret []byte) (*types.Transaction, error) {
-	return _AtomicSwap.Contract.Redeem(&_AtomicSwap.TransactOpts, _secret)
+// Solidity: function redeem(bytes32 _orderId, bytes _secret) returns()
+func (_AtomicSwap *AtomicSwapSession) Redeem(_orderId [32]byte, _secret []byte) (*types.Transaction, error) {
+	return _AtomicSwap.Contract.Redeem(&_AtomicSwap.TransactOpts, _orderId, _secret)
 }
 
-// Redeem is a paid mutator transaction binding the contract method 0x9945e3d3.
+// Redeem is a paid mutator transaction binding the contract method 0xf7ff7207.
 //
-// Solidity: function redeem(bytes _secret) returns()
-func (_AtomicSwap *AtomicSwapTransactorSession) Redeem(_secret []byte) (*types.Transaction, error) {
-	return _AtomicSwap.Contract.Redeem(&_AtomicSwap.TransactOpts, _secret)
-}
-
-// Refund is a paid mutator transaction binding the contract method 0x7249fbb6.
-//
-// Solidity: function refund(bytes32 _secretHash) returns()
-func (_AtomicSwap *AtomicSwapTransactor) Refund(opts *bind.TransactOpts, _secretHash [32]byte) (*types.Transaction, error) {
-	return _AtomicSwap.contract.Transact(opts, "refund", _secretHash)
+// Solidity: function redeem(bytes32 _orderId, bytes _secret) returns()
+func (_AtomicSwap *AtomicSwapTransactorSession) Redeem(_orderId [32]byte, _secret []byte) (*types.Transaction, error) {
+	return _AtomicSwap.Contract.Redeem(&_AtomicSwap.TransactOpts, _orderId, _secret)
 }
 
 // Refund is a paid mutator transaction binding the contract method 0x7249fbb6.
 //
-// Solidity: function refund(bytes32 _secretHash) returns()
-func (_AtomicSwap *AtomicSwapSession) Refund(_secretHash [32]byte) (*types.Transaction, error) {
-	return _AtomicSwap.Contract.Refund(&_AtomicSwap.TransactOpts, _secretHash)
+// Solidity: function refund(bytes32 _orderId) returns()
+func (_AtomicSwap *AtomicSwapTransactor) Refund(opts *bind.TransactOpts, _orderId [32]byte) (*types.Transaction, error) {
+	return _AtomicSwap.contract.Transact(opts, "refund", _orderId)
 }
 
 // Refund is a paid mutator transaction binding the contract method 0x7249fbb6.
 //
-// Solidity: function refund(bytes32 _secretHash) returns()
-func (_AtomicSwap *AtomicSwapTransactorSession) Refund(_secretHash [32]byte) (*types.Transaction, error) {
-	return _AtomicSwap.Contract.Refund(&_AtomicSwap.TransactOpts, _secretHash)
+// Solidity: function refund(bytes32 _orderId) returns()
+func (_AtomicSwap *AtomicSwapSession) Refund(_orderId [32]byte) (*types.Transaction, error) {
+	return _AtomicSwap.Contract.Refund(&_AtomicSwap.TransactOpts, _orderId)
+}
+
+// Refund is a paid mutator transaction binding the contract method 0x7249fbb6.
+//
+// Solidity: function refund(bytes32 _orderId) returns()
+func (_AtomicSwap *AtomicSwapTransactorSession) Refund(_orderId [32]byte) (*types.Transaction, error) {
+	return _AtomicSwap.Contract.Refund(&_AtomicSwap.TransactOpts, _orderId)
 }
 
 // AtomicSwapInitiatedIterator is returned from FilterInitiated and is used to iterate over the raw logs and unpacked data for Initiated events raised by the AtomicSwap contract.
@@ -424,39 +429,49 @@ func (it *AtomicSwapInitiatedIterator) Close() error {
 
 // AtomicSwapInitiated represents a Initiated event raised by the AtomicSwap contract.
 type AtomicSwapInitiated struct {
-	SecrectHash [32]byte
+	OrderId     [32]byte
+	SecretHash  [32]byte
+	InitiatedAt *big.Int
 	Amount      *big.Int
 	Raw         types.Log // Blockchain specific contextual infos
 }
 
-// FilterInitiated is a free log retrieval operation binding the contract event 0xbd7231421af354010a8dc99d32bc090722c773f05c06893cafffbdc19d9b5a89.
+// FilterInitiated is a free log retrieval operation binding the contract event 0x3dd1f59c2a4b236fc1e76892b9a4b62de617c6a44a56ed208a3ba79c589823ab.
 //
-// Solidity: event Initiated(bytes32 indexed secrectHash, uint256 amount)
-func (_AtomicSwap *AtomicSwapFilterer) FilterInitiated(opts *bind.FilterOpts, secrectHash [][32]byte) (*AtomicSwapInitiatedIterator, error) {
+// Solidity: event Initiated(bytes32 indexed orderId, bytes32 indexed secretHash, uint256 initiatedAt, uint256 amount)
+func (_AtomicSwap *AtomicSwapFilterer) FilterInitiated(opts *bind.FilterOpts, orderId [][32]byte, secretHash [][32]byte) (*AtomicSwapInitiatedIterator, error) {
 
-	var secrectHashRule []interface{}
-	for _, secrectHashItem := range secrectHash {
-		secrectHashRule = append(secrectHashRule, secrectHashItem)
+	var orderIdRule []interface{}
+	for _, orderIdItem := range orderId {
+		orderIdRule = append(orderIdRule, orderIdItem)
+	}
+	var secretHashRule []interface{}
+	for _, secretHashItem := range secretHash {
+		secretHashRule = append(secretHashRule, secretHashItem)
 	}
 
-	logs, sub, err := _AtomicSwap.contract.FilterLogs(opts, "Initiated", secrectHashRule)
+	logs, sub, err := _AtomicSwap.contract.FilterLogs(opts, "Initiated", orderIdRule, secretHashRule)
 	if err != nil {
 		return nil, err
 	}
 	return &AtomicSwapInitiatedIterator{contract: _AtomicSwap.contract, event: "Initiated", logs: logs, sub: sub}, nil
 }
 
-// WatchInitiated is a free log subscription operation binding the contract event 0xbd7231421af354010a8dc99d32bc090722c773f05c06893cafffbdc19d9b5a89.
+// WatchInitiated is a free log subscription operation binding the contract event 0x3dd1f59c2a4b236fc1e76892b9a4b62de617c6a44a56ed208a3ba79c589823ab.
 //
-// Solidity: event Initiated(bytes32 indexed secrectHash, uint256 amount)
-func (_AtomicSwap *AtomicSwapFilterer) WatchInitiated(opts *bind.WatchOpts, sink chan<- *AtomicSwapInitiated, secrectHash [][32]byte) (event.Subscription, error) {
+// Solidity: event Initiated(bytes32 indexed orderId, bytes32 indexed secretHash, uint256 initiatedAt, uint256 amount)
+func (_AtomicSwap *AtomicSwapFilterer) WatchInitiated(opts *bind.WatchOpts, sink chan<- *AtomicSwapInitiated, orderId [][32]byte, secretHash [][32]byte) (event.Subscription, error) {
 
-	var secrectHashRule []interface{}
-	for _, secrectHashItem := range secrectHash {
-		secrectHashRule = append(secrectHashRule, secrectHashItem)
+	var orderIdRule []interface{}
+	for _, orderIdItem := range orderId {
+		orderIdRule = append(orderIdRule, orderIdItem)
+	}
+	var secretHashRule []interface{}
+	for _, secretHashItem := range secretHash {
+		secretHashRule = append(secretHashRule, secretHashItem)
 	}
 
-	logs, sub, err := _AtomicSwap.contract.WatchLogs(opts, "Initiated", secrectHashRule)
+	logs, sub, err := _AtomicSwap.contract.WatchLogs(opts, "Initiated", orderIdRule, secretHashRule)
 	if err != nil {
 		return nil, err
 	}
@@ -488,9 +503,9 @@ func (_AtomicSwap *AtomicSwapFilterer) WatchInitiated(opts *bind.WatchOpts, sink
 	}), nil
 }
 
-// ParseInitiated is a log parse operation binding the contract event 0xbd7231421af354010a8dc99d32bc090722c773f05c06893cafffbdc19d9b5a89.
+// ParseInitiated is a log parse operation binding the contract event 0x3dd1f59c2a4b236fc1e76892b9a4b62de617c6a44a56ed208a3ba79c589823ab.
 //
-// Solidity: event Initiated(bytes32 indexed secrectHash, uint256 amount)
+// Solidity: event Initiated(bytes32 indexed orderId, bytes32 indexed secretHash, uint256 initiatedAt, uint256 amount)
 func (_AtomicSwap *AtomicSwapFilterer) ParseInitiated(log types.Log) (*AtomicSwapInitiated, error) {
 	event := new(AtomicSwapInitiated)
 	if err := _AtomicSwap.contract.UnpackLog(event, "Initiated", log); err != nil {
@@ -569,39 +584,48 @@ func (it *AtomicSwapRedeemedIterator) Close() error {
 
 // AtomicSwapRedeemed represents a Redeemed event raised by the AtomicSwap contract.
 type AtomicSwapRedeemed struct {
+	OrderId     [32]byte
 	SecrectHash [32]byte
 	Secret      []byte
 	Raw         types.Log // Blockchain specific contextual infos
 }
 
-// FilterRedeemed is a free log retrieval operation binding the contract event 0x866c33f43c7dda3105124ae616b2a42ff25811f48048edbb4ab215c59563b1e6.
+// FilterRedeemed is a free log retrieval operation binding the contract event 0x4c9a044220477b4e94dbb0d07ff6ff4ac30d443bef59098c4541b006954778e2.
 //
-// Solidity: event Redeemed(bytes32 indexed secrectHash, bytes _secret)
-func (_AtomicSwap *AtomicSwapFilterer) FilterRedeemed(opts *bind.FilterOpts, secrectHash [][32]byte) (*AtomicSwapRedeemedIterator, error) {
+// Solidity: event Redeemed(bytes32 indexed orderId, bytes32 indexed secrectHash, bytes secret)
+func (_AtomicSwap *AtomicSwapFilterer) FilterRedeemed(opts *bind.FilterOpts, orderId [][32]byte, secrectHash [][32]byte) (*AtomicSwapRedeemedIterator, error) {
 
+	var orderIdRule []interface{}
+	for _, orderIdItem := range orderId {
+		orderIdRule = append(orderIdRule, orderIdItem)
+	}
 	var secrectHashRule []interface{}
 	for _, secrectHashItem := range secrectHash {
 		secrectHashRule = append(secrectHashRule, secrectHashItem)
 	}
 
-	logs, sub, err := _AtomicSwap.contract.FilterLogs(opts, "Redeemed", secrectHashRule)
+	logs, sub, err := _AtomicSwap.contract.FilterLogs(opts, "Redeemed", orderIdRule, secrectHashRule)
 	if err != nil {
 		return nil, err
 	}
 	return &AtomicSwapRedeemedIterator{contract: _AtomicSwap.contract, event: "Redeemed", logs: logs, sub: sub}, nil
 }
 
-// WatchRedeemed is a free log subscription operation binding the contract event 0x866c33f43c7dda3105124ae616b2a42ff25811f48048edbb4ab215c59563b1e6.
+// WatchRedeemed is a free log subscription operation binding the contract event 0x4c9a044220477b4e94dbb0d07ff6ff4ac30d443bef59098c4541b006954778e2.
 //
-// Solidity: event Redeemed(bytes32 indexed secrectHash, bytes _secret)
-func (_AtomicSwap *AtomicSwapFilterer) WatchRedeemed(opts *bind.WatchOpts, sink chan<- *AtomicSwapRedeemed, secrectHash [][32]byte) (event.Subscription, error) {
+// Solidity: event Redeemed(bytes32 indexed orderId, bytes32 indexed secrectHash, bytes secret)
+func (_AtomicSwap *AtomicSwapFilterer) WatchRedeemed(opts *bind.WatchOpts, sink chan<- *AtomicSwapRedeemed, orderId [][32]byte, secrectHash [][32]byte) (event.Subscription, error) {
 
+	var orderIdRule []interface{}
+	for _, orderIdItem := range orderId {
+		orderIdRule = append(orderIdRule, orderIdItem)
+	}
 	var secrectHashRule []interface{}
 	for _, secrectHashItem := range secrectHash {
 		secrectHashRule = append(secrectHashRule, secrectHashItem)
 	}
 
-	logs, sub, err := _AtomicSwap.contract.WatchLogs(opts, "Redeemed", secrectHashRule)
+	logs, sub, err := _AtomicSwap.contract.WatchLogs(opts, "Redeemed", orderIdRule, secrectHashRule)
 	if err != nil {
 		return nil, err
 	}
@@ -633,9 +657,9 @@ func (_AtomicSwap *AtomicSwapFilterer) WatchRedeemed(opts *bind.WatchOpts, sink 
 	}), nil
 }
 
-// ParseRedeemed is a log parse operation binding the contract event 0x866c33f43c7dda3105124ae616b2a42ff25811f48048edbb4ab215c59563b1e6.
+// ParseRedeemed is a log parse operation binding the contract event 0x4c9a044220477b4e94dbb0d07ff6ff4ac30d443bef59098c4541b006954778e2.
 //
-// Solidity: event Redeemed(bytes32 indexed secrectHash, bytes _secret)
+// Solidity: event Redeemed(bytes32 indexed orderId, bytes32 indexed secrectHash, bytes secret)
 func (_AtomicSwap *AtomicSwapFilterer) ParseRedeemed(log types.Log) (*AtomicSwapRedeemed, error) {
 	event := new(AtomicSwapRedeemed)
 	if err := _AtomicSwap.contract.UnpackLog(event, "Redeemed", log); err != nil {
@@ -714,21 +738,21 @@ func (it *AtomicSwapRefundedIterator) Close() error {
 
 // AtomicSwapRefunded represents a Refunded event raised by the AtomicSwap contract.
 type AtomicSwapRefunded struct {
-	SecrectHash [32]byte
-	Raw         types.Log // Blockchain specific contextual infos
+	OrderId [32]byte
+	Raw     types.Log // Blockchain specific contextual infos
 }
 
 // FilterRefunded is a free log retrieval operation binding the contract event 0xfe509803c09416b28ff3d8f690c8b0c61462a892c46d5430c8fb20abe472daf0.
 //
-// Solidity: event Refunded(bytes32 indexed secrectHash)
-func (_AtomicSwap *AtomicSwapFilterer) FilterRefunded(opts *bind.FilterOpts, secrectHash [][32]byte) (*AtomicSwapRefundedIterator, error) {
+// Solidity: event Refunded(bytes32 indexed orderId)
+func (_AtomicSwap *AtomicSwapFilterer) FilterRefunded(opts *bind.FilterOpts, orderId [][32]byte) (*AtomicSwapRefundedIterator, error) {
 
-	var secrectHashRule []interface{}
-	for _, secrectHashItem := range secrectHash {
-		secrectHashRule = append(secrectHashRule, secrectHashItem)
+	var orderIdRule []interface{}
+	for _, orderIdItem := range orderId {
+		orderIdRule = append(orderIdRule, orderIdItem)
 	}
 
-	logs, sub, err := _AtomicSwap.contract.FilterLogs(opts, "Refunded", secrectHashRule)
+	logs, sub, err := _AtomicSwap.contract.FilterLogs(opts, "Refunded", orderIdRule)
 	if err != nil {
 		return nil, err
 	}
@@ -737,15 +761,15 @@ func (_AtomicSwap *AtomicSwapFilterer) FilterRefunded(opts *bind.FilterOpts, sec
 
 // WatchRefunded is a free log subscription operation binding the contract event 0xfe509803c09416b28ff3d8f690c8b0c61462a892c46d5430c8fb20abe472daf0.
 //
-// Solidity: event Refunded(bytes32 indexed secrectHash)
-func (_AtomicSwap *AtomicSwapFilterer) WatchRefunded(opts *bind.WatchOpts, sink chan<- *AtomicSwapRefunded, secrectHash [][32]byte) (event.Subscription, error) {
+// Solidity: event Refunded(bytes32 indexed orderId)
+func (_AtomicSwap *AtomicSwapFilterer) WatchRefunded(opts *bind.WatchOpts, sink chan<- *AtomicSwapRefunded, orderId [][32]byte) (event.Subscription, error) {
 
-	var secrectHashRule []interface{}
-	for _, secrectHashItem := range secrectHash {
-		secrectHashRule = append(secrectHashRule, secrectHashItem)
+	var orderIdRule []interface{}
+	for _, orderIdItem := range orderId {
+		orderIdRule = append(orderIdRule, orderIdItem)
 	}
 
-	logs, sub, err := _AtomicSwap.contract.WatchLogs(opts, "Refunded", secrectHashRule)
+	logs, sub, err := _AtomicSwap.contract.WatchLogs(opts, "Refunded", orderIdRule)
 	if err != nil {
 		return nil, err
 	}
@@ -779,7 +803,7 @@ func (_AtomicSwap *AtomicSwapFilterer) WatchRefunded(opts *bind.WatchOpts, sink 
 
 // ParseRefunded is a log parse operation binding the contract event 0xfe509803c09416b28ff3d8f690c8b0c61462a892c46d5430c8fb20abe472daf0.
 //
-// Solidity: event Refunded(bytes32 indexed secrectHash)
+// Solidity: event Refunded(bytes32 indexed orderId)
 func (_AtomicSwap *AtomicSwapFilterer) ParseRefunded(log types.Log) (*AtomicSwapRefunded, error) {
 	event := new(AtomicSwapRefunded)
 	if err := _AtomicSwap.contract.UnpackLog(event, "Refunded", log); err != nil {
