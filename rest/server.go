@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/spruceid/siwe-go"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 const (
@@ -168,62 +169,65 @@ func (s *Server) GetOrderBySocket() gin.HandlerFunc {
 		}
 		defer ws.Close()
 
-		for {
-			// Read message from client
-			mt, message, err := ws.ReadMessage()
+		// Wait for the initiating message
+		mt, message, err := ws.ReadMessage()
+		if err != nil {
+			s.logger.Debug("read message", zap.Error(err))
+			return
+		}
+
+		// Verify the user message
+		action, orderStr, match := ParseGetOrderMessage(string(message))
+		if !match {
+			if err := ws.WriteMessage(mt, []byte("invalid action message")); err != nil {
+				return
+			}
+			return
+		}
+		orderID, err := strconv.ParseUint(orderStr, 10, 64)
+		if err != nil {
+			if err := ws.WriteMessage(mt, []byte("invalid order ID")); err != nil {
+				return
+			}
+			return
+		}
+
+		switch action {
+		case "subscribe":
+			// Fetch the current status of the order and send it to client
+			order, err := s.store.GetOrder(uint(orderID))
 			if err != nil {
-				s.logger.Debug("read message", zap.Error(err))
+				s.logger.Debug("get order", zap.String("api", "/ws/order"))
+				return
+			}
+			if err := ws.WriteJSON(*order); err != nil {
 				return
 			}
 
-			// Verify the user message
-			action, orderStr, match := ParseGetOrderMessage(string(message))
-			if !match {
-				if err := ws.WriteMessage(mt, []byte("invalid action message")); err != nil {
-					return
-				}
-				continue
-			}
+			// Check the order status periodically and write updates to client
+			ticker := time.NewTicker(15 * time.Second)
 
-			switch action {
-			case "subscribe":
-				orderID, err := strconv.ParseUint(orderStr, 10, 64)
-				if err != nil {
-					if err := ws.WriteMessage(mt, []byte("invalid order ID")); err != nil {
-						return
-					}
-					continue
-				}
-
-				// Fetch the current status of the order
-				order, err := s.store.GetOrder(uint(orderID))
-				if err != nil {
-					s.logger.Error("get order", zap.String("api", "/ws/order"))
+			for ; true; <-ticker.C {
+				if order.Status >= model.Executed {
 					break
 				}
-
-				// Check the order status periodically and write updates to client
-				ticker := time.NewTicker(5 * time.Second)
-
-				for ; true; <-ticker.C {
-					if order.Status >= model.Executed {
-						break
-					}
-					newOrder, err := s.store.GetOrder(uint(orderID))
-					if err != nil {
-						s.logger.Error("get order", zap.String("api", "/ws/order"))
-						continue
-					}
-					if newOrder.Status != order.Status {
-						if err := ws.WriteJSON(*newOrder); err != nil {
-							return
-						}
-						order = newOrder
-					}
+				if err := ws.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+					return
 				}
-			default:
-				// ignore all unknown actions
+				newOrder, err := s.store.GetOrder(uint(orderID))
+				if err != nil {
+					s.logger.Error("get order", zap.String("api", "/ws/order"))
+					continue
+				}
+				if newOrder.Status != order.Status {
+					if err := ws.WriteJSON(*newOrder); err != nil {
+						return
+					}
+					order = newOrder
+				}
 			}
+		default:
+			// ignore all unknown actions
 		}
 	}
 }
@@ -238,68 +242,71 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 		}
 		defer ws.Close()
 
-		for {
-			// Read message from client
-			mt, message, err := ws.ReadMessage()
-			if err != nil {
-				s.logger.Debug("failed to read a message", zap.Error(err))
-				return
-			}
-
-			// Verify the user message
-			action, userAddr, match := ParseGetOrdersMessage(string(message))
-			if !match {
-				if err := ws.WriteMessage(mt, []byte("invalid action message")); err != nil {
-					return
-				}
-				continue
-			}
-
-			switch action {
-			case "subscribe":
-				userAddr = strings.ToLower(userAddr)
-				orders := map[uint]model.Order{}
-
-				// Check the order status periodically and write updates to client
-				ticker := time.NewTicker(5 * time.Second)
-
-				for first := true; true; <-ticker.C {
-					makerOrders, err := s.store.FilterOrders(userAddr, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
-					if err != nil {
-						s.logger.Error("load maker orders", zap.Error(err))
-						continue
-					}
-					takerOrders, err := s.store.FilterOrders("", userAddr, "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
-					if err != nil {
-						s.logger.Error("load taker orders", zap.Error(err))
-						continue
-					}
-					newOrders := append(makerOrders, takerOrders...)
-
-					// Remove unchanged orders
-					for i := 0; i < len(newOrders); i++ {
-						exist, ok := orders[newOrders[i].ID]
-						if !ok || !model.CompareOrder(exist, newOrders[i]) {
-							orders[newOrders[i].ID] = newOrders[i]
-						} else {
-							newOrders = append(newOrders[:i], newOrders[i+1:]...)
-							i--
-						}
-					}
-
-					// Write all orders which has new updates (or the initial message after connection)
-					if len(newOrders) != 0 || first {
-						if err := ws.WriteJSON(newOrders); err != nil {
-							return
-						}
-						first = false
-					}
-				}
-			default:
-				// ignore all unknown actions
-			}
+		// Read message from client
+		mt, message, err := ws.ReadMessage()
+		if err != nil {
+			s.logger.Debug("failed to read a message", zap.Error(err))
+			return
 		}
 
+		// Verify the user message
+		action, userAddr, match := ParseGetOrdersMessage(string(message))
+		if !match {
+			if err := ws.WriteMessage(mt, []byte("invalid action message")); err != nil {
+				return
+			}
+			return
+		}
+
+		switch action {
+		case "subscribe":
+			userAddr = strings.ToLower(userAddr)
+			orders := map[uint]model.Order{}
+
+			// Check the order status periodically and write updates to client
+			ticker := time.NewTicker(15 * time.Second)
+
+			for first := true; true; <-ticker.C {
+
+				// Send a Ping message
+				if err := ws.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+					return
+				}
+
+				// Fetch all orders has the userAddress
+				makerOrders, err := s.store.FilterOrders(userAddr, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
+				if err != nil && err != gorm.ErrRecordNotFound {
+					s.logger.Error("load maker orders", zap.Error(err))
+					continue
+				}
+				takerOrders, err := s.store.FilterOrders("", userAddr, "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
+				if err != nil && err != gorm.ErrRecordNotFound {
+					s.logger.Error("load taker orders", zap.Error(err))
+					continue
+				}
+				newOrders := append(makerOrders, takerOrders...)
+
+				// Remove unchanged orders
+				for i := 0; i < len(newOrders); i++ {
+					exist, ok := orders[newOrders[i].ID]
+					if !ok || !model.CompareOrder(exist, newOrders[i]) {
+						orders[newOrders[i].ID] = newOrders[i]
+					} else {
+						newOrders = append(newOrders[:i], newOrders[i+1:]...)
+						i--
+					}
+				}
+				// Write all orders which has new updates (or the initial message after connection)
+				if len(newOrders) != 0 || first {
+					if err := ws.WriteJSON(newOrders); err != nil {
+						return
+					}
+					first = false
+				}
+			}
+		default:
+			// ignore all unknown actions
+		}
 	}
 }
 
