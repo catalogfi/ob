@@ -42,17 +42,15 @@ func main() {
 		panic(err)
 	}
 
-	var log *zap.Logger
+	// Initialise the logger
+	logCores := []zapcore.Core{logger.ZapDevelopmentCore()}
 	if env.SENTRY_DSN != "" {
-		log = zap.New(logger.NewSentryCore(env.SENTRY_DSN, zapcore.ErrorLevel))
-	} else {
-		log, err = zap.NewDevelopment()
-		if err != nil {
-			panic(err)
-		}
+		logCores = append(logCores, logger.NewSentryCore(env.SENTRY_DSN, zapcore.ErrorLevel))
 	}
-	defer log.Sync()
+	logCore := zapcore.NewTee(logCores...)
+	lg := zap.New(logCore)
+	defer lg.Sync()
 
-	watcher := watcher.NewWatcher(log, store, env.CONFIG)
+	watcher := watcher.NewWatcher(lg, store, env.CONFIG)
 	watcher.Run()
 }

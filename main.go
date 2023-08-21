@@ -31,7 +31,9 @@ func LoadConfiguration(file string) Config {
 	}
 	defer configFile.Close()
 	jsonParser := json.NewDecoder(configFile)
-	jsonParser.Decode(&config)
+	if err := jsonParser.Decode(&config); err != nil {
+		panic(err)
+	}
 	return config
 }
 

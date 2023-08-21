@@ -11,30 +11,26 @@ import (
 
 type sentryCore struct {
 	zapcore.LevelEnabler
-	fields map[string]interface{}
+	tags []zap.Field
 }
 
 // NewSentryCore creates a new Zap Core for Sentry.
-func NewSentryCore(url string, enab zapcore.LevelEnabler) zapcore.Core {
+func NewSentryCore(url string, levelEnable zapcore.LevelEnabler, tags ...zap.Field) zapcore.Core {
 	if err := sentry.Init(sentry.ClientOptions{
 		Dsn: url,
 	}); err != nil {
 		panic("sentry.Init: " + err.Error())
 	}
-	return zapcore.NewTee(zapcore.NewCore(zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()), zapcore.AddSync(zapcore.Lock(os.Stdout)), zap.DebugLevel), &sentryCore{
-		LevelEnabler: zapcore.ErrorLevel,
-		fields:       make(map[string]interface{}),
-	})
+	return &sentryCore{
+		LevelEnabler: levelEnable,
+		tags:         tags,
+	}
 }
 
 // With adds structured context to the core.
 func (core *sentryCore) With(fields []zapcore.Field) zapcore.Core {
-	clone := *core
-	clone.fields = make(map[string]interface{}, len(core.fields)+len(fields))
-	for k, v := range core.fields {
-		clone.fields[k] = v
-	}
-	return &clone
+	core.tags = append(core.tags, fields...)
+	return core
 }
 
 // Check determines whether the logger should log at the given level.
@@ -47,12 +43,16 @@ func (core *sentryCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapc
 
 // Write logs the entry and fields supplied at the log site.
 func (core *sentryCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
-	event := sentry.NewEvent()
-	event.Level = sentrySeverity(ent.Level)
-	event.Message = ent.Message
-	event.Extra = core.fields
+	if core.LevelEnabler.Enabled(ent.Level) {
+		event := sentry.NewEvent()
+		event.Level = sentrySeverity(ent.Level)
+		event.Message = ent.Message
+		extras := core.with(fields)
+		event.Extra = extras
 
-	sentry.CaptureEvent(event)
+		sentry.CaptureEvent(event)
+	}
+
 	return nil
 }
 
@@ -60,6 +60,17 @@ func (core *sentryCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 func (core *sentryCore) Sync() error {
 	sentry.Flush(2 * time.Second)
 	return nil
+}
+
+func (core *sentryCore) with(fs []zapcore.Field) map[string]interface{} {
+	enc := zapcore.NewMapObjectEncoder()
+	for _, f := range fs {
+		f.AddTo(enc)
+	}
+	for _, f := range core.tags {
+		f.AddTo(enc)
+	}
+	return enc.Fields
 }
 
 // sentrySeverity converts Zap's log level to Sentry's severity.
@@ -80,4 +91,10 @@ func sentrySeverity(level zapcore.Level) sentry.Level {
 	default:
 		return sentry.LevelInfo
 	}
+}
+
+func ZapDevelopmentCore() zapcore.Core {
+	enc := zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
+	ws := zapcore.AddSync(zapcore.Lock(os.Stdout))
+	return zapcore.NewCore(enc, ws, zap.DebugLevel)
 }
