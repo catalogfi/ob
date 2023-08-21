@@ -92,9 +92,8 @@ var _ = Describe("ethereum swap", func() {
 // 		fmt.Println(pkAddr1.Hex())
 // 		fmt.Println(pkAddr2.Hex())
 //
-// 		logger, err := zap.NewDevelopment()
 // 		Expect(err).To(BeNil())
-// 		client, err := ethereum.NewClient(logger, "http://localhost:8545")
+// 		client, err := ethereum.NewClient("http://localhost:8545")
 // 		Expect(err).To(BeNil())
 //
 // 		// client.ApproveERC20(privKey1, big.NewInt(100000), TOKEN, atomicSwapAdrr)

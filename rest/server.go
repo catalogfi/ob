@@ -113,7 +113,7 @@ func (s *Server) authenticateJWT(ctx *gin.Context) {
 	tokenString := ctx.GetHeader("Authorization")
 	if tokenString == "" {
 		s.logger.Debug("authorization failure", zap.Error(fmt.Errorf("missing authorization token")))
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Missing authorization token"})
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "missing authorization token"})
 		ctx.Abort()
 		return
 	}
@@ -121,7 +121,7 @@ func (s *Server) authenticateJWT(ctx *gin.Context) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			s.logger.Debug("authorization failure", zap.Error(fmt.Errorf("invalid signing method")))
-			return nil, fmt.Errorf("Invalid signing method")
+			return nil, fmt.Errorf("invalid signing method")
 		}
 
 		return []byte(s.secret), nil
@@ -139,12 +139,12 @@ func (s *Server) authenticateJWT(ctx *gin.Context) {
 			ctx.Set("userWallet", strings.ToLower(userWallet.(string)))
 		} else {
 			s.logger.Debug("authorization failure", zap.Error(fmt.Errorf("invalid token claims")))
-			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
 			ctx.Abort()
 			return
 		}
 	} else {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
 		ctx.Abort()
 		return
 	}

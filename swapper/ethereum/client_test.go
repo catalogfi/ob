@@ -7,7 +7,6 @@ import (
 	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/TestERC20"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/crypto"
-	"go.uber.org/zap"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -17,10 +16,8 @@ var _ = Describe("Ethereum", func() {
 	Context("Client", func() {
 		It("should be able to read data from the blockchain", func() {
 			By("Initialise client")
-			logger, err := zap.NewDevelopment()
-			Expect(err).Should(BeNil())
 			localRPC := "http://127.0.0.1:7545"
-			client, err := ethereum.NewClient(logger, localRPC)
+			client, err := ethereum.NewClient(localRPC)
 			Expect(err).Should(BeNil())
 
 			By("GetCurrentBlock()")
@@ -30,10 +27,8 @@ var _ = Describe("Ethereum", func() {
 
 		It("should read ERC20 related data", func() {
 			By("Initialise client")
-			logger, err := zap.NewDevelopment()
-			Expect(err).Should(BeNil())
 			localRPC := "http://127.0.0.1:7545"
-			client, err := ethereum.NewClient(logger, localRPC)
+			client, err := ethereum.NewClient(localRPC)
 			Expect(err).Should(BeNil())
 
 			By("Deploy an ERC20 contract")
