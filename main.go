@@ -6,17 +6,21 @@ import (
 	"os"
 	"time"
 
+	"github.com/TheZeroSlave/zapsentry"
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/price"
 	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/catalogfi/wbtc-garden/store"
 	"github.com/catalogfi/wbtc-garden/watcher"
+	"github.com/getsentry/sentry-go"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 type Config struct {
+	SENTRY_DSN     string
 	PORT           string       `binding:"required"`
 	PSQL_DB        string       `binding:"required"`
 	PRICE_FEED_URL string       `binding:"required"`
@@ -50,6 +54,22 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	if envConfig.SENTRY_DSN != "" {
+		client, err := sentry.NewClient(sentry.ClientOptions{Dsn: envConfig.SENTRY_DSN})
+		if err != nil {
+			panic(err)
+		}
+		cfg := zapsentry.Configuration{
+			Level: zapcore.ErrorLevel,
+		}
+		core, err := zapsentry.NewCore(cfg, zapsentry.NewSentryClientFromClient(client))
+		if err != nil {
+			panic(err)
+		}
+		logger = zapsentry.AttachCoreToLogger(core, logger)
+		defer logger.Sync()
+	}
+
 	watcher := watcher.NewWatcher(logger, store, envConfig.CONFIG)
 	price := price.NewPriceChecker(store, envConfig.PRICE_FEED_URL)
 	go price.Run()
