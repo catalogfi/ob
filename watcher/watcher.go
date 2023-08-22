@@ -55,7 +55,7 @@ func (w *watcher) Run() {
 	for i := 0; i < w.workers; i++ {
 		go func() {
 			for order := range w.orders {
-				w.watch(order)
+				ProcessOrder(order, w.store, w.config, w.logger.With(zap.Uint("order id", order.ID)))
 			}
 		}()
 	}
@@ -82,37 +82,35 @@ func (w *watcher) Run() {
 	}
 }
 
-func (w *watcher) watch(order model.Order) {
-	log := w.logger.With(zap.Uint("order id", order.ID))
-
+func ProcessOrder(order model.Order, store Store, config model.Network, logger *zap.Logger) {
 	// Special cases regardless of order status
 	switch {
 	// Redeem and refund happens at the same time which should not happen. Defensive check.
 	case (order.InitiatorAtomicSwap.RedeemTxHash != "" || order.FollowerAtomicSwap.RedeemTxHash != "") && (order.FollowerAtomicSwap.RefundTxHash != "" || order.InitiatorAtomicSwap.RefundTxHash != ""):
-		log.Error("atomic swap hard failed as someone both redeemed and refunded")
+		logger.Error("atomic swap hard failed as someone both redeemed and refunded")
 		order.Status = model.FailedHard
 	// Follower swap never gets initiated and Initiator swap is initiated and refunded
 	case order.InitiatorAtomicSwap.RefundTxHash != "" && order.FollowerAtomicSwap.InitiateTxHash == "" && order.InitiatorAtomicSwap.RedeemTxHash == "":
-		log.Error("atomic swap soft failed due to initiator refunding")
+		logger.Error("atomic swap soft failed due to initiator refunding")
 		order.Status = model.FailedSoft
 	// Follower swap not been redeemed and both swap been refunded
 	case order.InitiatorAtomicSwap.RedeemTxHash == "" && order.FollowerAtomicSwap.RedeemTxHash == "" && order.FollowerAtomicSwap.RefundTxHash != "" && order.InitiatorAtomicSwap.RefundTxHash != "":
-		log.Error("atomic swap soft failed due to both parties refunding")
+		logger.Error("atomic swap soft failed due to both parties refunding")
 		order.Status = model.FailedSoft
 	}
 	// Follower has not filled the swap before the order timeout
 	if order.Status == model.Created && time.Since(order.CreatedAt) > OrderTimeout {
-		log.Info("atomic swap cancelled due to fill timeout")
+		logger.Info("atomic swap cancelled due to fill timeout")
 		order.Status = model.Cancelled
 	}
 	if order.Status == model.Filled && time.Since(order.CreatedAt) > SwapInitiationTimeout && order.InitiatorAtomicSwap.Status == model.NotStarted {
-		log.Error("atomic swap cancelled due to initiator failing to initiate before timeout")
+		logger.Error("atomic swap cancelled due to initiator failing to initiate before timeout")
 		order.Status = model.Cancelled
 	}
 
 	if order.Status == model.FailedHard || order.Status == model.FailedSoft || order.Status == model.Cancelled {
-		if err := w.store.UpdateOrder(&order); err != nil {
-			log.Error("failed to update status", zap.Error(err), zap.Uint("status", uint(order.Status)))
+		if err := store.UpdateOrder(&order); err != nil {
+			logger.Error("failed to update status", zap.Error(err), zap.Uint("status", uint(order.Status)))
 			return
 		}
 	}
@@ -122,14 +120,14 @@ func (w *watcher) watch(order model.Order) {
 	}
 
 	// Fetch swapper watchers for both parties
-	initiatorWatcher, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config, order.InitiatorAtomicSwap.MinimumConfirmations, order.InitiatorAtomicSwap.IsInstantWallet)
+	initiatorWatcher, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, config, order.InitiatorAtomicSwap.MinimumConfirmations, order.InitiatorAtomicSwap.IsInstantWallet)
 	if err != nil {
-		log.Error("failed to load initiator watcher", zap.Error(err))
+		logger.Error("failed to load initiator watcher", zap.Error(err))
 		return
 	}
-	followerWatcher, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, w.config, order.FollowerAtomicSwap.MinimumConfirmations, order.InitiatorAtomicSwap.IsInstantWallet)
+	followerWatcher, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, config, order.FollowerAtomicSwap.MinimumConfirmations, order.InitiatorAtomicSwap.IsInstantWallet)
 	if err != nil {
-		log.Error("failed to load follower watcher", zap.Error(err))
+		logger.Error("failed to load follower watcher", zap.Error(err))
 		return
 	}
 
@@ -137,9 +135,9 @@ func (w *watcher) watch(order model.Order) {
 	var orderUpdate bool
 	for {
 		var ctn bool
-		order, ctn, err = w.statusCheck(log, order, initiatorWatcher, followerWatcher)
+		order, ctn, err = updateStatus(logger, order, initiatorWatcher, followerWatcher)
 		if err != nil {
-			log.Error("failed to check status", zap.Error(err))
+			logger.Error("failed to update status", zap.Error(err))
 			// return
 		}
 		if !ctn {
@@ -147,16 +145,15 @@ func (w *watcher) watch(order model.Order) {
 		}
 		orderUpdate = true
 	}
-	fmt.Println(orderUpdate, "right")
+
 	if orderUpdate {
-		fmt.Println("updated", order.ID, order.Status)
-		if err := w.store.UpdateOrder(&order); err != nil {
-			log.Error("failed to update order", zap.Any("order", order), zap.Error(err))
+		if err := store.UpdateOrder(&order); err != nil {
+			logger.Error("failed to update order", zap.Any("order", order), zap.Error(err))
 		}
 	}
 }
 
-func (w *watcher) swapStatusCheck(log *zap.Logger, swap model.AtomicSwap, watcher swapper.Watcher) (model.AtomicSwap, bool, error) {
+func updateSwapStatus(log *zap.Logger, swap model.AtomicSwap, watcher swapper.Watcher) (model.AtomicSwap, bool, error) {
 	switch swap.Status {
 	case model.NotStarted:
 		fullyFilled, txHash, amount, err := watcher.IsDetected()
@@ -177,18 +174,6 @@ func (w *watcher) swapStatusCheck(log *zap.Logger, swap model.AtomicSwap, watche
 			return swap, true, nil
 		}
 	case model.Detected:
-		if swap.Chain.IsBTC() {
-			isIwTx, err := isBtcIwTxs(w.config[swap.Chain].IWRPC, swap.InitiateTxHash)
-			if err != nil {
-				return swap, false, fmt.Errorf("failed to check if txs are instant wallet, %w", err)
-			}
-			if isIwTx {
-				swap.IsInstantWallet = true
-				swap.MinimumConfirmations = 0
-				swap.Status = model.Initiated
-				return swap, true, nil
-			}
-		}
 		height, conf, err := watcher.Status(swap.InitiateTxHash)
 		if err != nil {
 			return swap, false, err
@@ -243,17 +228,16 @@ func (w *watcher) swapStatusCheck(log *zap.Logger, swap model.AtomicSwap, watche
 			swap.RefundTxHash = txHash
 			return swap, true, nil
 		}
-		// case model.InitiatorAtomicSwapRefunded: ?
 	}
 	return swap, false, nil
 }
 
-func (w *watcher) statusCheck(log *zap.Logger, order model.Order, initiatorWatcher, followerWatcher swapper.Watcher) (model.Order, bool, error) {
-	initiatorSwap, ictn, ierr := w.swapStatusCheck(log, *order.InitiatorAtomicSwap, initiatorWatcher)
+func updateStatus(log *zap.Logger, order model.Order, initiatorWatcher, followerWatcher swapper.Watcher) (model.Order, bool, error) {
+	initiatorSwap, ictn, ierr := updateSwapStatus(log, *order.InitiatorAtomicSwap, initiatorWatcher)
 	if ierr != nil {
 		return order, false, ierr
 	}
-	followerSwap, fctn, ferr := w.swapStatusCheck(log, *order.FollowerAtomicSwap, followerWatcher)
+	followerSwap, fctn, ferr := updateSwapStatus(log, *order.FollowerAtomicSwap, followerWatcher)
 	if ferr != nil {
 		return order, false, ferr
 	}
