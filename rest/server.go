@@ -170,7 +170,7 @@ func (s *Server) GetOrderBySocket() gin.HandlerFunc {
 		defer ws.Close()
 
 		// Wait for the initiating message
-		mt, message, err := ws.ReadMessage()
+		_, message, err := ws.ReadMessage()
 		if err != nil {
 			s.logger.Debug("read message", zap.Error(err))
 			return
@@ -179,16 +179,18 @@ func (s *Server) GetOrderBySocket() gin.HandlerFunc {
 		// Verify the user message
 		action, orderStr, match := ParseGetOrderMessage(string(message))
 		if !match {
-			if err := ws.WriteMessage(mt, []byte("invalid action message")); err != nil {
-				return
+			res := map[string]string{
+				"error": "invalid action message",
 			}
+			ws.WriteJSON(res)
 			return
 		}
 		orderID, err := strconv.ParseUint(orderStr, 10, 64)
 		if err != nil {
-			if err := ws.WriteMessage(mt, []byte("invalid order ID")); err != nil {
-				return
+			res := map[string]string{
+				"error": "invalid order ID",
 			}
+			ws.WriteJSON(res)
 			return
 		}
 
@@ -243,7 +245,7 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 		defer ws.Close()
 
 		// Read message from client
-		mt, message, err := ws.ReadMessage()
+		_, message, err := ws.ReadMessage()
 		if err != nil {
 			s.logger.Debug("failed to read a message", zap.Error(err))
 			return
@@ -252,9 +254,10 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 		// Verify the user message
 		action, userAddr, match := ParseGetOrdersMessage(string(message))
 		if !match {
-			if err := ws.WriteMessage(mt, []byte("invalid action message")); err != nil {
-				return
+			res := map[string]string{
+				"error": "invalid action message",
 			}
+			ws.WriteJSON(res)
 			return
 		}
 
