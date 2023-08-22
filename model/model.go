@@ -215,20 +215,10 @@ func (conf NetworkConfig) IsSupported(asset Asset) error {
 	return fmt.Errorf("asset %v is not supported", asset)
 }
 
-func CompareOrderSlices(a, b []Order) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i, v := range a {
-		if v.Status != b[i].Status {
-			return false
-		}
-		if v.FollowerAtomicSwap.CurrentConfirmations != b[i].FollowerAtomicSwap.CurrentConfirmations || v.InitiatorAtomicSwap.CurrentConfirmations != b[i].InitiatorAtomicSwap.CurrentConfirmations {
-			return false
-		}
-		if v.FollowerAtomicSwap.FilledAmount != b[i].FollowerAtomicSwap.FilledAmount || v.InitiatorAtomicSwap.FilledAmount != b[i].InitiatorAtomicSwap.FilledAmount {
-			return false
-		}
-	}
-	return true
+func CompareOrder(a, b Order) bool {
+	return a.Status == b.Status &&
+		a.InitiatorAtomicSwap.CurrentConfirmations == b.InitiatorAtomicSwap.CurrentConfirmations &&
+		a.FollowerAtomicSwap.CurrentConfirmations == b.FollowerAtomicSwap.CurrentConfirmations &&
+		a.InitiatorAtomicSwap.FilledAmount == b.InitiatorAtomicSwap.FilledAmount &&
+		a.FollowerAtomicSwap.FilledAmount == b.FollowerAtomicSwap.FilledAmount
 }
