@@ -311,3 +311,8 @@ func GetParams(chain Chain) (*chaincfg.Params, error) {
 		return nil, errors.New("constraint violation: unknown chain")
 	}
 }
+func CompareOrder(a, b Order) bool {
+	return a.Status == b.Status &&
+		a.InitiatorAtomicSwap.CurrentConfirmationStatus == b.InitiatorAtomicSwap.CurrentConfirmationStatus &&
+		a.FollowerAtomicSwap.CurrentConfirmationStatus == b.FollowerAtomicSwap.CurrentConfirmationStatus
+}
