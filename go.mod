@@ -79,8 +79,10 @@ require (
 )
 
 require (
+	github.com/TheZeroSlave/zapsentry v1.17.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/fatih/color v1.7.0
+	github.com/getsentry/sentry-go v0.18.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/spruceid/siwe-go v0.2.0
 	go.uber.org/zap v1.25.0
