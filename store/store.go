@@ -85,12 +85,16 @@ func (s *store) ValueTradedByUserYesterday(user string, config model.Network) (*
 		return big.NewInt(0), nil
 	}
 
-	swaps := make([]model.AtomicSwap, len(orders))
+	swapIDs := make([]uint, len(orders))
 	for i, order := range orders {
-		swaps[i] = *order.InitiatorAtomicSwap
+		swapIDs[i] = order.InitiatorAtomicSwapID
 		if order.Taker == user {
-			swaps[i] = *order.FollowerAtomicSwap
+			swapIDs[i] = order.FollowerAtomicSwapID
 		}
+	}
+	swaps := []model.AtomicSwap{}
+	if tx := s.db.Find(&swaps, swapIDs); tx.Error != nil {
+		return nil, tx.Error
 	}
 	return s.usdValue(swaps, config)
 }
