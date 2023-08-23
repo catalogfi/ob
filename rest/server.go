@@ -213,7 +213,9 @@ func (s *Server) GetOrderBySocket() gin.HandlerFunc {
 				if order.Status >= model.OrderExecuted {
 					break
 				}
-				if err := ws.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+				if err := ws.WriteJSON(map[string]string{
+					"event": "ping",
+				}); err != nil {
 					return
 				}
 				newOrder, err := s.store.GetOrder(uint(orderID))
@@ -272,7 +274,9 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 			for first := true; true; <-ticker.C {
 
 				// Send a Ping message
-				if err := ws.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+				if err := ws.WriteJSON(map[string]string{
+					"event": "ping",
+				}); err != nil {
 					return
 				}
 
