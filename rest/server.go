@@ -300,8 +300,8 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 						return
 					}
 					first = false
+					orders = newOrders
 				}
-				orders = newOrders
 			}
 		default:
 			// ignore all unknown actions
