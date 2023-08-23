@@ -107,6 +107,10 @@ func (w *watcher) watch(order model.Order) error {
 		return w.store.UpdateOrder(&order)
 	}
 
+	if order.Status == model.OrderCreated {
+		return nil
+	}
+
 	// Fetch swapper watchers for both parties
 	initiatorWatcher, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, w.config, order.InitiatorAtomicSwap.MinimumConfirmations)
 	if err != nil {

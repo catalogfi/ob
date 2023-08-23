@@ -12,10 +12,11 @@ import (
 	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-const MaxQueryBlockRange = 500
+const MaxQueryBlockRange = 2000
 
 type initiatorSwap struct {
 	orderID          [32]byte
@@ -235,30 +236,9 @@ func (watcher *watcher) IsInitiated() (bool, []string, uint64, error) {
 	}
 
 	initiatedEvent := atomicSwapAbi.Events["Initiated"]
-	window := new(big.Int).Sub(currentBlock, watcher.eventWindow)
-	if window.Cmp(big.NewInt(0)) < 0 {
-		window = big.NewInt(0)
-	}
-	query := ethereum.FilterQuery{
-		FromBlock: window,
-		ToBlock:   currentBlock,
-		Addresses: []common.Address{
-			watcher.atomicSwapAddr,
-		},
-		Topics: [][]common.Hash{{initiatedEvent.ID}, {common.BytesToHash(watcher.orderId)}, {common.BytesToHash(watcher.secretHash)}},
-	}
-
-	logs, err := watcher.client.GetProvider().FilterLogs(context.Background(), query)
-	if err != nil {
-		return false, []string{}, 0, err
-	}
-
+	eventIds := [][]common.Hash{{initiatedEvent.ID}, {common.BytesToHash(watcher.orderId)}, {common.BytesToHash(watcher.secretHash)}}
+	logs, err := watcher.checkLogs(currentBlock, eventIds)
 	if len(logs) == 0 {
-		// Update the last checked block height
-		// newLastCheckedBlock := big.NewInt(0).Sub(currentBlock, watcher.minConfirmations)
-		// if newLastCheckedBlock.Cmp(watcher.lastCheckedBlock) == 1 {
-		// 	watcher.lastCheckedBlock = currentBlock
-		// }
 		return false, []string{}, 0, err
 	}
 
@@ -293,21 +273,9 @@ func (watcher *watcher) IsRedeemed() (bool, []byte, string, error) {
 	}
 
 	redeemedEvent := atomicSwapAbi.Events["Redeemed"]
-	window := new(big.Int).Sub(currentBlock, watcher.eventWindow)
-	if window.Cmp(big.NewInt(0)) < 0 {
-		window = big.NewInt(0)
-	}
-	query := ethereum.FilterQuery{
-		FromBlock: window,
-		ToBlock:   currentBlock,
-		Addresses: []common.Address{
-			watcher.atomicSwapAddr,
-		},
-		Topics: [][]common.Hash{{redeemedEvent.ID}, {common.BytesToHash(watcher.orderId)}, {common.BytesToHash(watcher.secretHash)}},
-	}
-
-	logs, err := watcher.client.GetProvider().FilterLogs(context.Background(), query)
-	if err != nil {
+	eventIds := [][]common.Hash{{redeemedEvent.ID}, {common.BytesToHash(watcher.orderId)}, {common.BytesToHash(watcher.secretHash)}}
+	logs, err := watcher.checkLogs(currentBlock, eventIds)
+	if len(logs) == 0 {
 		return false, nil, "", err
 	}
 
@@ -346,20 +314,11 @@ func (watcher *watcher) IsRefunded() (bool, string, error) {
 	}
 
 	refundedEvent := atomicSwapAbi.Events["Refunded"]
-	window := new(big.Int).Sub(currentBlock, watcher.eventWindow)
-	if window.Cmp(big.NewInt(0)) < 0 {
-		window = big.NewInt(0)
+	eventIds := [][]common.Hash{{refundedEvent.ID}, {common.BytesToHash(watcher.orderId)}}
+	logs, err := watcher.checkLogs(currentBlock, eventIds)
+	if len(logs) == 0 {
+		return false, "", err
 	}
-	query := ethereum.FilterQuery{
-		FromBlock: window,
-		ToBlock:   currentBlock,
-		Addresses: []common.Address{
-			watcher.atomicSwapAddr,
-		},
-		Topics: [][]common.Hash{{refundedEvent.ID}, {common.BytesToHash(watcher.orderId)}},
-	}
-
-	logs, err := watcher.client.GetProvider().FilterLogs(context.Background(), query)
 	if err != nil {
 		return false, "", err
 	}
@@ -373,4 +332,28 @@ func (watcher *watcher) IsRefunded() (bool, string, error) {
 		return false, "", err
 	}
 	return true, logs[0].TxHash.Hex(), nil
+}
+
+func (watcher *watcher) checkLogs(maxBlock *big.Int, eventIds [][]common.Hash) ([]types.Log, error) {
+	leastWindow := new(big.Int).Sub(maxBlock, watcher.eventWindow)
+
+	for maxBlock.Cmp(leastWindow) >= 0 {
+		query := ethereum.FilterQuery{
+			FromBlock: new(big.Int).Sub(maxBlock, big.NewInt(MaxQueryBlockRange)),
+			ToBlock:   maxBlock,
+			Addresses: []common.Address{
+				watcher.atomicSwapAddr,
+			},
+			Topics: eventIds,
+		}
+		logs, err := watcher.client.GetProvider().FilterLogs(context.Background(), query)
+		if len(logs) > 0 {
+			return logs, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		maxBlock = maxBlock.Sub(maxBlock, big.NewInt(MaxQueryBlockRange))
+	}
+	return nil, nil
 }
