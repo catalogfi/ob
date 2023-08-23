@@ -291,11 +291,11 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 					s.logger.Error("load taker orders", zap.Error(err))
 					continue
 				}
-				var newOrders []model.Order
+				newOrders := []model.Order{}
 				newOrders = append(newOrders, takerOrders...)
 				newOrders = append(newOrders, makerOrders...)
-				isUpdated := model.CompareOrderSlices(orders, newOrders)
-				if isUpdated || first {
+				notUpdated := model.CompareOrderSlices(orders, newOrders)
+				if !notUpdated || first {
 					if err := ws.WriteJSON(newOrders); err != nil {
 						return
 					}
