@@ -451,7 +451,7 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 // get all the orders with active atomic swaps
 func (s *store) GetActiveOrders() ([]model.Order, error) {
 	orders := []model.Order{}
-	if tx := s.db.Where("status > ? AND status < ?", model.Unknown, model.Executed).Find(&orders); tx.Error != nil {
+	if tx := s.db.Where("status IN ?", []model.Status{model.Created, model.Filled}).Find(&orders); tx.Error != nil {
 		return nil, tx.Error
 	}
 	for i := range orders {

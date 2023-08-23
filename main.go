@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -51,8 +52,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	watcher := watcher.NewWatcher(logger, store, envConfig.CONFIG.Network)
-	go watcher.Run()
+	watcher := watcher.NewWatcher(logger, store, envConfig.CONFIG.Network, 4)
+	go watcher.Run(context.Background())
 	server := rest.NewServer(store, envConfig.CONFIG, logger, "SECRET")
 	if err := server.Run(fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)

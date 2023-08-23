@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"time"
 
 	"github.com/catalogfi/wbtc-garden/model"
@@ -49,8 +50,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	watcher := watcher.NewWatcher(logger, store, config)
-	go watcher.Run()
+	watcher := watcher.NewWatcher(logger, store, config, 4)
+	go watcher.Run(context.Background())
 	server := rest.NewServer(store, model.Config{Network: config}, logger, "SECRET")
 	if err := server.Run(":8080"); err != nil {
 		panic(err)

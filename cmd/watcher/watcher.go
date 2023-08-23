@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"time"
@@ -64,6 +65,6 @@ func main() {
 		defer logger.Sync()
 	}
 
-	watcher := watcher.NewWatcher(logger, store, env.CONFIG)
-	watcher.Run()
+	watcher := watcher.NewWatcher(logger, store, env.CONFIG, 4)
+	watcher.Run(context.Background())
 }
