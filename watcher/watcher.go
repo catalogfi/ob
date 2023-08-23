@@ -74,13 +74,14 @@ func (w *watcher) Run() {
 			w.orders <- order
 		}
 
-		// Wait at least 15 seconds and until the channel is empty
-		time.Sleep(15 * time.Second)
+		// Wait at least 5 seconds and until the channel is empty
+		// reduced to test increse in performance
+		time.Sleep(5 * time.Second)
 		for {
 			if len(w.orders) == 0 {
 				break
 			}
-			time.Sleep(5 * time.Second)
+			time.Sleep(1 * time.Second)
 		}
 	}
 }
