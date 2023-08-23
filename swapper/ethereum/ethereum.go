@@ -44,7 +44,7 @@ type redeemerSwap struct {
 	watcher          swapper.Watcher
 }
 
-func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr common.Address, secretHash []byte, expiry, minConfirmations, amount *big.Int, client Client) (swapper.InitiatorSwap, error) {
+func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr common.Address, secretHash []byte, expiry, minConfirmations, amount *big.Int, client Client, eventWindow int64) (swapper.InitiatorSwap, error) {
 
 	initiatorAddr := crypto.PubkeyToAddress(initiator.PublicKey)
 	orderId := sha256.Sum256(append(secretHash, initiatorAddr.Hash().Bytes()...))
@@ -54,7 +54,7 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr 
 		latestCheckedBlock = big.NewInt(0)
 	}
 
-	watcher, err := NewWatcher(atomicSwapAddr, secretHash, orderId[:], expiry, minConfirmations, amount, client)
+	watcher, err := NewWatcher(atomicSwapAddr, secretHash, orderId[:], expiry, minConfirmations, amount, client, eventWindow)
 	if err != nil {
 		return &initiatorSwap{}, err
 	}
@@ -120,9 +120,9 @@ func (initiatorSwap *initiatorSwap) Refund() (string, error) {
 	return tx, nil
 }
 
-func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr common.Address, secretHash []byte, expiry, amount, minConfirmations *big.Int, client Client) (swapper.RedeemerSwap, error) {
+func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr common.Address, secretHash []byte, expiry, amount, minConfirmations *big.Int, client Client, eventWindow int64) (swapper.RedeemerSwap, error) {
 	orderId := sha256.Sum256(append(secretHash, initiatorAddr.Hash().Bytes()...))
-	watcher, err := NewWatcher(atomicSwapAddr, secretHash, orderId[:], expiry, minConfirmations, amount, client)
+	watcher, err := NewWatcher(atomicSwapAddr, secretHash, orderId[:], expiry, minConfirmations, amount, client, eventWindow)
 	if err != nil {
 		return &redeemerSwap{}, err
 	}
@@ -182,9 +182,10 @@ type watcher struct {
 	orderId          []byte
 	minConfirmations *big.Int
 	initiatedBlock   *big.Int
+	eventWindow      *big.Int
 }
 
-func NewWatcher(atomicSwapAddr common.Address, secretHash, orderId []byte, expiry, minConfirmations, amount *big.Int, client Client) (swapper.Watcher, error) {
+func NewWatcher(atomicSwapAddr common.Address, secretHash, orderId []byte, expiry, minConfirmations, amount *big.Int, client Client, eventWindow int64) (swapper.Watcher, error) {
 	latestCheckedBlock := new(big.Int).Sub(expiry, big.NewInt(12000))
 	if latestCheckedBlock.Cmp(big.NewInt(0)) == -1 {
 		latestCheckedBlock = big.NewInt(0)
@@ -198,6 +199,7 @@ func NewWatcher(atomicSwapAddr common.Address, secretHash, orderId []byte, expir
 		secretHash:       secretHash,
 		minConfirmations: minConfirmations,
 		orderId:          orderId,
+		eventWindow:      big.NewInt(eventWindow),
 	}, nil
 }
 
@@ -233,8 +235,12 @@ func (watcher *watcher) IsInitiated() (bool, []string, uint64, error) {
 	}
 
 	initiatedEvent := atomicSwapAbi.Events["Initiated"]
+	window := new(big.Int).Sub(currentBlock, watcher.eventWindow)
+	if window.Cmp(big.NewInt(0)) < 0 {
+		window = big.NewInt(0)
+	}
 	query := ethereum.FilterQuery{
-		FromBlock: watcher.lastCheckedBlock,
+		FromBlock: window,
 		ToBlock:   currentBlock,
 		Addresses: []common.Address{
 			watcher.atomicSwapAddr,
@@ -287,8 +293,12 @@ func (watcher *watcher) IsRedeemed() (bool, []byte, string, error) {
 	}
 
 	redeemedEvent := atomicSwapAbi.Events["Redeemed"]
+	window := new(big.Int).Sub(currentBlock, watcher.eventWindow)
+	if window.Cmp(big.NewInt(0)) < 0 {
+		window = big.NewInt(0)
+	}
 	query := ethereum.FilterQuery{
-		FromBlock: watcher.lastCheckedBlock,
+		FromBlock: window,
 		ToBlock:   currentBlock,
 		Addresses: []common.Address{
 			watcher.atomicSwapAddr,
@@ -336,8 +346,12 @@ func (watcher *watcher) IsRefunded() (bool, string, error) {
 	}
 
 	refundedEvent := atomicSwapAbi.Events["Refunded"]
+	window := new(big.Int).Sub(currentBlock, watcher.eventWindow)
+	if window.Cmp(big.NewInt(0)) < 0 {
+		window = big.NewInt(0)
+	}
 	query := ethereum.FilterQuery{
-		FromBlock: watcher.lastCheckedBlock,
+		FromBlock: window,
 		ToBlock:   currentBlock,
 		Addresses: []common.Address{
 			watcher.atomicSwapAddr,

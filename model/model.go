@@ -15,9 +15,10 @@ import (
 
 type Config map[Chain]NetworkConfig
 type NetworkConfig struct {
-	Assets map[Asset]bool
-	RPC    string
-	Expiry int64
+	Assets      map[Asset]bool
+	RPC         string
+	Expiry      int64
+	EventWindow int64
 }
 
 type Chain string

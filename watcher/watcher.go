@@ -90,6 +90,9 @@ func (w *watcher) watch(order model.Order) error {
 
 	// Special cases regardless of order status
 	switch {
+	case order.Status == model.OrderCreated && time.Since(order.CreatedAt) > OrderTimeout:
+		order.Status = model.OrderCancelled
+
 	// Redeem and refund happens at the same time which should not happen. Defensive check.
 	case (order.InitiatorAtomicSwap.RedeemTxHash != "" || order.FollowerAtomicSwap.RedeemTxHash != "") && (order.FollowerAtomicSwap.RefundTxHash != "" || order.InitiatorAtomicSwap.RefundTxHash != ""):
 		order.Status = model.OrderFailedHard
@@ -100,7 +103,7 @@ func (w *watcher) watch(order model.Order) error {
 	case order.InitiatorAtomicSwap.RedeemTxHash == "" && order.FollowerAtomicSwap.RedeemTxHash == "" && order.FollowerAtomicSwap.RefundTxHash != "" && order.InitiatorAtomicSwap.RefundTxHash != "":
 		order.Status = model.OrderFailedSoft
 	}
-	if order.Status == model.OrderFailedHard || order.Status == model.OrderFailedSoft {
+	if order.Status == model.OrderFailedHard || order.Status == model.OrderFailedSoft || order.Status == model.OrderCancelled {
 		return w.store.UpdateOrder(&order)
 	}
 
