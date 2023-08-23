@@ -266,7 +266,7 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 		switch action {
 		case "subscribe":
 			userAddr = strings.ToLower(userAddr)
-			orders := map[uint]model.Order{}
+			var orders []model.Order
 
 			// Check the order status periodically and write updates to client
 			ticker := time.NewTicker(15 * time.Second)
@@ -292,24 +292,14 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 					continue
 				}
 				newOrders := append(makerOrders, takerOrders...)
-
-				// Remove unchanged orders
-				for i := 0; i < len(newOrders); i++ {
-					exist, ok := orders[newOrders[i].ID]
-					if !ok || !model.CompareOrder(exist, newOrders[i]) {
-						orders[newOrders[i].ID] = newOrders[i]
-					} else {
-						newOrders = append(newOrders[:i], newOrders[i+1:]...)
-						i--
-					}
-				}
-				// Write all orders which has new updates (or the initial message after connection)
-				if len(newOrders) != 0 || first {
+				isUpdated := model.CompareOrderSlices(orders, newOrders)
+				if isUpdated || first {
 					if err := ws.WriteJSON(newOrders); err != nil {
 						return
 					}
 					first = false
 				}
+				orders = newOrders
 			}
 		default:
 			// ignore all unknown actions
