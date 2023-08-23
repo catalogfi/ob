@@ -78,12 +78,8 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr 
 	}, nil
 }
 
-func (initiatorSwap *initiatorSwap) Initiate() (txHash string, err error) {
-	defer func() {
-		fmt.Printf("Done Initiate on contract : %s : token : %s : err : %v \n", initiatorSwap.atomicSwapAddr, initiatorSwap.tokenAddr, err)
-	}()
-	txHash, err = initiatorSwap.client.InitiateAtomicSwap(initiatorSwap.atomicSwapAddr, initiatorSwap.initiator, initiatorSwap.redeemerAddr, initiatorSwap.tokenAddr, initiatorSwap.expiry, initiatorSwap.amount, initiatorSwap.secretHash)
-	return
+func (initiatorSwap *initiatorSwap) Initiate() (string, error) {
+	return initiatorSwap.client.InitiateAtomicSwap(initiatorSwap.atomicSwapAddr, initiatorSwap.initiator, initiatorSwap.redeemerAddr, initiatorSwap.tokenAddr, initiatorSwap.expiry, initiatorSwap.amount, initiatorSwap.secretHash)
 }
 
 func (initiatorSwap *initiatorSwap) Expired() (bool, error) {
@@ -110,7 +106,6 @@ func (initiatorSwap *initiatorSwap) IsRedeemed() (bool, []byte, string, error) {
 }
 
 func (initiatorSwap *initiatorSwap) Refund() (string, error) {
-	defer fmt.Println("Done refund")
 
 	// Initialise the transactor
 	transactor, err := initiatorSwap.client.GetTransactOpts(initiatorSwap.initiator)
@@ -153,8 +148,6 @@ func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr c
 }
 
 func (redeemerSwap *redeemerSwap) Redeem(secret []byte) (string, error) {
-	defer fmt.Println("Done redeem")
-	fmt.Println("redeeming...")
 	transactor, err := redeemerSwap.client.GetTransactOpts(redeemerSwap.redeemer)
 	if err != nil {
 		return "", err
@@ -167,11 +160,9 @@ func (redeemerSwap *redeemerSwap) IsInitiated() (bool, []string, uint64, error) 
 }
 
 func (redeemerSwap *redeemerSwap) WaitForInitiate() ([]string, error) {
-	defer fmt.Println("Done WaitForInitiate")
 	for {
 		initiated, txHash, _, err := redeemerSwap.IsInitiated()
 		if initiated {
-			fmt.Printf("Initiation Found on contract : %s : token : %s \n", redeemerSwap.atomicSwapAddr, redeemerSwap.tokenAddr)
 			return txHash, nil
 		}
 		if err != nil {
@@ -227,7 +218,6 @@ func (watcher *watcher) Expired() (bool, error) {
 }
 
 func (watcher *watcher) IsInitiated() (bool, []string, uint64, error) {
-	fmt.Println("Checking if initiated")
 	currBlock, err := watcher.client.GetCurrentBlock()
 	if err != nil {
 		return false, []string{}, 0, err
@@ -263,7 +253,6 @@ func (watcher *watcher) IsInitiated() (bool, []string, uint64, error) {
 		// if newLastCheckedBlock.Cmp(watcher.lastCheckedBlock) == 1 {
 		// 	watcher.lastCheckedBlock = currentBlock
 		// }
-		fmt.Println("No logs found")
 		return false, []string{}, 0, err
 	}
 
@@ -318,7 +307,6 @@ func (watcher *watcher) IsRedeemed() (bool, []byte, string, error) {
 		// if newLastCheckedBlock.Cmp(watcher.lastCheckedBlock) == 1 {
 		// 	watcher.lastCheckedBlock = currentBlock
 		// }
-		fmt.Println("No logs found")
 		return false, nil, "", err
 	}
 
@@ -368,7 +356,6 @@ func (watcher *watcher) IsRefunded() (bool, string, error) {
 		// if newLastCheckedBlock.Cmp(watcher.lastCheckedBlock) == 1 {
 		// 	watcher.lastCheckedBlock = currentBlock
 		// }
-		fmt.Println("No logs found")
 		return false, "", err
 	}
 	return true, logs[0].TxHash.Hex(), nil
