@@ -291,15 +291,17 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 					s.logger.Error("load taker orders", zap.Error(err))
 					continue
 				}
-				newOrders := append(makerOrders, takerOrders...)
+				var newOrders []model.Order
+				newOrders = append(newOrders, takerOrders...)
+				newOrders = append(newOrders, makerOrders...)
 				isUpdated := model.CompareOrderSlices(orders, newOrders)
 				if isUpdated || first {
 					if err := ws.WriteJSON(newOrders); err != nil {
 						return
 					}
 					first = false
+					orders = newOrders
 				}
-				orders = newOrders
 			}
 		default:
 			// ignore all unknown actions
