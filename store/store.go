@@ -19,6 +19,8 @@ type Store interface {
 	rest.Store
 	watcher.Store
 	price.Store
+
+	Gorm() *gorm.DB
 }
 
 type store struct {
@@ -33,7 +35,7 @@ func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := db.AutoMigrate(&model.Order{}, &model.AtomicSwap{}); err != nil {
+	if err := db.AutoMigrate(&model.Order{}, &model.AtomicSwap{}, &model.Blacklist{}); err != nil {
 		return nil, err
 	}
 	return &store{mu: new(sync.RWMutex), cache: make(map[string]float64), db: db}, nil
@@ -158,7 +160,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		return 0, err
 	}
 
-	//fetch current price of btc from chain [for analytics]
+	// fetch current price of btc from chain [for analytics]
 	priceByOracle, err := s.Price("bitcoin", "ethereum")
 	if err != nil {
 		return 0, err
@@ -538,6 +540,10 @@ func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
 		}
 	}
 	return 0
+}
+
+func (s *store) Gorm() *gorm.DB {
+	return s.db
 }
 
 // func secretHashAlreadyExists(orderPair string, secretHash string) (bool, error) {
