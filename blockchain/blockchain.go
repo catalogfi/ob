@@ -26,7 +26,7 @@ import (
 func LoadClient(chain model.Chain, config model.Network, iwConfig ...model.InstantWalletConfig) (interface{}, error) {
 	if chain.IsBTC() {
 		client := bitcoin.NewClient(config[chain].RPC, getParams(chain))
-		if iwConfig != nil {
+		if model.ValidateIWCOnfig(iwConfig) {
 			store, err := bitcoin.NewStore(iwConfig[0].Dialector, &gorm.Config{})
 			if err != nil {
 				return nil, err
