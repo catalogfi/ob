@@ -169,8 +169,11 @@ func StartServer() {
 		Expect(err).NotTo(HaveOccurred())
 		config := model.Config{
 			model.BitcoinTestnet: model.NetworkConfig{
-				Assets: map[model.Asset]bool{
-					model.Primary: true,
+				Assets: map[model.Asset]model.Token{
+					model.NewSecondary(""): {
+						TokenAddress: "",
+						Decimals:     0,
+					},
 				},
 				RPC: map[string]string{
 					"mempool": "https://mempool.space/testnet/api",
@@ -178,8 +181,11 @@ func StartServer() {
 				Expiry: 1000,
 			},
 			model.EthereumSepolia: model.NetworkConfig{
-				Assets: map[model.Asset]bool{
-					model.NewSecondary(""): true,
+				Assets: map[model.Asset]model.Token{
+					model.NewSecondary(""): {
+						TokenAddress: "",
+						Decimals:     0,
+					},
 				},
 				RPC: map[string]string{
 					"ethrpc": "http://localhost:8545",
