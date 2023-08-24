@@ -20,7 +20,7 @@ var _ = Describe("atomic swap", func() {
 			By("Initialise client")
 			network := &chaincfg.RegressionNetParams
 			electrs := "http://localhost:30000"
-			client := bitcoin.NewClient(electrs, network)
+			client := bitcoin.NewClient(bitcoin.NewBlockstream(electrs), network)
 			logger, err := zap.NewDevelopment()
 			Expect(err).To(BeNil())
 
@@ -104,7 +104,7 @@ var _ = Describe("atomic swap", func() {
 			By("Initialise client")
 			network := &chaincfg.RegressionNetParams
 			electrs := "http://localhost:30000"
-			client := bitcoin.NewClient(electrs, network)
+			client := bitcoin.NewClient(bitcoin.NewBlockstream(electrs), network)
 			logger, err := zap.NewDevelopment()
 			Expect(err).To(BeNil())
 
@@ -151,7 +151,7 @@ var _ = Describe("atomic swap", func() {
 			By("Initialise client")
 			network := &chaincfg.RegressionNetParams
 			electrs := "http://localhost:30000"
-			client := bitcoin.NewClient(electrs, network)
+			client := bitcoin.NewClient(bitcoin.NewBlockstream(electrs), network)
 			logger, err := zap.NewDevelopment()
 			Expect(err).To(BeNil())
 

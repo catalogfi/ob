@@ -1,14 +1,8 @@
 package bitcoin
 
 import (
-	"bytes"
 	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"strconv"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
@@ -44,12 +38,12 @@ type Client interface {
 }
 
 type client struct {
-	url string
-	net *chaincfg.Params
+	indexer Indexer
+	net     *chaincfg.Params
 }
 
-func NewClient(url string, net *chaincfg.Params) Client {
-	return &client{url: url, net: net}
+func NewClient(indexer Indexer, net *chaincfg.Params) Client {
+	return &client{indexer: indexer, net: net}
 }
 
 func (client *client) Net() *chaincfg.Params {
@@ -57,69 +51,15 @@ func (client *client) Net() *chaincfg.Params {
 }
 
 func (client *client) GetTipBlockHeight() (uint64, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/blocks/tip/height", client.url))
-	if err != nil {
-		return 0, fmt.Errorf("failed to get transaction: %w", err)
-	}
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return 0, fmt.Errorf("failed to read response body: %w", err)
-	}
-	return strconv.ParseUint(string(data), 10, 64)
+	return client.indexer.GetTipBlockHeight()
 }
 
 func (client *client) GetSpendingWitness(address btcutil.Address) ([]string, Transaction, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/address/%s/txs", client.url, address.EncodeAddress()))
-	if err != nil {
-		return []string{}, Transaction{}, fmt.Errorf("failed to get transactions: %w", err)
-	}
-	var txs []Transaction
-	if err := json.NewDecoder(resp.Body).Decode(&txs); err != nil {
-		return []string{}, Transaction{}, fmt.Errorf("failed to decode transactions: %w", err)
-	}
-	for _, tx := range txs {
-		for _, vin := range tx.VINs {
-			if vin.Prevout.ScriptPubKeyAddress == address.EncodeAddress() {
-				return *vin.Witness, tx, nil
-			}
-		}
-	}
-	return []string{}, Transaction{}, nil
+	return client.indexer.GetSpendingWitness(address)
 }
 
 func (client *client) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/address/%s/utxo", client.url, address.EncodeAddress()))
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get UTXOs: %w", err)
-	}
-	utxos := UTXOs{}
-
-	if err := json.NewDecoder(resp.Body).Decode(&utxos); err != nil {
-		return nil, 0, fmt.Errorf("failed to decode UTXOs: %w", err)
-	}
-
-	var balance uint64
-	for _, utxo := range utxos {
-		balance += utxo.Amount
-	}
-
-	if amount == 0 {
-		return utxos, balance, nil
-	}
-	if balance < amount {
-		return nil, 0, fmt.Errorf("insufficient balance in %s", address.EncodeAddress())
-	}
-
-	var selected UTXOs
-	var total uint64
-	for _, utxo := range utxos {
-		if total >= amount {
-			break
-		}
-		selected = append(selected, utxo)
-		total += utxo.Amount
-	}
-	return selected, total, nil
+	return client.indexer.GetUTXOs(address, amount)
 }
 
 func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error) {
@@ -139,7 +79,7 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate fee: %w", err)
 	}
-  
+
 	utxosWihFee, selectedAmount, err := client.GetUTXOs(fromAddr, amount+fee)
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
@@ -181,7 +121,7 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 		tx.TxIn[i].Witness = witness
 	}
 
-	return client.SubmitTx(tx)
+	return client.indexer.SubmitTx(tx)
 }
 
 func (client *client) Spend(script []byte, redeemScript wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error) {
@@ -238,48 +178,12 @@ func (client *client) Spend(script []byte, redeemScript wire.TxWitness, spender 
 		tx.TxIn[i].Witness = append(wire.TxWitness{sig}, redeemScript...)
 		tx.TxIn[i].Witness = append(tx.TxIn[i].Witness, wire.TxWitness{script}...)
 	}
-	return client.SubmitTx(tx)
-}
-
-func (client *client) SubmitTx(tx *wire.MsgTx) (string, error) {
-	var buf bytes.Buffer
-	if err := tx.Serialize(&buf); err != nil {
-		return "", fmt.Errorf("failed to serialize transaction: %w", err)
-	}
-
-	resp, err := http.Post(fmt.Sprintf("%s/tx", client.url), "application/text", bytes.NewBufferString(hex.EncodeToString(buf.Bytes())))
-	if err != nil {
-		return "", fmt.Errorf("failed to send transaction: %w", err)
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read transaction id: %w", err)
-	}
-	
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to send transaction: %s", data)
-	}
-
-	return string(data), nil
-}
-
-func (client *client) GetFeeRates() (FeeRates, error) {
-	var feeRates FeeRates
-	resp, err := http.Get("https://mempool.space/api/v1/fees/recommended")
-	if err != nil {
-		return FeeRates{}, fmt.Errorf("failed to get fee rates: %w", err)
-	}
-	err = json.NewDecoder(resp.Body).Decode(&feeRates)
-	if err != nil {
-		return FeeRates{}, fmt.Errorf("failed to unmarshal response body: %w", err)
-	}
-	return feeRates, nil
+	return client.indexer.SubmitTx(tx)
 }
 
 // CalculateFee estimates the fees of the bitcoin tx with given number of inputs and outputs.
 func (client *client) CalculateTransferFee(nInputs, nOutputs int, txVersion int32) (uint64, error) {
-	feeRates, err := client.GetFeeRates()
+	feeRates, err := client.indexer.GetFeeRates()
 	if err != nil {
 		return 0, err
 	}
@@ -295,9 +199,8 @@ func (client *client) CalculateTransferFee(nInputs, nOutputs int, txVersion int3
 
 }
 
-
 func (client *client) CalculateRedeemFee() (uint64, error) {
-	feeRates, err := client.GetFeeRates()
+	feeRates, err := client.indexer.GetFeeRates()
 	if err != nil {
 		return 0, err
 	}

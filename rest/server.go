@@ -309,6 +309,22 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 	}
 }
 
+
+func (s *Server) Socket() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// upgrade get request to websocket protocol
+		ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to upgrade to websocket %v", err)})
+			return
+		}
+		defer ws.Close()
+
+		
+
+	}
+}
+
 func (s *Server) GetValueByChain() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		chain, err := model.ParseChain(c.Param("chain"))

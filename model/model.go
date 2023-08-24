@@ -16,7 +16,7 @@ import (
 type Config map[Chain]NetworkConfig
 type NetworkConfig struct {
 	Assets      map[Asset]Token
-	RPC         string
+	RPC         map[string]string
 	Expiry      int64
 	EventWindow int64
 }

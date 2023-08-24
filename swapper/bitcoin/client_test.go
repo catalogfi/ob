@@ -19,7 +19,7 @@ var _ = Describe("bitcoin client ", func() {
 			By("Initialise client")
 			network := &chaincfg.RegressionNetParams
 			electrs := "http://localhost:30000"
-			client := bitcoin.NewClient(electrs, network)
+			client := bitcoin.NewClient(bitcoin.NewBlockstream(electrs), network)
 
 			By("Net()")
 			net := client.Net()
@@ -49,7 +49,7 @@ var _ = Describe("bitcoin client ", func() {
 			By("Initialise client")
 			network := &chaincfg.RegressionNetParams
 			electrs := "http://localhost:30000"
-			client := bitcoin.NewClient(electrs, network)
+			client := bitcoin.NewClient(bitcoin.NewBlockstream(electrs), network)
 
 			By("Parse the private key")
 			pk1, addr1, err := ParseKey(PrivateKey1, network)
@@ -73,7 +73,7 @@ var _ = Describe("bitcoin client ", func() {
 			By("Initialise client")
 			network := &chaincfg.RegressionNetParams
 			electrs := "http://localhost:30000"
-			client := bitcoin.NewClient(electrs, network)
+			client := bitcoin.NewClient(bitcoin.NewBlockstream(electrs), network)
 
 			By("Parse the private key")
 			pk1, addr1, err := ParseKey(PrivateKey1, network)
