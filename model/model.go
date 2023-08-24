@@ -15,7 +15,7 @@ import (
 
 type Config map[Chain]NetworkConfig
 type NetworkConfig struct {
-	Assets      map[Asset]bool
+	Assets      map[Asset]Token
 	RPC         string
 	Expiry      int64
 	EventWindow int64
@@ -60,6 +60,11 @@ func (c Chain) IsEVM() bool {
 
 func (c Chain) IsBTC() bool {
 	return c == Bitcoin || c == BitcoinTestnet || c == BitcoinRegtest
+}
+
+type Token struct {
+	TokenAddress string
+	Decimals     int64
 }
 
 type Asset string
@@ -242,7 +247,8 @@ func ParseChainAsset(chainAsset string) (Chain, Asset, error) {
 }
 
 func (conf NetworkConfig) IsSupported(asset Asset) error {
-	if conf.Assets[asset] {
+	_, ok := conf.Assets[asset]
+	if !ok {
 		return nil
 	}
 	return fmt.Errorf("asset %v is not supported", asset)

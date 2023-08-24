@@ -9,9 +9,6 @@ import (
 	"time"
 
 	"github.com/catalogfi/wbtc-garden/model"
-	"github.com/catalogfi/wbtc-garden/swapper/ethereum"
-	"github.com/ethereum/go-ethereum/common"
-	"go.uber.org/zap"
 )
 
 type Store interface {
@@ -78,23 +75,7 @@ func (p *PriceChecker) Run() error {
 func GetPrice(asset model.Asset, chain model.Chain, config model.Config, amount *big.Int, PriceInUSD *big.Int) (*big.Int, error) {
 	var decimals int64
 	if chain.IsEVM() {
-		logger, err := zap.NewDevelopment()
-		if err != nil {
-			return nil, err
-		}
-		client, err := ethereum.NewClient(logger, config[chain].RPC)
-		if err != nil {
-			return nil, err
-		}
-		token, err := client.GetTokenAddress(common.HexToAddress(asset.SecondaryID()))
-		if err != nil {
-			return nil, err
-		}
-		tokenDecimals, err := client.GetDecimals(token)
-		if err != nil {
-			return nil, err
-		}
-		decimals = int64(tokenDecimals)
+		decimals = config[chain].Assets[asset].Decimals
 	} else if chain.IsBTC() {
 		decimals = 8
 	}
