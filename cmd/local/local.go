@@ -6,6 +6,7 @@ import (
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/price"
 	"github.com/catalogfi/wbtc-garden/rest"
+	"github.com/catalogfi/wbtc-garden/screener"
 	"github.com/catalogfi/wbtc-garden/store"
 	"github.com/catalogfi/wbtc-garden/watcher"
 	"go.uber.org/zap"
@@ -54,7 +55,10 @@ func main() {
 	price := price.NewPriceChecker(store, "https://api.coincap.io/v2/assets/bitcoin")
 	go price.Run()
 	go watcher.Run()
-	server := rest.NewServer(store, config, logger, "SECRET")
+
+	// Screen is not doing sanction check in this case
+	screener := screener.NewScreener(nil, "")
+	server := rest.NewServer(store, config, logger, "SECRET", screener)
 	if err := server.Run(":8080"); err != nil {
 		panic(err)
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/price"
 	"github.com/catalogfi/wbtc-garden/rest"
+	"github.com/catalogfi/wbtc-garden/screener"
 	"github.com/catalogfi/wbtc-garden/store"
 	"github.com/catalogfi/wbtc-garden/watcher"
 	"github.com/getsentry/sentry-go"
@@ -26,6 +27,7 @@ type Config struct {
 	PSQL_DB        string       `binding:"required"`
 	PRICE_FEED_URL string       `binding:"required"`
 	CONFIG         model.Config `binding:"required"`
+	TRM_KEY        string
 }
 
 func LoadConfiguration(file string) Config {
@@ -76,7 +78,8 @@ func main() {
 	price := price.NewPriceChecker(store, envConfig.PRICE_FEED_URL)
 	go price.Run()
 	go watcher.Run()
-	server := rest.NewServer(store, envConfig.CONFIG, logger, "SECRET")
+	screener := screener.NewScreener(store.Gorm(), envConfig.TRM_KEY)
+	server := rest.NewServer(store, envConfig.CONFIG, logger, "SECRET", screener)
 	if err := server.Run(fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}

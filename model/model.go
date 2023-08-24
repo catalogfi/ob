@@ -142,6 +142,11 @@ type AtomicSwap struct {
 	IsInstantWallet           bool    `json:"-"`
 }
 
+type Blacklist struct {
+	gorm.Model
+	Address string `gorm:"unique"`
+}
+
 type LockedAmount struct {
 	Asset  string
 	Amount sql.NullInt64
