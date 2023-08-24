@@ -120,12 +120,12 @@ func ProcessOrder(order model.Order, store Store, config model.Network, logger *
 	}
 
 	// Fetch swapper watchers for both parties
-	initiatorWatcher, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, config, order.InitiatorAtomicSwap.MinimumConfirmations, order.InitiatorAtomicSwap.IsInstantWallet)
+	initiatorWatcher, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, config, order.InitiatorAtomicSwap.MinimumConfirmations)
 	if err != nil {
 		logger.Error("failed to load initiator watcher", zap.Error(err))
 		return
 	}
-	followerWatcher, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, config, order.FollowerAtomicSwap.MinimumConfirmations, order.InitiatorAtomicSwap.IsInstantWallet)
+	followerWatcher, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, config, order.FollowerAtomicSwap.MinimumConfirmations)
 	if err != nil {
 		logger.Error("failed to load follower watcher", zap.Error(err))
 		return

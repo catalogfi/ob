@@ -19,14 +19,15 @@ import (
 	"github.com/catalogfi/wbtc-garden/swapper/ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"gorm.io/gorm"
 )
 
 // The function `LoadClient` returns a client for a given blockchain chain and its corresponding URLs(set during config).
-func LoadClient(chain model.Chain, config model.Network, isIW bool) (interface{}, error) {
+func LoadClient(chain model.Chain, config model.Network, iwConfig ...model.InstantWalletConfig) (interface{}, error) {
 	if chain.IsBTC() {
 		client := bitcoin.NewClient(config[chain].RPC, getParams(chain))
-		if isIW {
-			store, err := bitcoin.GetBitcoinIWStore()
+		if iwConfig != nil {
+			store, err := bitcoin.NewStore(iwConfig[0].Dialector, &gorm.Config{})
 			if err != nil {
 				return nil, err
 			}
@@ -42,8 +43,8 @@ func LoadClient(chain model.Chain, config model.Network, isIW bool) (interface{}
 
 // The function `LoadInitiatorSwap` loads an initiator swap based on the given atomic swap details, private key, secret hash, and URLs.
 // initiateSwap can be used to construct a Swap Object with methods required to handle Atomicswap on initiator side.
-func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interface{}, secretHash string, config model.Network, minConfirmations uint64, isIw bool) (swapper.InitiatorSwap, error) {
-	client, err := LoadClient(atomicSwap.Chain, config, isIw)
+func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interface{}, secretHash string, config model.Network, minConfirmations uint64, iwConfig ...model.InstantWalletConfig) (swapper.InitiatorSwap, error) {
+	client, err := LoadClient(atomicSwap.Chain, config, iwConfig...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
@@ -79,8 +80,8 @@ func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interfac
 	}
 }
 
-func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, config model.Network, minConfirmations uint64, isIw bool) (swapper.Watcher, error) {
-	client, err := LoadClient(atomicSwap.Chain, config, isIw)
+func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, config model.Network, minConfirmations uint64) (swapper.Watcher, error) {
+	client, err := LoadClient(atomicSwap.Chain, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
@@ -132,8 +133,8 @@ func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, config model.Ne
 	}
 }
 
-func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerPrivateKey interface{}, secretHash string, config model.Network, minConfirmations uint64, isIw bool) (swapper.RedeemerSwap, error) {
-	client, err := LoadClient(atomicSwap.Chain, config, isIw)
+func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerPrivateKey interface{}, secretHash string, config model.Network, minConfirmations uint64, iwConfig ...model.InstantWalletConfig) (swapper.RedeemerSwap, error) {
+	client, err := LoadClient(atomicSwap.Chain, config, iwConfig...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
 	}

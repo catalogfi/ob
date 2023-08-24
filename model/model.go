@@ -15,7 +15,9 @@ type NetworkConfig struct {
 	IWRPC   string
 	Expiry  int64
 }
-
+type InstantWalletConfig struct {
+	Dialector gorm.Dialector
+}
 type Config struct {
 	Network    Network
 	MinTxLimit string

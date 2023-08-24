@@ -1,9 +1,6 @@
 package bitcoin
 
 import (
-	"fmt"
-
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -35,13 +32,8 @@ type store struct {
 	db *gorm.DB
 }
 
-func GetBitcoinIWStore() (Store, error) {
-	return NewStore(sqlite.Open("BtcInstantWallet.db"), &gorm.Config{})
-}
-
 func NewStore(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 	db, err := gorm.Open(dialector, opts...)
-	fmt.Println("db", dialector.Name())
 	if err != nil {
 		return nil, err
 	}
