@@ -22,11 +22,26 @@ import (
 // The function `LoadClient` returns a client for a given blockchain chain and its corresponding URLs(set during config).
 func LoadClient(chain model.Chain, config model.Config) (interface{}, error) {
 	if chain.IsBTC() {
-		return bitcoin.NewClient(config[chain].RPC, getParams(chain)), nil
+		indexers := []bitcoin.Indexer{}
+		for iType, url := range config[chain].RPC {
+			switch iType {
+			case "blockstream":
+				indexers = append(indexers, bitcoin.NewBlockstream(url))
+			case "mempool":
+				indexers = append(indexers, bitcoin.NewMempool(url))
+			default:
+				return nil, fmt.Errorf("unknown indexer: %s", iType)
+			}
+		}
+		indexer, err := bitcoin.NewMultiIndexer(indexers...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create indexer: %v", err)
+		}
+		return bitcoin.NewClient(indexer, getParams(chain)), nil
 	}
 	if chain.IsEVM() {
 		logger, _ := zap.NewDevelopment()
-		return ethereum.NewClient(logger, config[chain].RPC)
+		return ethereum.NewClient(logger, config[chain].RPC["ethrpc"])
 	}
 	return nil, fmt.Errorf("invalid chain: %s", chain)
 }

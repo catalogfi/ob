@@ -24,21 +24,27 @@ func main() {
 
 	config := model.Config{
 		model.BitcoinTestnet: {
-			RPC: "https://mempool.space/testnet/api",
+			RPC: map[string]string{
+				"mempool": "https://mempool.space/testnet/api",
+			},
 			Assets: map[model.Asset]bool{
 				model.Primary: true,
 			},
 			Expiry: 144,
 		},
 		model.EthereumSepolia: {
-			RPC: "https://gateway.tenderly.co/public/sepolia",
+			RPC: map[string]string{
+				"ethrpc": "https://gateway.tenderly.co/public/sepolia",
+			},
 			Assets: map[model.Asset]bool{
 				model.NewSecondary(""): true,
 			},
 			Expiry: 6542,
 		},
 		model.EthereumOptimism: {
-			RPC: "https://opt-mainnet.g.alchemy.com/v2/lM_wORHU7fDVp_SSYJPCCO-erSffgpX9",
+			RPC: map[string]string{
+				"ethrpc": "https://opt-mainnet.g.alchemy.com/v2/lM_wORHU7fDVp_SSYJPCCO-erSffgpX9",
+			},
 			Assets: map[model.Asset]bool{
 				model.NewSecondary(""): true,
 			},

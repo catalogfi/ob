@@ -82,7 +82,7 @@ func GetPrice(asset model.Asset, chain model.Chain, config model.Config, amount 
 		if err != nil {
 			return nil, err
 		}
-		client, err := ethereum.NewClient(logger, config[chain].RPC)
+		client, err := ethereum.NewClient(logger, config[chain].RPC["ethrpc"])
 		if err != nil {
 			return nil, err
 		}

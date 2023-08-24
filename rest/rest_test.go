@@ -172,14 +172,18 @@ func StartServer() {
 				Assets: map[model.Asset]bool{
 					model.Primary: true,
 				},
-				RPC:    "https://mempool.space/testnet/api",
+				RPC: map[string]string{
+					"mempool": "https://mempool.space/testnet/api",
+				},
 				Expiry: 1000,
 			},
 			model.EthereumSepolia: model.NetworkConfig{
 				Assets: map[model.Asset]bool{
 					model.NewSecondary(""): true,
 				},
-				RPC:    "http://localhost:8545",
+				RPC: map[string]string{
+					"ethrpc": "http://localhost:8545",
+				},
 				Expiry: 10000,
 			},
 		}

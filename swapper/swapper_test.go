@@ -82,7 +82,7 @@ var _ = Describe("Ethereum to Bitcoin", func() {
 		ethClient, err := ethereum.NewClient(logger, "http://localhost:8545")
 		Expect(err).To(BeNil())
 
-		btcClient := bitcoin.NewClient("https://mempool.space/testnet/api", &chaincfg.RegressionNetParams)
+		btcClient := bitcoin.NewClient(bitcoin.NewMempool("https://mempool.space/testnet/api"), &chaincfg.RegressionNetParams)
 
 		ethClient.ApproveERC20(ethPrivKey1, big.NewInt(100000), TOKEN, ETH_ATOMICSWAP)
 
