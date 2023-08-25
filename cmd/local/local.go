@@ -53,7 +53,7 @@ func main() {
 	watcher := watcher.NewWatcher(logger, store, config, 4)
 	go watcher.Run(context.Background())
 	server := rest.NewServer(store, model.Config{Network: config}, logger, "SECRET")
-	if err := server.Run(":8080"); err != nil {
+	if err := server.Run(context.Background(), ":8080"); err != nil {
 		panic(err)
 	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -49,7 +50,7 @@ func main() {
 		panic(err)
 	}
 	server := rest.NewServer(store, envConfig.CONFIG, logger, envConfig.SERVER_SECRET)
-	if err := server.Run(fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
+	if err := server.Run(context.Background(), fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}
 }

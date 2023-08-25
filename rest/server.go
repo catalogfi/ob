@@ -1,12 +1,13 @@
 package rest
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/dgrijalva/jwt-go"
@@ -44,6 +45,8 @@ type Store interface {
 	FillOrder(orderID uint, filler, sendAddress, receiveAddress string, config model.Network) error
 	// get order by id
 	GetOrder(orderID uint) (*model.Order, error)
+	// get orders by address
+	GetOrdersByAddress(address string) ([]model.Order, error)
 	// cancel order by id
 	CancelOrder(creator string, orderID uint) error
 	// get all orders for the given user
@@ -62,7 +65,7 @@ func NewServer(store Store, config model.Config, logger *zap.Logger, secret stri
 	}
 }
 
-func (s *Server) Run(addr string) error {
+func (s *Server) Run(ctx context.Context, addr string) error {
 	s.router.Use(cors.New(cors.Config{
 		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
@@ -72,27 +75,38 @@ func (s *Server) Run(addr string) error {
 	}))
 
 	authRoutes := s.router.Group("/")
-	authRoutes.Use(s.authenticateJWT)
+	authRoutes.Use(s.authenticate)
 
-	s.router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status": "online",
-		})
-	})
-	s.router.GET("/ws/order", s.GetOrderBySocket())
-	s.router.GET("/ws/orders", s.GetOrdersSocket())
-	s.router.GET("/orders/:id", s.GetOrder())
-	s.router.GET("/orders", s.GetOrders())
-	s.router.GET("/nonce", s.Nonce())
-	s.router.GET("/assets", s.SupportedAssets())
-	s.router.GET("/chains/:chain/value", s.GetValueByChain())
-	s.router.POST("/verify", s.Verify())
+	// websocket
+	s.router.GET("/", s.socket())
+
+	s.router.GET("/health", s.health())
+	s.router.GET("/orders/:id", s.getOrder())
+	s.router.GET("/orders", s.getOrders())
+	s.router.GET("/nonce", s.nonce())
+	s.router.GET("/assets", s.supportedAssets())
+	s.router.GET("/chains/:chain/value", s.getValueByChain())
+	s.router.POST("/verify", s.verify())
 	{
-		authRoutes.POST("/orders", s.PostOrders())
-		authRoutes.PUT("/orders/:id", s.FillOrder())
-		authRoutes.DELETE("/orders/:id", s.CancelOrder())
+		authRoutes.POST("/orders", s.postOrders())
+		authRoutes.PUT("/orders/:id", s.fillOrder())
+		authRoutes.DELETE("/orders/:id", s.cancelOrder())
 	}
-	return s.router.Run(addr)
+
+	server := &http.Server{
+		Addr:    addr,
+		Handler: s.router,
+	}
+
+	go func() {
+		// service connections
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+		fmt.Println("stopped")
+	}()
+	<-ctx.Done()
+	return server.Shutdown(ctx)
 }
 
 type CreateOrder struct {
@@ -109,7 +123,7 @@ type Auth interface {
 	Verify(req model.VerifySiwe) (*jwt.Token, error)
 }
 
-func (s *Server) authenticateJWT(ctx *gin.Context) {
+func (s *Server) authenticate(ctx *gin.Context) {
 	tokenString := ctx.GetHeader("Authorization")
 	if tokenString == "" {
 		s.logger.Debug("authorization failure", zap.Error(fmt.Errorf("missing authorization token")))
@@ -152,151 +166,15 @@ func (s *Server) authenticateJWT(ctx *gin.Context) {
 	ctx.Next()
 }
 
-func (s *Server) GetOrderBySocket() gin.HandlerFunc {
+func (s *Server) health() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// upgrade get request to websocket protocol
-		ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		defer ws.Close()
-		for {
-			// Read Message from client
-			mt, message, err := ws.ReadMessage()
-			if err != nil {
-				fmt.Println(err)
-				break
-			}
-
-			// json.Unmarshal(data []byte, v any)
-			vals := strings.Split(string(message), ":")
-			if vals[0] == "subscribe" {
-				val, err := strconv.ParseUint(vals[1], 10, 64)
-				if err != nil {
-					ws.WriteMessage(mt, []byte(err.Error()))
-					break
-				}
-				order, err := s.store.GetOrder(uint(val))
-				if err != nil {
-					fmt.Println(err)
-					break
-				}
-				if err := ws.WriteJSON(*order); err != nil {
-					fmt.Println(err)
-					break
-				}
-
-				for {
-					if order.Status >= model.Executed {
-						break
-					}
-					order2, err := s.store.GetOrder(uint(val))
-					if err != nil {
-						fmt.Println(err)
-						break
-					}
-					if order2.Status != order.Status {
-						if err := ws.WriteJSON(*order2); err != nil {
-							fmt.Println(err)
-							break
-						}
-						order = order2
-						time.Sleep(2)
-					}
-				}
-			}
-
-			// Response message to client
-			err = ws.WriteMessage(mt, message)
-			if err != nil {
-				fmt.Println(err)
-				break
-			}
-		}
+		c.JSON(http.StatusOK, gin.H{
+			"status": "online",
+		})
 	}
 }
 
-func (s *Server) GetOrdersSocket() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// upgrade get request to websocket protocol
-		ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to upgrade to websocket %v", err)})
-			return
-		}
-		defer ws.Close()
-
-		// Read Message from client
-		_, message, err := ws.ReadMessage()
-		if err != nil {
-			s.logger.Debug("failed to read a message", zap.Error(err))
-			err = ws.WriteJSON(map[string]interface{}{
-				"error": fmt.Sprintf("%v", err),
-			})
-			if err != nil {
-				ws.Close()
-			}
-		}
-		isFirstMessage := true
-		input := strings.Split(string(message), ":")
-		if input[0] == "subscribe" {
-			makerOrTaker := strings.ToLower(string(input[1]))
-			var orders []model.Order = []model.Order{}
-			ticker := time.NewTicker(time.Second * 60)
-			go func() {
-				for {
-					select {
-					case <-ticker.C:
-						err := ws.WriteJSON(map[string]interface{}{
-							"msg": "ping",
-						})
-						if err != nil {
-							s.logger.Debug("failed to write ping", zap.Error(err))
-							return
-						}
-
-					}
-					time.Sleep(time.Second * 1)
-				}
-			}()
-			for {
-				makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
-				if err != nil {
-					s.logger.Debug("failed to filter maker orders", zap.Error(err))
-					ws.WriteJSON(map[string]interface{}{
-						"error": err,
-					})
-					break
-				}
-				takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
-				if err != nil {
-					s.logger.Debug("failed to filter taker orders", zap.Error(err))
-					ws.WriteJSON(map[string]interface{}{
-						"error": err,
-					})
-					break
-				}
-				var newOrders []model.Order = []model.Order{}
-				newOrders = append(newOrders, makerOrders...)
-				newOrders = append(newOrders, takerOrders...)
-				if !model.CompareOrderSlices(newOrders, orders) || isFirstMessage {
-					if err := ws.WriteJSON(newOrders); err != nil {
-						s.logger.Debug("failed to write updated orders", zap.Error(err))
-						break
-					}
-					orders = newOrders
-				}
-
-				isFirstMessage = false
-				time.Sleep(time.Second * 2)
-			}
-		}
-
-	}
-}
-
-func (s *Server) GetValueByChain() gin.HandlerFunc {
+func (s *Server) getValueByChain() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		chain, err := model.ParseChain(c.Param("chain"))
 		if err != nil {
@@ -315,7 +193,7 @@ func (s *Server) GetValueByChain() gin.HandlerFunc {
 	}
 }
 
-func (s *Server) SupportedAssets() gin.HandlerFunc {
+func (s *Server) supportedAssets() gin.HandlerFunc {
 	assets := map[model.Chain][]model.Asset{}
 	for chain, netConf := range s.config.Network {
 		assets[chain] = []model.Asset{}
@@ -328,7 +206,7 @@ func (s *Server) SupportedAssets() gin.HandlerFunc {
 	}
 }
 
-func (s *Server) PostOrders() gin.HandlerFunc {
+func (s *Server) postOrders() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		creator, exists := c.Get("userWallet")
 		if !exists {
@@ -362,7 +240,7 @@ type FillOrder struct {
 	ReceiveAddress string `json:"receiveAddress" binding:"required"`
 }
 
-func (s *Server) FillOrder() gin.HandlerFunc {
+func (s *Server) fillOrder() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orderID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 		if err != nil {
@@ -392,7 +270,7 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 	}
 }
 
-func (s *Server) GetOrder() gin.HandlerFunc {
+func (s *Server) getOrder() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orderID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 		if err != nil {
@@ -409,7 +287,7 @@ func (s *Server) GetOrder() gin.HandlerFunc {
 	}
 }
 
-func (s *Server) CancelOrder() gin.HandlerFunc {
+func (s *Server) cancelOrder() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// TODO: extract from auth token
 		maker, exists := c.Get("userWallet")
@@ -433,7 +311,7 @@ func (s *Server) CancelOrder() gin.HandlerFunc {
 	}
 }
 
-func (s *Server) GetOrders() gin.HandlerFunc {
+func (s *Server) getOrders() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		maker := c.DefaultQuery("maker", "")
 		taker := c.DefaultQuery("taker", "")
@@ -501,7 +379,7 @@ func (s *Server) GetOrders() gin.HandlerFunc {
 	}
 }
 
-func (s *Server) Nonce() gin.HandlerFunc {
+func (s *Server) nonce() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{
 			"nonce": siwe.GenerateNonce(),
@@ -509,7 +387,7 @@ func (s *Server) Nonce() gin.HandlerFunc {
 	}
 }
 
-func (s *Server) Verify() gin.HandlerFunc {
+func (s *Server) verify() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := model.VerifySiwe{}
 		if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -528,6 +406,5 @@ func (s *Server) Verify() gin.HandlerFunc {
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{"token": tokenString})
-
 	}
 }

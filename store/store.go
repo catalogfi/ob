@@ -448,6 +448,20 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 	return orders, nil
 }
 
+// filter the orders based on the given query parameters
+func (s *store) GetOrdersByAddress(address string) ([]model.Order, error) {
+	orders := []model.Order{}
+	if tx := s.db.Where("maker = ? OR taker = ?", address, address).Find(&orders); tx.Error != nil {
+		return nil, tx.Error
+	}
+	for i := range orders {
+		if err := s.fillSwapDetails(&orders[i]); err != nil {
+			return nil, err
+		}
+	}
+	return orders, nil
+}
+
 // get all the orders with active atomic swaps
 func (s *store) GetActiveOrders() ([]model.Order, error) {
 	orders := []model.Order{}

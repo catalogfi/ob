@@ -557,7 +557,7 @@ var _ = Describe("Watcher", func() {
 		var minWorkers = 4
 
 		It("should build a watcher", func() {
-			watcher := NewWatcher(logger, mockStore, model.Network{}, minWorkers)
+			watcher := NewWatcher(logger, mockStore, model.Network{}, 1)
 			Expect(watcher).ToNot(BeNil())
 			order := model.Order{
 				Status: model.Filled,
@@ -578,13 +578,12 @@ var _ = Describe("Watcher", func() {
 				},
 			}
 
-			watcher.AddOrder(order)
+			mockStore.EXPECT().GetActiveOrders().Return([]model.Order{order}, nil).MaxTimes(2)
 			mockStore.EXPECT().UpdateOrder(&updatedOrder).Return(nil)
-			go func() {
-				time.Sleep(2 * time.Second)
-				watcher.Close()
-			}()
-			watcher.RunWorker()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
+			defer cancel()
+			watcher.Run(ctx)
 		})
 
 		It("should build a watcher", func() {
@@ -603,12 +602,10 @@ var _ = Describe("Watcher", func() {
 				},
 			}
 
-			watcher.AddOrder(order)
-			go func() {
-				time.Sleep(2 * time.Second)
-				watcher.Close()
-			}()
-			watcher.RunWorker()
+			mockStore.EXPECT().GetActiveOrders().Return([]model.Order{order}, nil).MaxTimes(2)
+			ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
+			defer cancel()
+			watcher.Run(ctx)
 		})
 
 		It("should build a watcher", func() {
@@ -633,40 +630,9 @@ var _ = Describe("Watcher", func() {
 				},
 			}
 
-			watcher.AddOrder(order)
-			mockStore.EXPECT().UpdateOrder(&updatedOrder).Return(mockError)
-			go func() {
-				time.Sleep(2 * time.Second)
-				watcher.Close()
-			}()
-			watcher.RunWorker()
-		})
-
-		It("should build a watcher", func() {
-			watcher := NewWatcher(logger, mockStore, model.Network{}, minWorkers)
-			Expect(watcher).ToNot(BeNil())
-			order := model.Order{
-				Status: model.Filled,
-				InitiatorAtomicSwap: &model.AtomicSwap{
-					Status: model.Refunded,
-				},
-				FollowerAtomicSwap: &model.AtomicSwap{
-					Status: model.Redeemed,
-				},
-			}
-			// updatedOrder := model.Order{
-			// 	Status: model.FailedHard,
-			// 	InitiatorAtomicSwap: &model.AtomicSwap{
-			// 		Status: model.Refunded,
-			// 	},
-			// 	FollowerAtomicSwap: &model.AtomicSwap{
-			// 		Status: model.Redeemed,
-			// 	},
-			// }
-
 			mockStore.EXPECT().GetActiveOrders().Return([]model.Order{order}, nil).AnyTimes()
-			// mockStore.EXPECT().UpdateOrder(&updatedOrder).Return(mockError)
-			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+			mockStore.EXPECT().UpdateOrder(&updatedOrder).Return(mockError)
+			ctx, _ := context.WithTimeout(context.Background(), 7*time.Second)
 			watcher.Run(ctx)
 		})
 

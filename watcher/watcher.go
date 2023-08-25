@@ -25,10 +25,7 @@ type Store interface {
 // Watcher watches the blockchain and update order status accordingly.
 type Watcher interface {
 	Run(ctx context.Context)
-	RunWorker()
-
-	AddOrder(order model.Order)
-	Close()
+	RunWorker(ctx context.Context)
 }
 
 type watcher struct {
@@ -52,11 +49,13 @@ func NewWatcher(logger *zap.Logger, store Store, config model.Network, workers i
 
 func (w *watcher) Run(ctx context.Context) {
 	for i := 0; i < w.workers; i++ {
-		go w.RunWorker()
+		childCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		go w.RunWorker(childCtx)
 	}
 
 	ticker := time.NewTicker(5 * time.Second)
-	defer w.Close()
+	defer close(w.orders)
 	for {
 		select {
 		case <-ctx.Done():
@@ -69,7 +68,7 @@ func (w *watcher) Run(ctx context.Context) {
 					continue
 				}
 				for _, order := range orders {
-					w.AddOrder(order)
+					w.orders <- order
 				}
 			}
 		}
@@ -77,28 +76,25 @@ func (w *watcher) Run(ctx context.Context) {
 }
 
 // allows for concurrent processing of orders
-func (w *watcher) RunWorker() {
-	for order := range w.orders {
-		logger := w.logger.With(zap.Uint("order id", order.ID))
-		order, hasUpdated, err := ProcessOrder(order, w.store, w.config, logger)
-		if err != nil {
-			logger.Error("process order failed with", zap.Error(err))
-			continue
-		}
-		if hasUpdated {
-			if err := w.store.UpdateOrder(&order); err != nil {
-				logger.Error("update order failed with", zap.Error(err))
+func (w *watcher) RunWorker(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case order := <-w.orders:
+			logger := w.logger.With(zap.Uint("order id", order.ID))
+			order, hasUpdated, err := ProcessOrder(order, w.store, w.config, logger)
+			if err != nil {
+				logger.Error("process order failed with", zap.Error(err))
+				continue
+			}
+			if hasUpdated {
+				if err := w.store.UpdateOrder(&order); err != nil {
+					logger.Error("update order failed with", zap.Error(err))
+				}
 			}
 		}
 	}
-}
-
-func (w *watcher) AddOrder(order model.Order) {
-	w.orders <- order
-}
-
-func (w *watcher) Close() {
-	close(w.orders)
 }
 
 func ProcessOrder(order model.Order, store Store, config model.Network, logger *zap.Logger) (model.Order, bool, error) {
