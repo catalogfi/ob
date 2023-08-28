@@ -4,17 +4,25 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/screener"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/spruceid/siwe-go"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
+)
+
+const (
+	GetOrderMessageRegex  = `^(?P<action>subscribe):(?P<orderID>\d+)$`
+	GetOrdersMessageRegex = `^(?P<action>subscribe):(?P<address>0x[a-fA-F0-9]{40})$`
 )
 
 var upgrader = websocket.Upgrader{
@@ -27,12 +35,13 @@ var upgrader = websocket.Upgrader{
 }
 
 type Server struct {
-	router *gin.Engine
-	store  Store
-	auth   Auth
-	config model.Config
-	logger *zap.Logger
-	secret string
+	router   *gin.Engine
+	store    Store
+	auth     Auth
+	config   model.Config
+	logger   *zap.Logger
+	secret   string
+	screener screener.Screener
 }
 
 type Store interface {
@@ -50,15 +59,16 @@ type Store interface {
 	FilterOrders(maker, taker, orderPair, secretHash, sort string, status model.Status, minPrice, maxPrice float64, minAmount, maxAmount float64, page, perPage int, verbose bool) ([]model.Order, error)
 }
 
-func NewServer(store Store, config model.Config, logger *zap.Logger, secret string) *Server {
+func NewServer(store Store, config model.Config, logger *zap.Logger, secret string, screener screener.Screener) *Server {
 	childLogger := logger.With(zap.String("service", "rest"))
 	return &Server{
-		router: gin.Default(),
-		store:  store,
-		secret: secret,
-		logger: childLogger,
-		auth:   NewAuth(config.Network),
-		config: config,
+		router:   gin.Default(),
+		store:    store,
+		secret:   secret,
+		logger:   childLogger,
+		auth:     NewAuth(config.Network),
+		config:   config,
+		screener: screener,
 	}
 }
 
@@ -227,71 +237,78 @@ func (s *Server) GetOrdersSocket() gin.HandlerFunc {
 		}
 		defer ws.Close()
 
-		// Read Message from client
+		// Read message from client
 		_, message, err := ws.ReadMessage()
 		if err != nil {
 			s.logger.Debug("failed to read a message", zap.Error(err))
-			err = ws.WriteJSON(map[string]interface{}{
-				"error": fmt.Sprintf("%v", err),
-			})
-			if err != nil {
-				ws.Close()
-			}
+			return
 		}
-		isFirstMessage := true
-		input := strings.Split(string(message), ":")
-		if input[0] == "subscribe" {
-			makerOrTaker := strings.ToLower(string(input[1]))
-			var orders []model.Order = []model.Order{}
-			ticker := time.NewTicker(time.Second * 60)
-			go func() {
-				for {
-					select {
-					case <-ticker.C:
-						err := ws.WriteJSON(map[string]interface{}{
-							"msg": "ping",
-						})
-						if err != nil {
-							s.logger.Debug("failed to write ping", zap.Error(err))
-							return
-						}
 
-					}
-					time.Sleep(time.Second * 1)
+		// Verify the user message
+		action, userAddr, match := ParseGetOrdersMessage(string(message))
+		if !match {
+			res := map[string]string{
+				"error": "invalid action message",
+			}
+			ws.WriteJSON(res)
+			return
+		}
+
+		switch action {
+		case "subscribe":
+			userAddr = strings.ToLower(userAddr)
+			var orders []model.Order
+
+			// Check the order status periodically and write updates to client
+			ticker := time.NewTicker(15 * time.Second)
+
+			for first := true; true; <-ticker.C {
+
+				// Send a Ping message
+				if err := ws.WriteJSON(map[string]string{
+					"event": "ping",
+				}); err != nil {
+					return
 				}
-			}()
-			for {
-				makerOrders, err := s.store.FilterOrders(makerOrTaker, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
-				if err != nil {
-					s.logger.Debug("failed to filter maker orders", zap.Error(err))
-					ws.WriteJSON(map[string]interface{}{
-						"error": err,
-					})
-					break
+
+				// Fetch all orders has the userAddress
+				makerOrders, err := s.store.FilterOrders(userAddr, "", "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
+				if err != nil && err != gorm.ErrRecordNotFound {
+					s.logger.Error("load maker orders", zap.Error(err))
+					continue
 				}
-				takerOrders, err := s.store.FilterOrders("", makerOrTaker, "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
-				if err != nil {
-					s.logger.Debug("failed to filter taker orders", zap.Error(err))
-					ws.WriteJSON(map[string]interface{}{
-						"error": err,
-					})
-					break
+				takerOrders, err := s.store.FilterOrders("", userAddr, "", "", "", model.Status(0), 0.0, 0.0, 0.0, 0.0, 0, 0, true)
+				if err != nil && err != gorm.ErrRecordNotFound {
+					s.logger.Error("load taker orders", zap.Error(err))
+					continue
 				}
-				var newOrders []model.Order = []model.Order{}
-				newOrders = append(newOrders, makerOrders...)
+				newOrders := []model.Order{}
 				newOrders = append(newOrders, takerOrders...)
-				if !model.CompareOrderSlices(newOrders, orders) || isFirstMessage {
+				newOrders = append(newOrders, makerOrders...)
+				notUpdated := model.CompareOrderSlices(orders, newOrders)
+				if !notUpdated || first {
 					if err := ws.WriteJSON(newOrders); err != nil {
-						s.logger.Debug("failed to write updated orders", zap.Error(err))
-						break
+						return
 					}
+					first = false
 					orders = newOrders
 				}
-
-				isFirstMessage = false
-				time.Sleep(time.Second * 2)
 			}
+		default:
+			// ignore all unknown actions
 		}
+	}
+}
+
+func (s *Server) Socket() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// upgrade get request to websocket protocol
+		ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to upgrade to websocket %v", err)})
+			return
+		}
+		defer ws.Close()
 
 	}
 }
@@ -341,6 +358,30 @@ func (s *Server) PostOrders() gin.HandlerFunc {
 			return
 		}
 
+		// Check if the addresses is blacklisted
+		senderChain, receiverChain, _, _, err := model.ParseOrderPair(req.OrderPair)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		addrs := map[string]model.Chain{
+			creator.(string):   model.Ethereum,
+			req.ReceiveAddress: receiverChain,
+			req.SendAddress:    senderChain,
+		}
+
+		blacklisted, err := s.screener.IsBlacklisted(addrs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if blacklisted {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Address is blacklisted from database",
+			})
+			return
+		}
+
 		oid, err := s.store.CreateOrder(strings.ToLower(creator.(string)), req.SendAddress, req.ReceiveAddress, req.OrderPair, req.SendAmount, req.ReceiveAmount, req.SecretHash, req.UserWalletBTCAddress, s.config)
 		if err != nil {
 			errorMessage := fmt.Sprintf("failed to create order: %v", err.Error())
@@ -379,6 +420,39 @@ func (s *Server) FillOrder() gin.HandlerFunc {
 		req := FillOrder{}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Get details of the order to fill
+		order, err := s.store.GetOrder(uint(orderID))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": fmt.Sprintf("error getting the order %v", err.Error()),
+			})
+			return
+		}
+
+		// Check if the addresses is blacklisted
+		senderChain, receiverChain, _, _, err := model.ParseOrderPair(order.OrderPair)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		addrs := map[string]model.Chain{
+			filler.(string):    model.Ethereum,
+			req.ReceiveAddress: senderChain,
+			req.SendAddress:    receiverChain,
+		}
+
+		blacklisted, err := s.screener.IsBlacklisted(addrs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if blacklisted {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Address is blacklisted from database",
+			})
 			return
 		}
 
@@ -530,4 +604,28 @@ func (s *Server) Verify() gin.HandlerFunc {
 		ctx.JSON(http.StatusOK, gin.H{"token": tokenString})
 
 	}
+}
+
+func ParseGetOrderMessage(message string) (string, string, bool) {
+	messageRegex := regexp.MustCompile(GetOrderMessageRegex)
+	if !messageRegex.MatchString(message) {
+		return "", "", false
+	}
+	matches := messageRegex.FindStringSubmatch(message)
+	if len(matches) != 3 {
+		return "", "", false
+	}
+	return matches[1], matches[2], true
+}
+
+func ParseGetOrdersMessage(message string) (string, string, bool) {
+	messageRegex := regexp.MustCompile(GetOrdersMessageRegex)
+	if !messageRegex.MatchString(message) {
+		return "", "", false
+	}
+	matches := messageRegex.FindStringSubmatch(message)
+	if len(matches) != 3 {
+		return "", "", false
+	}
+	return matches[1], matches[2], true
 }

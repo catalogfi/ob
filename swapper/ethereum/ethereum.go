@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-const MaxQueryBlockRange = 500
+const MaxQueryBlockRange = 2000
 
 type initiatorSwap struct {
 	orderID          [32]byte
@@ -41,7 +41,7 @@ type redeemerSwap struct {
 	watcher          swapper.Watcher
 }
 
-func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr common.Address, secretHash []byte, expiry, minConfirmations, amount *big.Int, client Client) (swapper.InitiatorSwap, error) {
+func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr common.Address, secretHash []byte, expiry, minConfirmations, amount *big.Int, client Client, eventWindow int64) (swapper.InitiatorSwap, error) {
 
 	initiatorAddr := crypto.PubkeyToAddress(initiator.PublicKey)
 	orderId := sha256.Sum256(append(secretHash, initiatorAddr.Hash().Bytes()...))
@@ -51,7 +51,7 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr 
 		latestCheckedBlock = big.NewInt(0)
 	}
 
-	watcher, err := NewWatcher(atomicSwapAddr, secretHash, orderId[:], expiry, minConfirmations, amount, client)
+	watcher, err := NewWatcher(atomicSwapAddr, secretHash, orderId[:], expiry, minConfirmations, amount, client, eventWindow)
 	if err != nil {
 		return &initiatorSwap{}, err
 	}
@@ -75,12 +75,8 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr 
 	}, nil
 }
 
-func (initiatorSwap *initiatorSwap) Initiate() (txHash string, err error) {
-	defer func() {
-		fmt.Printf("Done Initiate on contract : %s : token : %s : err : %v \n", initiatorSwap.atomicSwapAddr, initiatorSwap.tokenAddr, err)
-	}()
-	txHash, err = initiatorSwap.client.InitiateAtomicSwap(initiatorSwap.atomicSwapAddr, initiatorSwap.initiator, initiatorSwap.redeemerAddr, initiatorSwap.tokenAddr, initiatorSwap.expiry, initiatorSwap.amount, initiatorSwap.secretHash)
-	return
+func (initiatorSwap *initiatorSwap) Initiate() (string, error) {
+	return initiatorSwap.client.InitiateAtomicSwap(initiatorSwap.atomicSwapAddr, initiatorSwap.initiator, initiatorSwap.redeemerAddr, initiatorSwap.tokenAddr, initiatorSwap.expiry, initiatorSwap.amount, initiatorSwap.secretHash)
 }
 
 func (initiatorSwap *initiatorSwap) Expired() (bool, error) {
@@ -107,7 +103,6 @@ func (initiatorSwap *initiatorSwap) IsRedeemed() (bool, []byte, string, error) {
 }
 
 func (initiatorSwap *initiatorSwap) Refund() (string, error) {
-	defer fmt.Println("Done refund")
 
 	// Initialise the transactor
 	transactor, err := initiatorSwap.client.GetTransactOpts(initiatorSwap.initiator)
@@ -122,9 +117,9 @@ func (initiatorSwap *initiatorSwap) Refund() (string, error) {
 	return tx, nil
 }
 
-func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr common.Address, secretHash []byte, expiry, amount, minConfirmations *big.Int, client Client) (swapper.RedeemerSwap, error) {
+func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr common.Address, secretHash []byte, expiry, amount, minConfirmations *big.Int, client Client, eventWindow int64) (swapper.RedeemerSwap, error) {
 	orderId := sha256.Sum256(append(secretHash, initiatorAddr.Hash().Bytes()...))
-	watcher, err := NewWatcher(atomicSwapAddr, secretHash, orderId[:], expiry, minConfirmations, amount, client)
+	watcher, err := NewWatcher(atomicSwapAddr, secretHash, orderId[:], expiry, minConfirmations, amount, client, eventWindow)
 	if err != nil {
 		return &redeemerSwap{}, err
 	}
@@ -150,8 +145,6 @@ func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr c
 }
 
 func (redeemerSwap *redeemerSwap) Redeem(secret []byte) (string, error) {
-	defer fmt.Println("Done redeem")
-	fmt.Println("redeeming...")
 	transactor, err := redeemerSwap.client.GetTransactOpts(redeemerSwap.redeemer)
 	if err != nil {
 		return "", err
@@ -160,7 +153,8 @@ func (redeemerSwap *redeemerSwap) Redeem(secret []byte) (string, error) {
 }
 
 func (redeemerSwap *redeemerSwap) IsInitiated() (bool, string, uint64, error) {
-	return redeemerSwap.watcher.IsInitiated()
+	initated, txhash, _, minConf, err := redeemerSwap.watcher.IsInitiated()
+	return initated, txhash, minConf, err
 }
 
 func (redeemerSwap *redeemerSwap) WaitForInitiate() (string, error) {
@@ -168,7 +162,6 @@ func (redeemerSwap *redeemerSwap) WaitForInitiate() (string, error) {
 	for {
 		initiated, txHash, _, err := redeemerSwap.IsInitiated()
 		if initiated {
-			fmt.Printf("Initiation Found on contract : %s : token : %s \n", redeemerSwap.atomicSwapAddr, redeemerSwap.tokenAddr)
 			return txHash, nil
 		}
 		if err != nil {

@@ -3,6 +3,8 @@ package swapper
 import (
 	"errors"
 	"fmt"
+
+	"github.com/catalogfi/wbtc-garden/model"
 )
 
 var (
@@ -28,7 +30,7 @@ type Watcher interface {
 	Expired() (bool, error)
 	Status(initiateTxHash string) (uint64, uint64, error)
 	IsDetected() (bool, string, string, error)
-	IsInitiated() (bool, string, uint64, error)
+	IsInitiated() (bool, string, map[string]model.Chain, uint64, error)
 	IsRedeemed() (bool, []byte, string, error)
 	IsRefunded() (bool, string, error)
 }

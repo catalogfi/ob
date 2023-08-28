@@ -24,6 +24,8 @@ type store struct {
 type Store interface {
 	rest.Store
 	watcher.Store
+
+	Gorm() *gorm.DB
 }
 
 func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
@@ -31,7 +33,7 @@ func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := db.AutoMigrate(&model.Order{}, &model.AtomicSwap{}); err != nil {
+	if err := db.AutoMigrate(&model.Order{}, &model.AtomicSwap{}, &model.Blacklist{}); err != nil {
 		return nil, err
 	}
 	return &store{mu: new(sync.RWMutex), cache: make(map[string]blockchain.Price), db: db}, nil
@@ -48,13 +50,13 @@ func (s *store) price(chain model.Chain, asset model.Asset, config model.Config)
 		return blockchain.Price{}, fmt.Errorf("unsupported asset: %s", asset)
 	}
 
-	priceObj, ok := s.cache[config.Network[chain].Oracles[asset]]
+	priceObj, ok := s.cache[config.Network[chain].Oracles[asset].PriceUrl]
 	if !ok || time.Now().Unix()-priceObj.Timestamp > config.PriceTTL {
-		updatedPrice, err := blockchain.GetPrice(config.Network[chain].Oracles[asset])
+		updatedPrice, err := blockchain.GetPrice(config.Network[chain].Oracles[asset].PriceUrl)
 		if err != nil {
 			return blockchain.Price{}, err
 		}
-		s.cache[config.Network[chain].Oracles[asset]] = updatedPrice
+		s.cache[config.Network[chain].Oracles[asset].PriceUrl] = updatedPrice
 		priceObj = updatedPrice
 	}
 	return priceObj, nil
@@ -113,9 +115,9 @@ func (s *store) usdValue(swaps []model.AtomicSwap, config model.Network) (*big.I
 			}
 			normaliser, ok := cacheNormalisers[swap.Asset]
 			if !ok {
-				decimals, err := blockchain.GetDecimals(swap.Chain, swap.Asset, config)
-				if err != nil {
-					return nil, fmt.Errorf("failed to get decimals for %v on %v: %v", swap.Chain, swap.Asset, err)
+				decimals := config[swap.Chain].Oracles[swap.Asset].Decimals
+				if decimals == 0 {
+					return nil, fmt.Errorf("failed to get decimals for %v on %v: %v", swap.Chain, swap.Asset)
 				}
 				normaliser = new(big.Int).Exp(big.NewInt(10), big.NewInt(decimals), nil)
 				cacheNormalisers[swap.Asset] = normaliser
@@ -500,4 +502,8 @@ func (s *store) fillSwapDetails(order *model.Order) error {
 		return tx.Error
 	}
 	return nil
+}
+
+func (s *store) Gorm() *gorm.DB {
+	return s.db
 }

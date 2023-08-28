@@ -71,6 +71,10 @@ func (client *instantClient) Net() *chaincfg.Params {
 	return client.indexerClient.Net()
 }
 
+func (client *instantClient) GetTx(txid string) (Transaction, error) {
+	return client.indexerClient.GetTx(txid)
+}
+
 func (client *instantClient) CalculateTransferFee(nInputs, nOutputs int, txType int32) (uint64, error) {
 	return client.indexerClient.CalculateTransferFee(nInputs, nOutputs, txType)
 }

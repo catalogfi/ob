@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/swapper"
 )
 
@@ -19,6 +21,9 @@ type watcher struct {
 	amount           uint64
 	minConfirmations uint64
 	waitBlocks       int64
+	initiatedBlock   uint64
+	initiatedTxs     []string
+	initiatedAddrs   map[string]model.Chain
 }
 
 func NewWatcher(scriptAddr btcutil.Address, waitBlocks int64, minConfirmations, amount uint64, client Client) (swapper.Watcher, error) {
@@ -33,7 +38,7 @@ func NewWatcher(scriptAddr btcutil.Address, waitBlocks int64, minConfirmations, 
 
 func (w *watcher) Expired() (bool, error) {
 	// Check if the swap has been initiated
-	initiated, txHash, _, err := w.IsInitiated()
+	initiated, txHash, _, _, err := w.IsInitiated()
 	if err != nil {
 		return false, err
 	}
@@ -69,18 +74,18 @@ func (w *watcher) IsDetected() (bool, string, string, error) {
 	return bal >= w.amount, strings.Join(txHashes, ","), strconv.FormatUint(bal, 10), nil
 }
 
-func (w *watcher) IsInitiated() (bool, string, uint64, error) {
+func (w *watcher) IsInitiated() (bool, string, map[string]model.Chain, uint64, error) {
 	// Fetch all utxos
 	utxos, bal, err := w.client.GetUTXOs(w.scriptAddr, 0)
 	if err != nil {
-		return false, "", 0, fmt.Errorf("failed to get UTXOs: %w", err)
+		return false, "", nil, 0, fmt.Errorf("failed to get UTXOs: %w", err)
 	}
 
 	// Check all utxos are confirmed and greater than or equal to the required amount
 	if bal >= w.amount && len(utxos) > 0 {
 		latest, err := w.client.GetTipBlockHeight()
 		if err != nil {
-			return false, "", 0, fmt.Errorf("failed to get tip block: %w", err)
+			return false, "", nil, 0, fmt.Errorf("failed to get tip block: %w", err)
 		}
 		txHashes := make([]string, len(utxos))
 		lastConfirmedTxBlock := uint64(0)
@@ -88,18 +93,35 @@ func (w *watcher) IsInitiated() (bool, string, uint64, error) {
 			confirmation := latest - utxo.Status.BlockHeight + 1
 			if utxo.Status == nil || !utxo.Status.Confirmed || confirmation < w.minConfirmations {
 				if confirmation < w.minConfirmations && utxo.Status.BlockHeight > 0 {
-					return false, "", confirmation, nil
+					return false, "", nil, confirmation, nil
 				}
-				return false, "", 0, nil
+				return false, "", nil, 0, nil
 			}
 			txHashes[i] = utxo.TxID
 			if utxo.Status.BlockHeight > lastConfirmedTxBlock {
 				lastConfirmedTxBlock = utxo.Status.BlockHeight
 			}
 		}
-		return true, strings.Join(txHashes, ","), w.minConfirmations, nil
+		txSenders := map[string]model.Chain{}
+		if w.client.Net() == &chaincfg.MainNetParams {
+			for _, utxo := range utxos {
+				rawTx, err := w.client.GetTx(utxo.TxID)
+				if err != nil {
+					return false, "", nil, 0, err
+				}
+				for _, vin := range rawTx.VINs {
+					txSenders[vin.Prevout.ScriptPubKeyAddress] = model.Bitcoin
+				}
+			}
+		}
+
+		// Cache the result
+		w.initiatedBlock = lastConfirmedTxBlock
+		w.initiatedTxs = txHashes
+		w.initiatedAddrs = txSenders
+		return true, strings.Join(txHashes, ","), txSenders, w.minConfirmations, nil
 	}
-	return false, "", 0, nil
+	return false, "", nil, 0, nil
 }
 
 func (w *watcher) Status(initateTxHash string) (uint64, uint64, error) {
@@ -210,7 +232,6 @@ func (w *watcher) IsRefunded() (bool, string, error) {
 		return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
 	if len(witness) == 4 && bal == 0 {
-		fmt.Println("Refunded:", witness)
 		// inputs are [ 0 : sig, 1 : spender.PubKey().SerializeCompressed(), 2 :[]byte{}, script]
 		return true, tx.TxID, nil
 

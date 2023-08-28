@@ -13,6 +13,7 @@ import (
 
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/rest"
+	"github.com/catalogfi/wbtc-garden/screener"
 	"github.com/catalogfi/wbtc-garden/store"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -169,25 +170,38 @@ func StartServer() {
 		config := model.Config{
 			Network: model.Network{
 				model.BitcoinTestnet: model.NetworkConfig{
-					Oracles: map[model.Asset]string{
-						model.Primary: "https://api.coincap.io/v2/assets/bitcoin",
+					Oracles: map[model.Asset]model.Token{
+						model.NewSecondary(""): {
+							TokenAddress: "",
+							Decimals:     0,
+							PriceUrl:     "https://api.coincap.io/v2/assets/bitcoin",
+						},
 					},
-					RPC:    "https://mempool.space/testnet/api",
+					RPC: map[string]string{
+						"mempool": "https://mempool.space/testnet/api",
+					},
 					Expiry: 1000,
 				},
 				model.EthereumSepolia: model.NetworkConfig{
-					Oracles: map[model.Asset]string{
-						model.NewSecondary(""): "https://api.coincap.io/v2/assets/bitcoin",
+					Oracles: map[model.Asset]model.Token{
+						model.NewSecondary(""): {
+							TokenAddress: "",
+							Decimals:     0,
+							PriceUrl:     "https://api.coincap.io/v2/assets/bitcoin",
+						},
 					},
-					RPC:    "http://localhost:8545",
+					RPC: map[string]string{
+						"ethrpc": "https://gateway.tenderly.co/public/sepolia",
+					},
 					Expiry: 10000,
 				},
 			},
 		}
 
 		logger, err := zap.NewDevelopment()
+		screener := screener.NewScreener(nil, "")
 		Expect(err).To(BeNil())
-		s := rest.NewServer(store, config, logger, "PANTHER")
+		s := rest.NewServer(store, config, logger, "PANTHER", screener)
 		s.Run(":8080")
 	}()
 }

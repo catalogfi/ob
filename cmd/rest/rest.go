@@ -8,6 +8,7 @@ import (
 
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/rest"
+	"github.com/catalogfi/wbtc-garden/screener"
 	"github.com/catalogfi/wbtc-garden/store"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
@@ -19,6 +20,7 @@ type Config struct {
 	PSQL_DB       string       `binding:"required"`
 	SERVER_SECRET string       `binding:"required"`
 	CONFIG        model.Config `binding:"required"`
+	TRM_KEY       string
 }
 
 func LoadConfiguration(file string) Config {
@@ -48,7 +50,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	server := rest.NewServer(store, envConfig.CONFIG, logger, envConfig.SERVER_SECRET)
+	screener := screener.NewScreener(store.Gorm(), envConfig.TRM_KEY)
+	server := rest.NewServer(store, envConfig.CONFIG, logger, envConfig.SERVER_SECRET, screener)
 	if err := server.Run(fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}

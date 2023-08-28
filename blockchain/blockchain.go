@@ -19,13 +19,29 @@ import (
 	"github.com/catalogfi/wbtc-garden/swapper/ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
 // The function `LoadClient` returns a client for a given blockchain chain and its corresponding URLs(set during config).
 func LoadClient(chain model.Chain, config model.Network, iwConfig ...model.InstantWalletConfig) (interface{}, error) {
 	if chain.IsBTC() {
-		client := bitcoin.NewClient(config[chain].RPC, getParams(chain))
+		indexers := []bitcoin.Indexer{}
+		for iType, url := range config[chain].RPC {
+			switch iType {
+			case "blockstream":
+				indexers = append(indexers, bitcoin.NewBlockstream(url))
+			case "mempool":
+				indexers = append(indexers, bitcoin.NewMempool(url))
+			default:
+				return nil, fmt.Errorf("unknown indexer: %s", iType)
+			}
+		}
+		indexer, err := bitcoin.NewMultiIndexer(indexers...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create indexer: %v", err)
+		}
+		client := bitcoin.NewClient(indexer, getParams(chain))
 		if model.ValidateIWCOnfig(iwConfig) {
 			store, err := bitcoin.NewStore(iwConfig[0].Dialector, &gorm.Config{})
 			if err != nil {
@@ -36,7 +52,8 @@ func LoadClient(chain model.Chain, config model.Network, iwConfig ...model.Insta
 		return client, nil
 	}
 	if chain.IsEVM() {
-		return ethereum.NewClient(config[chain].RPC)
+		logger, _ := zap.NewDevelopment()
+		return ethereum.NewClient(logger, config[chain].RPC["ethrpc"])
 	}
 	return nil, fmt.Errorf("invalid chain: %s", chain)
 }
@@ -69,12 +86,14 @@ func LoadInitiatorSwap(atomicSwap model.AtomicSwap, initiatorPrivateKey interfac
 		return nil, fmt.Errorf("invalid timelock: %s", atomicSwap.Timelock)
 	}
 
+	logger, _ := zap.NewDevelopment()
+
 	switch client := client.(type) {
 	case bitcoin.Client:
-		return bitcoin.NewInitiatorSwap(initiatorPrivateKey.(*btcec.PrivateKey), redeemerAddress.(btcutil.Address), secHash, expiry.Int64(), minConfirmations, amt.Uint64(), client)
+		return bitcoin.NewInitiatorSwap(logger, initiatorPrivateKey.(*btcec.PrivateKey), redeemerAddress.(btcutil.Address), secHash, expiry.Int64(), minConfirmations, amt.Uint64(), client)
 	case ethereum.Client:
 		contractAddr := common.HexToAddress(atomicSwap.Asset.SecondaryID())
-		return ethereum.NewInitiatorSwap(initiatorPrivateKey.(*ecdsa.PrivateKey), redeemerAddress.(common.Address), contractAddr, secHash, expiry, big.NewInt(int64(minConfirmations)), amt, client)
+		return ethereum.NewInitiatorSwap(initiatorPrivateKey.(*ecdsa.PrivateKey), redeemerAddress.(common.Address), contractAddr, secHash, expiry, big.NewInt(int64(minConfirmations)), amt, client, config[atomicSwap.Chain].EventWindow)
 	default:
 		return nil, fmt.Errorf("unknown chain: %T", client)
 	}
@@ -127,7 +146,7 @@ func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, config model.Ne
 	case ethereum.Client:
 		contractAddr := common.HexToAddress(atomicSwap.Asset.SecondaryID())
 		orderId := sha256.Sum256(append(secHash, common.HexToAddress(atomicSwap.InitiatorAddress).Hash().Bytes()...))
-		return ethereum.NewWatcher(contractAddr, secHash, orderId[:], expiry, big.NewInt(int64(minConfirmations)), amt, client)
+		return ethereum.NewWatcher(contractAddr, secHash, orderId[:], expiry, big.NewInt(int64(minConfirmations)), amt, client, config[atomicSwap.Chain].EventWindow)
 	default:
 		return nil, fmt.Errorf("unknown chain: %T", client)
 	}
@@ -159,12 +178,14 @@ func LoadRedeemerSwap(atomicSwap model.AtomicSwap, redeemerPrivateKey interface{
 		return nil, fmt.Errorf("invalid timelock: %s", atomicSwap.Timelock)
 	}
 
+	logger, _ := zap.NewDevelopment()
+
 	switch client := client.(type) {
 	case bitcoin.Client:
-		return bitcoin.NewRedeemerSwap(redeemerPrivateKey.(*btcec.PrivateKey), initiatorAddress.(btcutil.Address), secHash, expiry.Int64(), minConfirmations, amt.Uint64(), client)
+		return bitcoin.NewRedeemerSwap(logger, redeemerPrivateKey.(*btcec.PrivateKey), initiatorAddress.(btcutil.Address), secHash, expiry.Int64(), minConfirmations, amt.Uint64(), client)
 	case ethereum.Client:
 		contractAddr := common.HexToAddress(atomicSwap.Asset.SecondaryID())
-		return ethereum.NewRedeemerSwap(redeemerPrivateKey.(*ecdsa.PrivateKey), initiatorAddress.(common.Address), contractAddr, secHash, expiry, amt, big.NewInt(int64(minConfirmations)), client)
+		return ethereum.NewRedeemerSwap(redeemerPrivateKey.(*ecdsa.PrivateKey), initiatorAddress.(common.Address), contractAddr, secHash, expiry, amt, big.NewInt(int64(minConfirmations)), client, config[atomicSwap.Chain].EventWindow)
 	default:
 		return nil, fmt.Errorf("unknown chain: %T", client)
 	}
@@ -285,27 +306,6 @@ func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
 		}
 	}
 	return 0
-}
-
-func GetDecimals(chain model.Chain, asset model.Asset, config model.Network) (int64, error) {
-	if chain.IsEVM() {
-		client, err := ethereum.NewClient(config[chain].RPC)
-		if err != nil {
-			return -1, err
-		}
-		token, err := client.GetTokenAddress(common.HexToAddress(asset.SecondaryID()))
-		if err != nil {
-			return -1, err
-		}
-		tokenDecimals, err := client.GetDecimals(token)
-		if err != nil {
-			return -1, err
-		}
-		return int64(tokenDecimals), nil
-	} else if chain.IsBTC() {
-		return 8, nil
-	}
-	return -1, fmt.Errorf("unsupported chain: %v", chain)
 }
 
 type Price struct {

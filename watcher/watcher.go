@@ -71,13 +71,14 @@ func (w *watcher) Run() {
 			w.orders <- order
 		}
 
-		// Wait at least 15 seconds and until the channel is empty
-		time.Sleep(15 * time.Second)
+		// Wait at least 5 seconds and until the channel is empty
+		// reduced to test increse in performance
+		time.Sleep(5 * time.Second)
 		for {
 			if len(w.orders) == 0 {
 				break
 			}
-			time.Sleep(5 * time.Second)
+			time.Sleep(1 * time.Second)
 		}
 	}
 }
@@ -85,6 +86,9 @@ func (w *watcher) Run() {
 func ProcessOrder(order model.Order, store Store, config model.Network, logger *zap.Logger) {
 	// Special cases regardless of order status
 	switch {
+	case order.Status == model.Created && time.Since(order.CreatedAt) > OrderTimeout:
+		order.Status = model.Cancelled
+
 	// Redeem and refund happens at the same time which should not happen. Defensive check.
 	case (order.InitiatorAtomicSwap.RedeemTxHash != "" || order.FollowerAtomicSwap.RedeemTxHash != "") && (order.FollowerAtomicSwap.RefundTxHash != "" || order.InitiatorAtomicSwap.RefundTxHash != ""):
 		logger.Error("atomic swap hard failed as someone both redeemed and refunded")
@@ -116,6 +120,10 @@ func ProcessOrder(order model.Order, store Store, config model.Network, logger *
 	}
 
 	if order.Status != model.Filled {
+		return
+	}
+
+	if order.Status == model.Created {
 		return
 	}
 
