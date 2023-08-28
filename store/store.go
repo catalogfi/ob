@@ -62,8 +62,8 @@ func (s *store) price(chain model.Chain, asset model.Asset, config model.Config)
 
 // total amount of funds that are currently locked in active atomic swaps related to this system
 func (s *store) ValueLockedByChain(chain model.Chain, config model.Network) (*big.Int, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	// s.mu.RLock()
+	// defer s.mu.RUnlock()
 	swaps := []model.AtomicSwap{}
 	if tx := s.db.Where("chain = ? AND status > ? AND status < ?", chain, model.NotStarted, model.Redeemed).Find(&swaps); tx.Error != nil {
 		return nil, tx.Error
@@ -73,18 +73,17 @@ func (s *store) ValueLockedByChain(chain model.Chain, config model.Network) (*bi
 
 // total amount of value traded by the user in the last 24 hrs in USD
 func (s *store) ValueTradedByUserYesterday(user string, config model.Network) (*big.Int, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	// s.mu.RLock()
+	// defer s.mu.RUnlock()
 
 	yesterday := time.Now().Add(-24 * time.Hour).UTC()
 	orders := []model.Order{}
-	if tx := s.db.Where("(maker = ? OR taker = ?) AND status > ? AND status < ? AND created_at >= ?", user, user, model.Created, model.FailedSoft, yesterday).Find(&orders); tx.Error != nil {
+	if tx := s.db.Where("(maker = ? OR taker = ?) AND status >= ? AND status < ? AND created_at >= ?", user, user, model.Created, model.FailedSoft, yesterday).Find(&orders); tx.Error != nil {
 		return nil, tx.Error
 	}
 	if len(orders) == 0 {
 		return big.NewInt(0), nil
 	}
-
 	swapIDs := make([]uint, len(orders))
 	for i, order := range orders {
 		swapIDs[i] = order.InitiatorAtomicSwapID
@@ -102,14 +101,20 @@ func (s *store) ValueTradedByUserYesterday(user string, config model.Network) (*
 // calculates the cummulative usd value of all the given swaps
 func (s *store) usdValue(swaps []model.AtomicSwap, config model.Network) (*big.Int, error) {
 	tvlF := big.NewFloat(0)
+	
 
 	// scoping the cache
 	{
 		cacheNormalisers := map[model.Asset]*big.Int{}
 		for _, swap := range swaps {
-			swapAmount, ok := new(big.Int).SetString(swap.FilledAmount, 10)
+			if swap.FilledAmount == "" {
+				swap.FilledAmount = "0"
+			}
+
+			swapAmount, ok := new(big.Int).SetString(swap.Amount, 10)
+
 			if !ok {
-				return nil, fmt.Errorf("currupted value stored for filled amount: %v", swap.FilledAmount)
+				return nil, fmt.Errorf("currupted value stored for amount: %v", swap.Amount)
 			}
 			normaliser, ok := cacheNormalisers[swap.Asset]
 			if !ok {
@@ -123,6 +128,8 @@ func (s *store) usdValue(swaps []model.AtomicSwap, config model.Network) (*big.I
 			normalisedLockedAmount := new(big.Float).Quo(new(big.Float).SetInt(swapAmount), new(big.Float).SetInt(normaliser))
 			lockedAmountValue := new(big.Float).Mul(big.NewFloat(swap.PriceByOracle), normalisedLockedAmount)
 			tvlF.Add(lockedAmountValue, tvlF)
+
+
 		}
 	}
 
@@ -135,7 +142,6 @@ func (s *store) usdValue(swaps []model.AtomicSwap, config model.Network) (*big.I
 func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userBtcWalletAddress string, config model.Config) (uint, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	// check if creatorAddress is valid eth address
 	if err := blockchain.CheckAddress(model.Ethereum, creator); err != nil {
 		return 0, err
@@ -167,7 +173,6 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	if err := blockchain.CheckHash(secretHash); err != nil {
 		return 0, err
 	}
-
 	sendAmt, ok := new(big.Int).SetString(sendAmount, 10)
 	if !ok {
 		return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
@@ -184,7 +189,6 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		if err != nil {
 			return 0, err
 		}
-
 		dailyLimit, ok := new(big.Int).SetString(config.DailyLimit, 10)
 		if !ok {
 			return 0, fmt.Errorf("invalid daily limit: %v", err)
@@ -231,9 +235,8 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		// check if send amount is less than MinTxLimit
 		minTxLimit, ok := new(big.Int).SetString(config.MinTxLimit, 10)
 		if !ok {
-			return 0, fmt.Errorf("invalid daily limit: %v", err)
+			return 0, fmt.Errorf("invalid min limit: %v", err)
 		}
-
 		if sendValue.Cmp(minTxLimit) == -1 {
 			return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
 		}
@@ -243,7 +246,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		// check if send amount is less than MinTxLimit
 		maxTxLimit, ok := new(big.Int).SetString(config.MaxTxLimit, 10)
 		if !ok {
-			return 0, fmt.Errorf("invalid daily limit: %v", err)
+			return 0, fmt.Errorf("invalid max limit: %v", err)
 		}
 
 		if sendValue.Cmp(maxTxLimit) == 1 {
@@ -283,6 +286,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		return 0, tx.Error
 	}
 
+
 	return order.ID, nil
 }
 
@@ -298,20 +302,16 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	if order.Status != model.Created {
 		return fmt.Errorf("order already filled, current status: %v", order.Status)
 	}
-
 	fromChain, toChain, _, _, err := model.ParseOrderPair(order.OrderPair)
 	if err != nil {
 		return fmt.Errorf("constraint violation: corrupted order pair: %v", err)
 	}
-
 	if err := blockchain.CheckAddress(fromChain, receiveAddress); err != nil {
 		return fmt.Errorf("invalid recieve address: %v", err)
 	}
-
 	if err := blockchain.CheckAddress(toChain, sendAddress); err != nil {
 		return fmt.Errorf("invalid send address: %v", err)
 	}
-
 	initiateAtomicSwap := &model.AtomicSwap{}
 	if tx := s.db.First(initiateAtomicSwap, order.InitiatorAtomicSwapID); tx.Error != nil {
 		return tx.Error
@@ -320,25 +320,20 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	if tx := s.db.First(followerAtomicSwap, order.FollowerAtomicSwapID); tx.Error != nil {
 		return tx.Error
 	}
-
 	toChainAmount, err := s.ValueLockedByChain(toChain, config)
 	if err != nil {
 		return fmt.Errorf("failed to calculate value locked on %s: %v", toChain, err)
 	}
-
 	fromChainAmount, err := s.ValueLockedByChain(fromChain, config)
 	if err != nil {
 		return fmt.Errorf("failed to calculate value locked on %s: %v", toChain, err)
 	}
-
 	initiateAtomicSwap.RedeemerAddress = receiveAddress
 	initiateAtomicSwap.Timelock = strconv.FormatInt(config[fromChain].Expiry*2, 10)
 	initiateAtomicSwap.MinimumConfirmations = blockchain.GetMinConfirmations(fromChainAmount, fromChain)
-
 	followerAtomicSwap.InitiatorAddress = sendAddress
 	followerAtomicSwap.Timelock = strconv.FormatInt(config[toChain].Expiry, 10)
 	followerAtomicSwap.MinimumConfirmations = blockchain.GetMinConfirmations(toChainAmount, toChain)
-
 	order.Taker = filler
 	order.Status = model.Filled
 	if tx := s.db.Save(order); tx.Error != nil {
@@ -397,7 +392,7 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 		tx = tx.Where("price <= ?", maxPrice)
 	}
 	if status != model.Unknown {
-		tx = tx.Where("status = ?", status)
+		tx = tx.Where("orders.status = ?", status)
 	}
 	if maker != "" {
 		tx = tx.Where("maker = ?", maker)
@@ -406,25 +401,25 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 		tx = tx.Where("taker = ?", taker)
 	}
 	if secretHash != "" {
-		tx = tx.Where("secret_hash = ?", secretHash)
+		tx = tx.Where("orders.secret_hash = ?", secretHash)
 	}
 
 	// sort
 	orderByList := strings.Split(sort, ",")
 	orderByQuery := ""
-	for _, orderBy := range orderByList {
-		if orderBy == "" {
-			continue
-		}
-		if orderByQuery != "" {
-			orderByQuery += ", "
-		}
-		if orderBy[0] == '-' {
-			orderByQuery += orderBy[1:] + " DESC"
-		} else {
-			orderByQuery += orderBy
-		}
-	}
+for _, orderBy := range orderByList {
+    if orderBy == "" {
+        continue
+    }
+    if orderByQuery != "" {
+        orderByQuery += ", "
+    }
+    if orderBy[0] == '-' {
+        orderByQuery += orderBy[1:] + " DESC"  
+    } else {
+        orderByQuery += orderBy + ""   
+    }
+}
 	if orderByQuery != "" {
 		tx = tx.Order(orderByQuery)
 	}
@@ -433,7 +428,6 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 	if page != 0 && perPage != 0 {
 		tx = tx.Offset((page - 1) * perPage).Limit(perPage)
 	}
-
 	if tx = tx.Find(&orders); tx.Error != nil {
 		return nil, tx.Error
 	}
