@@ -74,7 +74,7 @@ func (r *Recipient) UnmarshalJSON(data []byte) error {
 	r.Amount = aux.Amount
 	return nil
 }
-func (client *instantClient) getRedeemTx(ctx context.Context, asTxIns []*wire.TxIn, amount, change, fee uint64, revokerSecret, nextRevokerSecretHash string, masterKey *bip32.Key, fromScript []byte) (*wire.MsgTx, error) {
+func (client *instantClient) GetRedeemTx(ctx context.Context, asTxIns []*wire.TxIn, amount, change, fee uint64, revokerSecret, nextRevokerSecretHash string, masterKey *bip32.Key, fromScript []byte) (*wire.MsgTx, error) {
 	wallet, err := client.getInstantWalletDetails(masterKey, client.code)
 	if err != nil {
 		return nil, err
@@ -189,7 +189,7 @@ func (client *instantClient) getRedeemTx(ctx context.Context, asTxIns []*wire.Tx
 
 }
 
-func (client *instantClient) transfer(ctx context.Context, recipients []Recipient, revokerSecret, nextRevokerSecretHash string, masterKey *bip32.Key, from *secp256k1.PrivateKey) (string, error) {
+func (client *instantClient) Transfer(ctx context.Context, recipients []Recipient, revokerSecret, nextRevokerSecretHash string, masterKey *bip32.Key, from *secp256k1.PrivateKey) (string, error) {
 	wallet, err := client.getInstantWalletDetails(masterKey, client.code)
 	if err != nil {
 		return "", err

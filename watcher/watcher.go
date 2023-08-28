@@ -123,10 +123,6 @@ func ProcessOrder(order model.Order, store Store, config model.Network, logger *
 		return
 	}
 
-	if order.Status == model.Created {
-		return
-	}
-
 	// Fetch swapper watchers for both parties
 	initiatorWatcher, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, config, order.InitiatorAtomicSwap.MinimumConfirmations)
 	if err != nil {
