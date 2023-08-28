@@ -236,20 +236,4 @@ var _ = Describe("subscribe to orders on an address", func() {
 		order := <-listener
 		Expect(order.(rest.WebsocketError).Error).ToNot(BeEmpty())
 	})
-
-	It("should send ping messages after 60 seconds", func() {
-		mockStore.EXPECT().GetOrder(uint(5)).Return(&model.Order{
-			Status:              model.Filled,
-			InitiatorAtomicSwap: &model.AtomicSwap{},
-			FollowerAtomicSwap:  &model.AtomicSwap{},
-		}, nil).AnyTimes()
-
-		client.Subscribe("subscribe_5")
-		listener := client.Listen()
-		go func() {
-			<-listener
-		}()
-		order :=
-			Expect(order.(rest.WebsocketError).Error).ToNot(BeEmpty())
-	})
 })

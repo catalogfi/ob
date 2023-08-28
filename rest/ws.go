@@ -37,7 +37,7 @@ func (s *Server) socket() gin.HandlerFunc {
 					ws.Close()
 				}
 			}
-			subscription := s.Subscribe(message)
+			subscription := s.subscribe(message)
 
 			go func() {
 				for {
@@ -70,7 +70,7 @@ func (s *Server) socket() gin.HandlerFunc {
 	}
 }
 
-func (s *Server) Subscribe(msg []byte) <-chan interface{} {
+func (s *Server) subscribe(msg []byte) <-chan interface{} {
 	responses := make(chan interface{})
 	fmt.Println("subscribing to ", string(msg))
 
@@ -85,7 +85,7 @@ func (s *Server) Subscribe(msg []byte) <-chan interface{} {
 
 		isAddress, err := regexp.Match("0x[0-9a-fA-F]{40}", []byte(values[1]))
 		if err == nil && isAddress {
-			for order := range s.SubscribeToUpdatedOrders(values[1]) {
+			for order := range s.subscribeToUpdatedOrders(values[1]) {
 				responses <- order
 			}
 			return
@@ -98,7 +98,7 @@ func (s *Server) Subscribe(msg []byte) <-chan interface{} {
 				responses <- WebsocketError{Code: 2, Error: fmt.Sprintf("failed to parse order id %s: %v", values[1], err)}
 				return
 			}
-			for order := range s.SubscribeToOrderUpdates(uint(orderID)) {
+			for order := range s.subscribeToOrderUpdates(uint(orderID)) {
 				responses <- order
 			}
 			return
@@ -106,7 +106,7 @@ func (s *Server) Subscribe(msg []byte) <-chan interface{} {
 
 		isOrderPair, err := regexp.Match("^[a-zA-Z:]+-[a-zA-Z:]+", []byte(values[1]))
 		if err == nil && isOrderPair {
-			for response := range s.SubscribeToOpenOrders(values[1]) {
+			for response := range s.subscribeToOpenOrders(values[1]) {
 				responses <- response
 			}
 			return
@@ -121,7 +121,7 @@ type WebsocketError struct {
 	Error string `json:"error"`
 }
 
-func (s *Server) SubscribeToOrderUpdates(id uint) <-chan UpdatedOrder {
+func (s *Server) subscribeToOrderUpdates(id uint) <-chan UpdatedOrder {
 	responses := make(chan UpdatedOrder)
 	go func() {
 		defer close(responses)
@@ -159,7 +159,7 @@ func (s *Server) SubscribeToOrderUpdates(id uint) <-chan UpdatedOrder {
 	return responses
 }
 
-func (s *Server) SubscribeToUpdatedOrders(creator string) <-chan UpdatedOrders {
+func (s *Server) subscribeToUpdatedOrders(creator string) <-chan UpdatedOrders {
 	responses := make(chan UpdatedOrders)
 
 	go func() {
@@ -199,7 +199,7 @@ func (s *Server) SubscribeToUpdatedOrders(creator string) <-chan UpdatedOrders {
 	return responses
 }
 
-func (s *Server) SubscribeToOpenOrders(orderPair string) <-chan OpenOrder {
+func (s *Server) subscribeToOpenOrders(orderPair string) <-chan OpenOrder {
 	responses := make(chan OpenOrder)
 	go func() {
 		defer close(responses)

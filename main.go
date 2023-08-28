@@ -55,7 +55,7 @@ func main() {
 	watcher := watcher.NewWatcher(logger, store, envConfig.CONFIG.Network, 4)
 	go watcher.Run(context.Background())
 	server := rest.NewServer(store, envConfig.CONFIG, logger, "SECRET")
-	if err := server.Run(fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
+	if err := server.Run(context.Background(), fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}
 }
