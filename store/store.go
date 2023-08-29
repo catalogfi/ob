@@ -64,8 +64,6 @@ func (s *store) price(chain model.Chain, asset model.Asset, config model.Config)
 
 // total amount of funds that are currently locked in active atomic swaps related to this system
 func (s *store) ValueLockedByChain(chain model.Chain, config model.Network) (*big.Int, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
 	swaps := []model.AtomicSwap{}
 	if tx := s.db.Where("chain = ? AND status > ? AND status < ?", chain, model.NotStarted, model.Redeemed).Find(&swaps); tx.Error != nil {
 		return nil, tx.Error
@@ -75,9 +73,6 @@ func (s *store) ValueLockedByChain(chain model.Chain, config model.Network) (*bi
 
 // total amount of value traded by the user in the last 24 hrs in USD
 func (s *store) ValueTradedByUserYesterday(user string, config model.Network) (*big.Int, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	yesterday := time.Now().Add(-24 * time.Hour).UTC()
 	orders := []model.Order{}
 	if tx := s.db.Where("(maker = ? OR taker = ?) AND status > ? AND status < ? AND created_at >= ?", user, user, model.Created, model.FailedSoft, yesterday).Find(&orders); tx.Error != nil {
@@ -109,7 +104,7 @@ func (s *store) usdValue(swaps []model.AtomicSwap, config model.Network) (*big.I
 	{
 		cacheNormalisers := map[model.Asset]*big.Int{}
 		for _, swap := range swaps {
-			swapAmount, ok := new(big.Int).SetString(swap.FilledAmount, 10)
+			swapAmount, ok := new(big.Int).SetString(swap.Amount, 10)
 			if !ok {
 				return nil, fmt.Errorf("currupted value stored for filled amount: %v", swap.FilledAmount)
 			}
