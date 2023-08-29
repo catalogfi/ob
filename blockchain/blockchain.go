@@ -212,8 +212,14 @@ func getParams(chain model.Chain) *chaincfg.Params {
 
 func CheckAddress(chain model.Chain, address string) error {
 	if chain.IsEVM() {
-		if len(common.HexToAddress(address).Bytes()) == 0 {
-			return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
+		if address[:2] == "0x" {
+			if len(address) != 42 {
+				return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
+			}
+		} else {
+			if len(address) == 40 {
+				return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
+			}
 		}
 	} else if chain.IsBTC() {
 		_, err := btcutil.DecodeAddress(address, getParams(chain))
