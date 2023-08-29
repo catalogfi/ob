@@ -101,22 +101,16 @@ func (watcher *watcher) IsDetected() (bool, string, string, error) {
 		return false, "", "", err
 	}
 
-	initiatedEvent := atomicSwapAbi.Events["Initiated"]
-	query := ethereum.FilterQuery{
-		FromBlock: watcher.lastCheckedBlock,
-		Addresses: []common.Address{
-			watcher.atomicSwapAddr,
-		},
-		Topics: [][]common.Hash{{initiatedEvent.ID}, {common.BytesToHash(watcher.orderId)}, {common.BytesToHash(watcher.secretHash)}},
-	}
-
-	logs, err := watcher.client.GetProvider().FilterLogs(context.Background(), query)
+	currBlock, err := watcher.client.GetCurrentBlock()
 	if err != nil {
 		return false, "", "", err
 	}
-
+	currentBlock := big.NewInt(int64(currBlock))
+	initiatedEvent := atomicSwapAbi.Events["Initiated"]
+	eventIds := [][]common.Hash{{initiatedEvent.ID}, {common.BytesToHash(watcher.orderId)}, {common.BytesToHash(watcher.secretHash)}}
+	logs, err := watcher.checkLogs(currentBlock, eventIds)
 	if len(logs) == 0 {
-		return false, "", "", fmt.Errorf("no logs found")
+		return false, "", "", err
 	}
 
 	vLog := logs[0]
@@ -135,7 +129,7 @@ func (watcher *watcher) IsDetected() (bool, string, string, error) {
 	if err != nil {
 		return false, "", "", err
 	}
-	if order.Expiry != watcher.expiry {
+	if order.Expiry.Cmp(watcher.expiry) != 0 {
 		return false, "", "", fmt.Errorf("inititate with wrong timelock")
 	}
 
@@ -147,7 +141,6 @@ func (watcher *watcher) IsDetected() (bool, string, string, error) {
 }
 
 func (watcher *watcher) IsInitiated() (bool, string, map[string]model.Chain, uint64, error) {
-	fmt.Println("Checking if initiated")
 	currBlock, err := watcher.client.GetCurrentBlock()
 	if err != nil {
 		return false, "", nil, 0, err
