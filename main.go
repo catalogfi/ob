@@ -7,20 +7,27 @@ import (
 	"os"
 	"time"
 
+	"github.com/TheZeroSlave/zapsentry"
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/rest"
+	"github.com/catalogfi/wbtc-garden/screener"
 	"github.com/catalogfi/wbtc-garden/store"
 	"github.com/catalogfi/wbtc-garden/watcher"
+	"github.com/getsentry/sentry-go"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type Config struct {
-	PORT           string       `binding:"required"`
-	PSQL_DB        string       `binding:"required"`
-	PRICE_FEED_URL string       `binding:"required"`
-	CONFIG         model.Config `binding:"required"`
+	SENTRY_DSN    string
+	PORT          string       `binding:"required"`
+	PSQL_DB       string       `binding:"required"`
+	SERVER_SECRET string       `binding:"required"`
+	CONFIG        model.Config `binding:"required"`
+	TRM_KEY       string
 }
 
 func LoadConfiguration(file string) Config {
@@ -43,6 +50,7 @@ func main() {
 	// fmt.Println(envConfig.PSQL_DB)
 	store, err := store.New(postgres.Open(envConfig.PSQL_DB), &gorm.Config{
 		NowFunc: func() time.Time { return time.Now().UTC() },
+		Logger:  logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		panic(err)
@@ -52,9 +60,28 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	if envConfig.SENTRY_DSN != "" {
+		client, err := sentry.NewClient(sentry.ClientOptions{Dsn: envConfig.SENTRY_DSN})
+		if err != nil {
+			panic(err)
+		}
+		cfg := zapsentry.Configuration{
+			Level: zapcore.ErrorLevel,
+		}
+		core, err := zapsentry.NewCore(cfg, zapsentry.NewSentryClientFromClient(client))
+		if err != nil {
+			panic(err)
+		}
+		logger = zapsentry.AttachCoreToLogger(core, logger)
+		defer logger.Sync()
+	}
+
 	watcher := watcher.NewWatcher(logger, store, envConfig.CONFIG.Network, 4)
 	go watcher.Run(context.Background())
-	server := rest.NewServer(store, envConfig.CONFIG, logger, "SECRET")
+
+	screener := screener.NewScreener(store.Gorm(), envConfig.TRM_KEY)
+	server := rest.NewServer(store, envConfig.CONFIG, logger, "SECRET", screener)
 	if err := server.Run(context.Background(), fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}

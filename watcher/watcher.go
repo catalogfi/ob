@@ -100,6 +100,9 @@ func (w *watcher) RunWorker(ctx context.Context) {
 func ProcessOrder(order model.Order, store Store, config model.Network, logger *zap.Logger) (model.Order, bool, error) {
 	// Special cases regardless of order status
 	switch {
+	case order.Status == model.Created && time.Since(order.CreatedAt) > OrderTimeout:
+		order.Status = model.Cancelled
+
 	// Redeem and refund happens at the same time which should not happen. Defensive check.
 	case (order.InitiatorAtomicSwap.Status == model.Redeemed && order.FollowerAtomicSwap.Status == model.Refunded) || (order.FollowerAtomicSwap.Status == model.Redeemed && order.InitiatorAtomicSwap.Status == model.Refunded):
 		logger.Error("atomic swap hard failed as someone both redeemed and refunded")
@@ -118,11 +121,11 @@ func ProcessOrder(order model.Order, store Store, config model.Network, logger *
 	}
 
 	// Fetch swapper watchers for both parties
-	initiatorWatcher, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, config, order.InitiatorAtomicSwap.MinimumConfirmations, order.InitiatorAtomicSwap.IsInstantWallet)
+	initiatorWatcher, err := blockchain.LoadWatcher(*order.InitiatorAtomicSwap, order.SecretHash, config, order.InitiatorAtomicSwap.MinimumConfirmations)
 	if err != nil {
 		return order, false, fmt.Errorf("failed to load initiator watcher: %w", err)
 	}
-	followerWatcher, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, config, order.FollowerAtomicSwap.MinimumConfirmations, order.InitiatorAtomicSwap.IsInstantWallet)
+	followerWatcher, err := blockchain.LoadWatcher(*order.FollowerAtomicSwap, order.SecretHash, config, order.FollowerAtomicSwap.MinimumConfirmations)
 	if err != nil {
 		return order, false, fmt.Errorf("failed to load follower watcher: %w", err)
 	}
@@ -157,7 +160,7 @@ func UpdateSwapStatus(log *zap.Logger, swap model.AtomicSwap, watcher swapper.Wa
 			return swap, false, err
 		}
 		if swap.CurrentConfirmations != conf {
-			if conf > swap.MinimumConfirmations {
+			if conf >= swap.MinimumConfirmations {
 				conf = swap.MinimumConfirmations
 			}
 			swap.CurrentConfirmations = conf
@@ -223,13 +226,15 @@ func UpdateSwapStatus(log *zap.Logger, swap model.AtomicSwap, watcher swapper.Wa
 	return swap, false, nil
 }
 
-func UpdateStatus(log *zap.Logger, order model.Order, initiatorWatcher, followerWatcher swapper.Watcher) (model.Order, bool, error) {
-	// Status update
-	var hasUpdated bool
-	for {
-		initiatorSwap, ictn, ierr := UpdateSwapStatus(log, *order.InitiatorAtomicSwap, initiatorWatcher)
-		if ierr != nil {
-			return order, hasUpdated, ierr
+func updateStatus(log *zap.Logger, order model.Order, initiatorWatcher, followerWatcher swapper.Watcher) (model.Order, bool, error) {
+	initiatorSwap, ictn, ierr := updateSwapStatus(log, *order.InitiatorAtomicSwap, initiatorWatcher)
+	followerSwap, fctn, ferr := updateSwapStatus(log, *order.FollowerAtomicSwap, followerWatcher)
+	if ierr != nil && ferr != nil {
+		return order, false, fmt.Errorf("initiatorSwap error : %v ,followerSwap error : %v ", ierr, ferr)
+	}
+	if ictn || fctn {
+		if order.Secret != followerSwap.Secret {
+			order.Secret = followerSwap.Secret
 		}
 		followerSwap, fctn, ferr := UpdateSwapStatus(log, *order.FollowerAtomicSwap, followerWatcher)
 		if ferr != nil {

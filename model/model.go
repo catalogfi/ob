@@ -1,6 +1,7 @@
 package model
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"strings"
@@ -10,12 +11,15 @@ import (
 
 type Network map[Chain]NetworkConfig
 type NetworkConfig struct {
-	Oracles map[Asset]string
-	RPC     string
-	IWRPC   string
-	Expiry  int64
+	Oracles     map[Asset]Token
+	RPC         map[string]string
+	IWRPC       string
+	Expiry      int64
+	EventWindow int64
 }
-
+type InstantWalletConfig struct {
+	Dialector gorm.Dialector
+}
 type Config struct {
 	Network    Network
 	MinTxLimit string
@@ -57,6 +61,10 @@ func ParseChain(c string) (Chain, error) {
 	}
 }
 
+func ValidateIWCOnfig(iwConfig []InstantWalletConfig) bool {
+	return iwConfig != nil && len(iwConfig) != 0 && iwConfig[0].Dialector != nil
+}
+
 func (c Chain) IsEVM() bool {
 	return c == Ethereum || c == EthereumSepolia || c == EthereumLocalnet || c == EthereumOptimism
 }
@@ -67,6 +75,12 @@ func (c Chain) IsBTC() bool {
 
 func (c Chain) IsTestnet() bool {
 	return c == EthereumSepolia || c == EthereumLocalnet || c == BitcoinTestnet || c == BitcoinRegtest
+}
+
+type Token struct {
+	PriceUrl     string
+	TokenAddress string
+	Decimals     int64
 }
 
 type Asset string
@@ -222,4 +236,19 @@ func CompareOrder(a, b Order) bool {
 		a.FollowerAtomicSwap.CurrentConfirmations == b.FollowerAtomicSwap.CurrentConfirmations &&
 		a.InitiatorAtomicSwap.FilledAmount == b.InitiatorAtomicSwap.FilledAmount &&
 		a.FollowerAtomicSwap.FilledAmount == b.FollowerAtomicSwap.FilledAmount
+}
+func CompareOrder(a, b Order) bool {
+	return a.Status == b.Status &&
+		a.InitiatorAtomicSwap.CurrentConfirmations == b.InitiatorAtomicSwap.CurrentConfirmations &&
+		a.FollowerAtomicSwap.CurrentConfirmations == b.FollowerAtomicSwap.CurrentConfirmations
+}
+
+type Blacklist struct {
+	gorm.Model
+	Address string `gorm:"unique"`
+}
+
+type LockedAmount struct {
+	Asset  string
+	Amount sql.NullInt64
 }

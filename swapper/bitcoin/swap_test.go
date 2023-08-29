@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/catalogfi/wbtc-garden/swapper/bitcoin"
 	"github.com/fatih/color"
+	"go.uber.org/zap"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -19,7 +20,9 @@ var _ = Describe("atomic swap", func() {
 			By("Initialise client")
 			network := &chaincfg.RegressionNetParams
 			electrs := "http://localhost:30000"
-			client := bitcoin.NewClient(electrs, network)
+			client := bitcoin.NewClient(bitcoin.NewBlockstream(electrs), network)
+			logger, err := zap.NewDevelopment()
+			Expect(err).To(BeNil())
 
 			By("Parse keys")
 			pk1, addr1, err := ParseKey(PrivateKey1, network)
@@ -33,14 +36,14 @@ var _ = Describe("atomic swap", func() {
 			waitBlock := int64(6)
 			minConf := uint64(1)
 			sendAmount, receiveAmount := uint64(1e8), uint64(1e7)
-			initiatorInitSwap, err := bitcoin.NewInitiatorSwap(pk1, addr2, secretHash[:], waitBlock, minConf, sendAmount, client)
+			initiatorInitSwap, err := bitcoin.NewInitiatorSwap(logger, pk1, addr2, secretHash[:], waitBlock, minConf, sendAmount, client)
 			Expect(err).Should(BeNil())
-			initiatorFollSwap, err := bitcoin.NewRedeemerSwap(pk1, addr2, secretHash[:], waitBlock, minConf, receiveAmount, client)
+			initiatorFollSwap, err := bitcoin.NewRedeemerSwap(logger, pk1, addr2, secretHash[:], waitBlock, minConf, receiveAmount, client)
 			Expect(err).Should(BeNil())
 
-			followerInitSwap, err := bitcoin.NewInitiatorSwap(pk2, addr1, secretHash[:], waitBlock, minConf, sendAmount, client)
+			followerInitSwap, err := bitcoin.NewInitiatorSwap(logger, pk2, addr1, secretHash[:], waitBlock, minConf, sendAmount, client)
 			Expect(err).Should(BeNil())
-			followerFollSwap, err := bitcoin.NewRedeemerSwap(pk2, addr1, secretHash[:], waitBlock, minConf, receiveAmount, client)
+			followerFollSwap, err := bitcoin.NewRedeemerSwap(logger, pk2, addr1, secretHash[:], waitBlock, minConf, receiveAmount, client)
 			Expect(err).Should(BeNil())
 
 			By("Fund the wallets")
@@ -101,7 +104,9 @@ var _ = Describe("atomic swap", func() {
 			By("Initialise client")
 			network := &chaincfg.RegressionNetParams
 			electrs := "http://localhost:30000"
-			client := bitcoin.NewClient(electrs, network)
+			client := bitcoin.NewClient(bitcoin.NewBlockstream(electrs), network)
+			logger, err := zap.NewDevelopment()
+			Expect(err).To(BeNil())
 
 			By("Parse keys")
 			pk1, addr1, err := ParseKey(PrivateKey1, network)
@@ -115,7 +120,7 @@ var _ = Describe("atomic swap", func() {
 			waitBlock := int64(6)
 			minConf := uint64(1)
 			sendAmount := uint64(1e8)
-			initiatorInitSwap, err := bitcoin.NewInitiatorSwap(pk1, addr2, secretHash[:], waitBlock, minConf, sendAmount, client)
+			initiatorInitSwap, err := bitcoin.NewInitiatorSwap(logger, pk1, addr2, secretHash[:], waitBlock, minConf, sendAmount, client)
 			Expect(err).Should(BeNil())
 
 			By("Fund the wallets")
@@ -146,7 +151,9 @@ var _ = Describe("atomic swap", func() {
 			By("Initialise client")
 			network := &chaincfg.RegressionNetParams
 			electrs := "http://localhost:30000"
-			client := bitcoin.NewClient(electrs, network)
+			client := bitcoin.NewClient(bitcoin.NewBlockstream(electrs), network)
+			logger, err := zap.NewDevelopment()
+			Expect(err).To(BeNil())
 
 			By("Parse keys")
 			pk1, addr1, err := ParseKey(PrivateKey1, network)
@@ -160,14 +167,14 @@ var _ = Describe("atomic swap", func() {
 			waitBlock := int64(6)
 			minConf := uint64(1)
 			sendAmount, receiveAmount := uint64(1e8), uint64(1e7)
-			initiatorInitSwap, err := bitcoin.NewInitiatorSwap(pk1, addr2, secretHash[:], waitBlock, minConf, sendAmount, client)
+			initiatorInitSwap, err := bitcoin.NewInitiatorSwap(logger, pk1, addr2, secretHash[:], waitBlock, minConf, sendAmount, client)
 			Expect(err).Should(BeNil())
-			initiatorFollSwap, err := bitcoin.NewRedeemerSwap(pk1, addr2, secretHash[:], waitBlock, minConf, receiveAmount, client)
+			initiatorFollSwap, err := bitcoin.NewRedeemerSwap(logger, pk1, addr2, secretHash[:], waitBlock, minConf, receiveAmount, client)
 			Expect(err).Should(BeNil())
 
-			followerInitSwap, err := bitcoin.NewInitiatorSwap(pk2, addr1, secretHash[:], waitBlock, minConf, sendAmount, client)
+			followerInitSwap, err := bitcoin.NewInitiatorSwap(logger, pk2, addr1, secretHash[:], waitBlock, minConf, sendAmount, client)
 			Expect(err).Should(BeNil())
-			followerFollSwap, err := bitcoin.NewRedeemerSwap(pk2, addr1, secretHash[:], waitBlock, minConf, receiveAmount, client)
+			followerFollSwap, err := bitcoin.NewRedeemerSwap(logger, pk2, addr1, secretHash[:], waitBlock, minConf, receiveAmount, client)
 			Expect(err).Should(BeNil())
 
 			By("Fund the wallets")

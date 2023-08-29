@@ -11,12 +11,18 @@ import (
 	"strings"
 
 	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/screener"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/spruceid/siwe-go"
 	"go.uber.org/zap"
+)
+
+const (
+	GetOrderMessageRegex  = `^(?P<action>subscribe):(?P<orderID>\d+)$`
+	GetOrdersMessageRegex = `^(?P<action>subscribe):(?P<address>0x[a-fA-F0-9]{40})$`
 )
 
 const (
@@ -34,12 +40,13 @@ var upgrader = websocket.Upgrader{
 }
 
 type Server struct {
-	router *gin.Engine
-	store  Store
-	auth   Auth
-	config model.Config
-	logger *zap.Logger
-	secret string
+	router   *gin.Engine
+	store    Store
+	auth     Auth
+	config   model.Config
+	logger   *zap.Logger
+	secret   string
+	screener screener.Screener
 }
 
 type Store interface {
@@ -59,15 +66,16 @@ type Store interface {
 	FilterOrders(maker, taker, orderPair, secretHash, sort string, status model.Status, minPrice, maxPrice float64, minAmount, maxAmount float64, page, perPage int, verbose bool) ([]model.Order, error)
 }
 
-func NewServer(store Store, config model.Config, logger *zap.Logger, secret string) *Server {
+func NewServer(store Store, config model.Config, logger *zap.Logger, secret string, screener screener.Screener) *Server {
 	childLogger := logger.With(zap.String("service", "rest"))
 	return &Server{
-		router: gin.Default(),
-		store:  store,
-		secret: secret,
-		logger: childLogger,
-		auth:   NewAuth(config.Network),
-		config: config,
+		router:   gin.Default(),
+		store:    store,
+		secret:   secret,
+		logger:   childLogger,
+		auth:     NewAuth(config.Network),
+		config:   config,
+		screener: screener,
 	}
 }
 
@@ -225,6 +233,30 @@ func (s *Server) postOrders() gin.HandlerFunc {
 			return
 		}
 
+		// Check if the addresses is blacklisted
+		senderChain, receiverChain, _, _, err := model.ParseOrderPair(req.OrderPair)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		addrs := map[string]model.Chain{
+			creator.(string):   model.Ethereum,
+			req.ReceiveAddress: receiverChain,
+			req.SendAddress:    senderChain,
+		}
+
+		blacklisted, err := s.screener.IsBlacklisted(addrs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if blacklisted {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Address is blacklisted from database",
+			})
+			return
+		}
+
 		oid, err := s.store.CreateOrder(strings.ToLower(creator.(string)), req.SendAddress, req.ReceiveAddress, req.OrderPair, req.SendAmount, req.ReceiveAmount, req.SecretHash, req.UserWalletBTCAddress, s.config)
 		if err != nil {
 			errorMessage := fmt.Sprintf("failed to create order: %v", err.Error())
@@ -263,6 +295,39 @@ func (s *Server) fillOrder() gin.HandlerFunc {
 		req := FillOrder{}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Get details of the order to fill
+		order, err := s.store.GetOrder(uint(orderID))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": fmt.Sprintf("error getting the order %v", err.Error()),
+			})
+			return
+		}
+
+		// Check if the addresses is blacklisted
+		senderChain, receiverChain, _, _, err := model.ParseOrderPair(order.OrderPair)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		addrs := map[string]model.Chain{
+			filler.(string):    model.Ethereum,
+			req.ReceiveAddress: senderChain,
+			req.SendAddress:    receiverChain,
+		}
+
+		blacklisted, err := s.screener.IsBlacklisted(addrs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if blacklisted {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Address is blacklisted from database",
+			})
 			return
 		}
 
