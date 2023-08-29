@@ -76,6 +76,10 @@ func (s *store) ValueTradedByUserYesterday(user string, config model.Network) (*
 	// s.mu.RLock()
 	// defer s.mu.RUnlock()
 
+	return s.valueTradedByUserYesterday(user, config)
+}
+
+func (s *store) valueTradedByUserYesterday(user string, config model.Network) (*big.Int, error) {
 	yesterday := time.Now().Add(-24 * time.Hour).UTC()
 	orders := []model.Order{}
 	if tx := s.db.Where("(maker = ? OR taker = ?) AND status >= ? AND status < ? AND created_at >= ?", user, user, model.Created, model.FailedSoft, yesterday).Find(&orders); tx.Error != nil {

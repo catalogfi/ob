@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/big"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -16,6 +17,11 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/spruceid/siwe-go"
 	"go.uber.org/zap"
+)
+
+const (
+	GetOrderMessageRegex  = `^(?P<action>subscribe):(?P<orderID>\d+)$`
+	GetOrdersMessageRegex = `^(?P<action>subscribe):(?P<address>0x[a-fA-F0-9]{40})$`
 )
 
 var upgrader = websocket.Upgrader{
@@ -407,4 +413,28 @@ func (s *Server) verify() gin.HandlerFunc {
 
 		ctx.JSON(http.StatusOK, gin.H{"token": tokenString})
 	}
+}
+
+func ParseGetOrderMessage(message string) (string, string, bool) {
+	messageRegex := regexp.MustCompile(GetOrderMessageRegex)
+	if !messageRegex.MatchString(message) {
+		return "", "", false
+	}
+	matches := messageRegex.FindStringSubmatch(message)
+	if len(matches) != 3 {
+		return "", "", false
+	}
+	return matches[1], matches[2], true
+}
+
+func ParseGetOrdersMessage(message string) (string, string, bool) {
+	messageRegex := regexp.MustCompile(GetOrdersMessageRegex)
+	if !messageRegex.MatchString(message) {
+		return "", "", false
+	}
+	matches := messageRegex.FindStringSubmatch(message)
+	if len(matches) != 3 {
+		return "", "", false
+	}
+	return matches[1], matches[2], true
 }
