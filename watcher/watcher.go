@@ -183,7 +183,7 @@ func updateSwapStatus(log *zap.Logger, swap model.AtomicSwap, watcher swapper.Wa
 			return swap, false, err
 		}
 		if swap.CurrentConfirmations != conf {
-			if conf > swap.MinimumConfirmations {
+			if conf >= swap.MinimumConfirmations {
 				conf = swap.MinimumConfirmations
 			}
 			swap.CurrentConfirmations = conf
@@ -238,12 +238,9 @@ func updateSwapStatus(log *zap.Logger, swap model.AtomicSwap, watcher swapper.Wa
 
 func updateStatus(log *zap.Logger, order model.Order, initiatorWatcher, followerWatcher swapper.Watcher) (model.Order, bool, error) {
 	initiatorSwap, ictn, ierr := updateSwapStatus(log, *order.InitiatorAtomicSwap, initiatorWatcher)
-	if ierr != nil {
-		return order, false, ierr
-	}
 	followerSwap, fctn, ferr := updateSwapStatus(log, *order.FollowerAtomicSwap, followerWatcher)
-	if ferr != nil {
-		return order, false, ferr
+	if ierr != nil && ferr != nil {
+		return order, false, fmt.Errorf("initiatorSwap error : %v ,followerSwap error : %v ", ierr, ferr)
 	}
 	if ictn || fctn {
 		if order.Secret != followerSwap.Secret {

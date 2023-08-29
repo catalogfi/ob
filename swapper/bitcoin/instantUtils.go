@@ -878,7 +878,7 @@ func (client *instantClient) Deposit(ctx context.Context, amount int64, revokeSe
 	if err != nil {
 		return "", err
 	}
-	fee, err := client.CalculateTransferFee(len(utxos)+1, 1, 2)
+	fee, err := client.CalculateTransferFee(len(utxos)+1, 2, 2)
 	if err != nil {
 		return "", err
 	}

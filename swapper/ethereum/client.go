@@ -146,7 +146,7 @@ func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecd
 		}
 	}
 
-	if err := client.simulateInitiate(contract, initiatorAddr, redeemerAddr, expiry, amount, secretHash); err != nil {
+	if err := client.simulateInitiate(contract, initiatorAddr, redeemerAddr, expiry, amount, hash); err != nil {
 		return "", err
 	}
 
@@ -244,7 +244,7 @@ func (client *client) callOpts() *bind.CallOpts {
 	}
 }
 
-func (client *client) simulateInitiate(contract, initiatorAddr, redeemerAddr common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) error {
+func (client *client) simulateInitiate(contract, initiatorAddr, redeemerAddr common.Address, expiry *big.Int, amount *big.Int, secretHash [32]byte) error {
 	parsed, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
 	if err != nil {
 		return err
