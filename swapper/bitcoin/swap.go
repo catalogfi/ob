@@ -42,7 +42,7 @@ func NewInitiatorSwap(logger *zap.Logger, initiator *btcec.PrivateKey, redeemerA
 		return nil, fmt.Errorf("failed to create script address: %w", err)
 	}
 
-	watcher, err := NewWatcher(scriptAddr, waitBlocks, minConfirmations, amount, client)
+	watcher, err := NewWatcher(scriptAddr, waitBlocks, minConfirmations, amount, "", client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create watcher: %w", err)
 	}
@@ -129,7 +129,7 @@ func NewRedeemerSwap(logger *zap.Logger, redeemer *btcec.PrivateKey, initiator b
 		return nil, fmt.Errorf("failed to create script address: %w", err)
 	}
 
-	watcher, err := NewWatcher(scriptAddr, waitBlocks, minConfirmations, amount, client)
+	watcher, err := NewWatcher(scriptAddr, waitBlocks, minConfirmations, amount, "", client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create watcher: %w", err)
 	}

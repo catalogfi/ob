@@ -5,10 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -95,41 +92,6 @@ func (client *instantClient) GetSpendingWitness(address btcutil.Address) ([]stri
 	return client.indexerClient.GetSpendingWitness(address)
 }
 func (client *instantClient) GetConfirmations(txHash string) (uint64, uint64, error) {
-	resp, err := http.Get(client.url + "/validateTransaction/" + txHash)
-	if err != nil {
-		return 0, 0, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusNotFound {
-			return 0, 0, fmt.Errorf("failed to reach the server %v", 404)
-		}
-		errObj := struct {
-			Error string `json:"error"`
-		}{}
-		if err := json.NewDecoder(resp.Body).Decode(&errObj); err != nil {
-			errMsg, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return 0, 0, fmt.Errorf("failed to read the error message %v", err)
-			}
-			return 0, 0, fmt.Errorf("failed to decode the error %v", string(errMsg))
-		}
-		return 0, 0, fmt.Errorf("request failed %v", errObj.Error)
-	}
-	response := struct {
-		Message bool `json:"message"`
-	}{}
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return 0, 0, fmt.Errorf("failed to get decode response: %v", err)
-	}
-
-	if response.Message {
-		height, err := client.GetTipBlockHeight()
-		if err != nil {
-			return 0, 0, fmt.Errorf("failed to get block height: %v", err)
-		}
-		return height, 100, nil
-	}
 	return client.indexerClient.GetConfirmations(txHash)
 }
 

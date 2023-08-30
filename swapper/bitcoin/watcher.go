@@ -2,7 +2,10 @@ package bitcoin
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -24,9 +27,10 @@ type watcher struct {
 	initiatedBlock   uint64
 	initiatedTxs     []string
 	initiatedAddrs   map[string]model.Chain
+	iwRpc            string
 }
 
-func NewWatcher(scriptAddr btcutil.Address, waitBlocks int64, minConfirmations, amount uint64, client Client) (swapper.Watcher, error) {
+func NewWatcher(scriptAddr btcutil.Address, waitBlocks int64, minConfirmations, amount uint64, iwRpc string, client Client) (swapper.Watcher, error) {
 	return &watcher{
 		scriptAddr:       scriptAddr,
 		amount:           amount,
@@ -45,7 +49,7 @@ func (w *watcher) Expired() (bool, error) {
 	if !initiated {
 		return false, nil
 	}
-	height, _, err := w.Status(txHash)
+	height, _, _, err := w.Status(txHash)
 	if err != nil {
 		return false, err
 	}
@@ -124,20 +128,25 @@ func (w *watcher) IsInitiated() (bool, string, map[string]model.Chain, uint64, e
 	return false, "", nil, 0, nil
 }
 
-func (w *watcher) Status(initateTxHash string) (uint64, uint64, error) {
+func (w *watcher) Status(initateTxHash string) (uint64, uint64, bool, error) {
 	txHashes := strings.Split(initateTxHash, ",")
 	if len(txHashes) == 0 {
-		return 0, 0, fmt.Errorf("empty initiate txhash list")
+		return 0, 0, false, fmt.Errorf("empty initiate txhash list")
 	}
 	blockHeight, conf, err := w.client.GetConfirmations(txHashes[0])
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get confirmations: %w", err)
+		return 0, 0, false, fmt.Errorf("failed to get confirmations: %w", err)
 	}
+	isIW, err := w.IsInstantWallet(txHashes[0])
+	if err != nil {
+		return 0, 0, false, fmt.Errorf("failed to check for instant wallet txs: %w", err)
+	}
+
 	if len(txHashes) > 1 {
 		for _, txHash := range txHashes[1:] {
 			nextBlockHeight, nextConf, err := w.client.GetConfirmations(txHash)
 			if err != nil {
-				return 0, 0, fmt.Errorf("failed to get confirmations: %w", err)
+				return 0, 0, false, fmt.Errorf("failed to get confirmations: %w", err)
 			}
 			if nextBlockHeight < blockHeight {
 				blockHeight = nextBlockHeight
@@ -145,9 +154,18 @@ func (w *watcher) Status(initateTxHash string) (uint64, uint64, error) {
 			if nextConf < conf {
 				conf = nextConf
 			}
+			if isIW {
+				isIW, err = w.IsInstantWallet(txHashes[0])
+				if err != nil {
+					return 0, 0, false, fmt.Errorf("failed to check for instant wallet txs: %w", err)
+				}
+			}
 		}
 	}
-	return blockHeight, conf, err
+	if isIW {
+		return blockHeight, conf, true, err
+	}
+	return blockHeight, conf, false, err
 }
 
 // IsRedeemed checks if the secret has been revealed on-chain.
@@ -237,4 +255,39 @@ func (w *watcher) IsRefunded() (bool, string, error) {
 
 	}
 	return false, "", nil
+}
+
+func (w *watcher) IsInstantWallet(txHash string) (bool, error) {
+	resp, err := http.Get(w.iwRpc + "/validateTransaction/" + txHash)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusNotFound {
+			return false, fmt.Errorf("failed to reach the server %v", 404)
+		}
+		errObj := struct {
+			Error string `json:"error"`
+		}{}
+		if err := json.NewDecoder(resp.Body).Decode(&errObj); err != nil {
+			errMsg, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return false, fmt.Errorf("failed to read the error message %v", err)
+			}
+			return false, fmt.Errorf("failed to decode the error %v", string(errMsg))
+		}
+		return false, fmt.Errorf("request failed %v", errObj.Error)
+	}
+	response := struct {
+		Message bool `json:"message"`
+	}{}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return false, fmt.Errorf("failed to get decode response: %v", err)
+	}
+
+	if !response.Message {
+		return false, nil
+	}
+	return true, nil
 }

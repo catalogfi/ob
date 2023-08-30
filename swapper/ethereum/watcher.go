@@ -26,6 +26,7 @@ type watcher struct {
 	initiatedBlock   *big.Int
 	eventWindow      *big.Int
 	atomicSwap       *AtomicSwap.AtomicSwap
+	// IiwRpc           string
 }
 
 func NewWatcher(atomicSwapAddr common.Address, secretHash, orderId []byte, expiry, minConfirmations, amount *big.Int, client Client, eventWindow int64) (swapper.Watcher, error) {
@@ -58,7 +59,7 @@ func (watcher *watcher) Expired() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	height, _, err := watcher.Status(txHash)
+	height, _, _, err := watcher.Status(txHash)
 	if err != nil {
 		return false, err
 	}
@@ -69,20 +70,20 @@ func (watcher *watcher) Expired() (bool, error) {
 	}
 }
 
-func (watcher *watcher) Status(txHash string) (uint64, uint64, error) {
+func (watcher *watcher) Status(txHash string) (uint64, uint64, bool, error) {
 	txHashes := strings.Split(txHash, ",")
 	if len(txHashes) == 0 {
-		return 0, 0, fmt.Errorf("empty initiate txhash list")
+		return 0, 0, false, fmt.Errorf("empty initiate txhash list")
 	}
 	blockHeight, conf, err := watcher.client.GetConfirmations(txHashes[0])
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get confirmations: %w", err)
+		return 0, 0, false, fmt.Errorf("failed to get confirmations: %w", err)
 	}
 	if len(txHashes) > 1 {
 		for _, txHash := range txHashes[1:] {
 			nextBlockHeight, nextConf, err := watcher.client.GetConfirmations(txHash)
 			if err != nil {
-				return 0, 0, fmt.Errorf("failed to get confirmations: %w", err)
+				return 0, 0, false, fmt.Errorf("failed to get confirmations: %w", err)
 			}
 			if nextBlockHeight < blockHeight {
 				blockHeight = nextBlockHeight
@@ -92,7 +93,7 @@ func (watcher *watcher) Status(txHash string) (uint64, uint64, error) {
 			}
 		}
 	}
-	return blockHeight, conf, err
+	return blockHeight, conf, false, err
 }
 
 func (watcher *watcher) IsDetected() (bool, string, string, error) {
@@ -290,4 +291,8 @@ func (watcher *watcher) checkLogs(maxBlock *big.Int, eventIds [][]common.Hash) (
 		maxBlock = maxBlock.Sub(maxBlock, big.NewInt(MaxQueryBlockRange))
 	}
 	return nil, nil
+}
+
+func (watcher *watcher) IsInstantWallet(txHash string) (bool, error) {
+	return false, nil
 }

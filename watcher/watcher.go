@@ -155,9 +155,15 @@ func UpdateSwapStatus(log *zap.Logger, swap model.AtomicSwap, watcher swapper.Wa
 			return swap, true, nil
 		}
 	case model.Detected:
-		height, conf, err := watcher.Status(swap.InitiateTxHash)
+		height, conf, isIw, err := watcher.Status(swap.InitiateTxHash)
 		if err != nil {
 			return swap, false, err
+		}
+		if isIw {
+			swap.MinimumConfirmations = 0
+			swap.IsInstantWallet = true
+			swap.Status = model.Initiated
+			return swap, true, nil
 		}
 		if swap.CurrentConfirmations != conf {
 			if conf >= swap.MinimumConfirmations {

@@ -131,18 +131,18 @@ func LoadWatcher(atomicSwap model.AtomicSwap, secretHash string, config model.Ne
 	}
 
 	switch client := client.(type) {
-	case bitcoin.Client:
+	case bitcoin.Client, bitcoin.InstantClient:
 		htlcScript, err := bitcoin.NewHTLCScript(initiatorAddress.(btcutil.Address), redeemerAddress.(btcutil.Address), secHash, expiry.Int64())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create HTLC script: %w", err)
 		}
 
 		witnessProgram := sha256.Sum256(htlcScript)
-		scriptAddr, err := btcutil.NewAddressWitnessScriptHash(witnessProgram[:], client.Net())
+		scriptAddr, err := btcutil.NewAddressWitnessScriptHash(witnessProgram[:], client.(bitcoin.Client).Net())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create script address: %w", err)
 		}
-		return bitcoin.NewWatcher(scriptAddr, expiry.Int64(), minConfirmations, amt.Uint64(), client)
+		return bitcoin.NewWatcher(scriptAddr, expiry.Int64(), minConfirmations, amt.Uint64(), config[atomicSwap.Chain].IWRPC, client.(bitcoin.Client))
 	case ethereum.Client:
 		contractAddr := common.HexToAddress(atomicSwap.Asset.SecondaryID())
 		orderId := sha256.Sum256(append(secHash, common.HexToAddress(atomicSwap.InitiatorAddress).Hash().Bytes()...))
