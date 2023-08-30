@@ -45,20 +45,24 @@ type Entity struct {
 	RiskScoreLevelLabel  string `json:"riskScoreLevelLabel"`
 }
 
-type Screener struct {
+type screener struct {
 	db  *gorm.DB
 	key string
 }
 
-func NewScreener(db *gorm.DB, key string) Screener {
-	screener := Screener{
+type Screener interface {
+	IsBlacklisted(addrs map[string]model.Chain) (bool, error)
+}
+
+func NewScreener(db *gorm.DB, key string) screener {
+	screener := screener{
 		db:  db,
 		key: key,
 	}
 	return screener
 }
 
-func (screener Screener) IsBlacklisted(addrs map[string]model.Chain) (bool, error) {
+func (screener screener) IsBlacklisted(addrs map[string]model.Chain) (bool, error) {
 
 	// If the key is not set, we skip this check. Usually happens to testnet.
 	if screener.key == "" {
@@ -82,7 +86,7 @@ func (screener Screener) IsBlacklisted(addrs map[string]model.Chain) (bool, erro
 	return blacklisted, nil
 }
 
-func (screener Screener) isBlacklistedFromDB(addrs map[string]model.Chain) (bool, error) {
+func (screener screener) isBlacklistedFromDB(addrs map[string]model.Chain) (bool, error) {
 	if screener.db == nil {
 		return false, nil
 	}
@@ -101,7 +105,7 @@ func (screener Screener) isBlacklistedFromDB(addrs map[string]model.Chain) (bool
 	return true, nil
 }
 
-func (screener Screener) isBlacklistedFromAPI(addrs map[string]model.Chain) (bool, error) {
+func (screener screener) isBlacklistedFromAPI(addrs map[string]model.Chain) (bool, error) {
 	// Generate the request body
 	client := new(http.Client)
 	requestData := make([]AddressScreeningRequest, 0, len(addrs))
@@ -180,7 +184,7 @@ Responses:
 	return blacklisted, nil
 }
 
-func (screener Screener) addToDB(addr string) error {
+func (screener screener) addToDB(addr string) error {
 	addr = FormatAddress(addr)
 	blacklist := model.Blacklist{
 		Address: addr,

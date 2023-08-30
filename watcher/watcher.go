@@ -226,19 +226,13 @@ func UpdateSwapStatus(log *zap.Logger, swap model.AtomicSwap, watcher swapper.Wa
 	return swap, false, nil
 }
 
-func updateStatus(log *zap.Logger, order model.Order, initiatorWatcher, followerWatcher swapper.Watcher) (model.Order, bool, error) {
-	initiatorSwap, ictn, ierr := updateSwapStatus(log, *order.InitiatorAtomicSwap, initiatorWatcher)
-	followerSwap, fctn, ferr := updateSwapStatus(log, *order.FollowerAtomicSwap, followerWatcher)
-	if ierr != nil && ferr != nil {
-		return order, false, fmt.Errorf("initiatorSwap error : %v ,followerSwap error : %v ", ierr, ferr)
-	}
-	if ictn || fctn {
-		if order.Secret != followerSwap.Secret {
-			order.Secret = followerSwap.Secret
-		}
+func UpdateStatus(log *zap.Logger, order model.Order, initiatorWatcher, followerWatcher swapper.Watcher) (model.Order, bool, error) {
+	var hasUpdated bool
+	for {
+		initiatorSwap, ictn, ierr := UpdateSwapStatus(log, *order.InitiatorAtomicSwap, initiatorWatcher)
 		followerSwap, fctn, ferr := UpdateSwapStatus(log, *order.FollowerAtomicSwap, followerWatcher)
-		if ferr != nil {
-			return order, hasUpdated, ferr
+		if ierr != nil || ferr != nil {
+			return order, false, fmt.Errorf("initiatorSwap error : %v ,followerSwap error : %v ", ierr, ferr)
 		}
 		if ictn || fctn {
 			if order.Secret != followerSwap.Secret {

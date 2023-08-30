@@ -45,18 +45,18 @@ func (s *store) price(chain model.Chain, asset model.Asset, config model.Config)
 	if !ok {
 		return blockchain.Price{}, fmt.Errorf("unsupported chain: %s", chain)
 	}
-	_, ok = config.Network[chain].Oracles[asset]
+	_, ok = config.Network[chain].Assets[asset]
 	if !ok {
 		return blockchain.Price{}, fmt.Errorf("unsupported asset: %s", asset)
 	}
 
-	priceObj, ok := s.cache[config.Network[chain].Oracles[asset].PriceUrl]
+	priceObj, ok := s.cache[config.Network[chain].Assets[asset].Oracle]
 	if !ok || time.Now().Unix()-priceObj.Timestamp > config.PriceTTL {
-		updatedPrice, err := blockchain.GetPrice(config.Network[chain].Oracles[asset].PriceUrl)
+		updatedPrice, err := blockchain.GetPrice(config.Network[chain].Assets[asset].Oracle)
 		if err != nil {
 			return blockchain.Price{}, err
 		}
-		s.cache[config.Network[chain].Oracles[asset].PriceUrl] = updatedPrice
+		s.cache[config.Network[chain].Assets[asset].Oracle] = updatedPrice
 		priceObj = updatedPrice
 	}
 	return priceObj, nil
@@ -121,9 +121,9 @@ func (s *store) usdValue(swaps []model.AtomicSwap, config model.Network) (*big.I
 			}
 			normaliser, ok := cacheNormalisers[swap.Asset]
 			if !ok {
-				decimals := config[swap.Chain].Oracles[swap.Asset].Decimals
+				decimals := config[swap.Chain].Assets[swap.Asset].Decimals
 				if decimals == 0 {
-					return nil, fmt.Errorf("failed to get decimals for %v on %v: %v", swap.Chain, swap.Asset)
+					return nil, fmt.Errorf("failed to get decimals for %v on %v", swap.Asset, swap.Chain)
 				}
 				normaliser = new(big.Int).Exp(big.NewInt(10), big.NewInt(decimals), nil)
 				cacheNormalisers[swap.Asset] = normaliser

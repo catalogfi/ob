@@ -25,11 +25,6 @@ const (
 	GetOrdersMessageRegex = `^(?P<action>subscribe):(?P<address>0x[a-fA-F0-9]{40})$`
 )
 
-const (
-	GetOrderMessageRegex  = `^(?P<action>subscribe):(?P<orderID>\d+)$`
-	GetOrdersMessageRegex = `^(?P<action>subscribe):(?P<address>0x[a-fA-F0-9]{40})$`
-)
-
 var upgrader = websocket.Upgrader{
 	// check origin will check the cross region source (note : please not using in production)
 	CheckOrigin: func(r *http.Request) bool {
@@ -211,7 +206,7 @@ func (s *Server) supportedAssets() gin.HandlerFunc {
 	assets := map[model.Chain][]model.Asset{}
 	for chain, netConf := range s.config.Network {
 		assets[chain] = []model.Asset{}
-		for asset := range netConf.Oracles {
+		for asset := range netConf.Assets {
 			assets[chain] = append(assets[chain], asset)
 		}
 	}

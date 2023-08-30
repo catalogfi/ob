@@ -11,7 +11,7 @@ import (
 
 type Network map[Chain]NetworkConfig
 type NetworkConfig struct {
-	Oracles     map[Asset]Token
+	Assets      map[Asset]Token
 	RPC         map[string]string
 	IWRPC       string
 	Expiry      int64
@@ -78,7 +78,7 @@ func (c Chain) IsTestnet() bool {
 }
 
 type Token struct {
-	PriceUrl     string
+	Oracle       string
 	TokenAddress string
 	Decimals     int64
 }
@@ -224,7 +224,7 @@ func ParseChainAsset(chainAsset string) (Chain, Asset, error) {
 }
 
 func (conf NetworkConfig) IsSupported(asset Asset) error {
-	if _, ok := conf.Oracles[asset]; ok {
+	if _, ok := conf.Assets[asset]; ok {
 		return nil
 	}
 	return fmt.Errorf("asset %v is not supported", asset)
@@ -236,11 +236,6 @@ func CompareOrder(a, b Order) bool {
 		a.FollowerAtomicSwap.CurrentConfirmations == b.FollowerAtomicSwap.CurrentConfirmations &&
 		a.InitiatorAtomicSwap.FilledAmount == b.InitiatorAtomicSwap.FilledAmount &&
 		a.FollowerAtomicSwap.FilledAmount == b.FollowerAtomicSwap.FilledAmount
-}
-func CompareOrder(a, b Order) bool {
-	return a.Status == b.Status &&
-		a.InitiatorAtomicSwap.CurrentConfirmations == b.InitiatorAtomicSwap.CurrentConfirmations &&
-		a.FollowerAtomicSwap.CurrentConfirmations == b.FollowerAtomicSwap.CurrentConfirmations
 }
 
 type Blacklist struct {

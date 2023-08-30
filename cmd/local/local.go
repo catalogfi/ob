@@ -24,44 +24,24 @@ func main() {
 	}
 
 	config := model.Network{
-		model.BitcoinTestnet: {
-			RPC: map[string]string{
-				"mempool": "https://mempool.space/testnet/api",
-			},
-			Oracles: map[model.Asset]model.Token{
-				model.NewSecondary(""): {
-					TokenAddress: "",
-					Decimals:     0,
+		"bitcoin_testnet": model.NetworkConfig{
+			Assets: map[model.Asset]model.Token{
+				model.Primary: {
+					Oracle:   "https://api.coincap.io/v2/assets/bitcoin",
+					Decimals: 8,
 				},
 			},
-			Expiry: 144,
-		},
-		model.EthereumSepolia: {
-			RPC: map[string]string{
-				"ethrpc": "https://gateway.tenderly.co/public/sepolia",
-			},
-			Oracles: map[model.Asset]model.Token{
-				model.NewSecondary(""): {
-					PriceUrl:     "",
-					TokenAddress: "",
-					Decimals:     0,
-				},
-			},
-			Expiry: 6542,
-		},
-		model.EthereumOptimism: {
-			RPC: map[string]string{
-				"ethrpc": "https://opt-mainnet.g.alchemy.com/v2/lM_wORHU7fDVp_SSYJPCCO-erSffgpX9",
-			},
-			Oracles: map[model.Asset]model.Token{
-				model.NewSecondary(""): {
-					PriceUrl:     "",
-					TokenAddress: "",
-					Decimals:     0,
-				},
-			},
-			Expiry: 10000,
-		},
+			RPC:    map[string]string{"mempool": "https://mempool.space/testnet/api"},
+			Expiry: 0},
+		"ethereum_sepolia": model.NetworkConfig{
+			Assets: map[model.Asset]model.Token{
+				model.NewSecondary("0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF"): {
+					Oracle:       "https://api.coincap.io/v2/assets/bitcoin",
+					TokenAddress: "0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF",
+					Decimals:     8,
+				}},
+			RPC:    map[string]string{"ethrpc": "https://gateway.tenderly.co/public/sepolia"},
+			Expiry: 0},
 	}
 
 	logger, err := zap.NewDevelopment()

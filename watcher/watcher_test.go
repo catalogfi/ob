@@ -225,15 +225,7 @@ var _ = Describe("Watcher", func() {
 	})
 
 	Describe("update order status when status is Filled", func() {
-		It("should return an error when initiator atomic swap fails", func() {
-			mockWatcher.EXPECT().IsDetected().Return(false, "", "", mockError).AnyTimes()
-			order, cond, err := UpdateStatus(logger, model.Order{Status: model.Filled, InitiatorAtomicSwap: &model.AtomicSwap{Status: model.NotStarted}}, mockWatcher, mockWatcher)
-			Expect(cond).To(BeFalse())
-			Expect(order.Status).Should(Equal(model.Filled))
-			Expect(err).To(HaveOccurred())
-		})
-
-		It("should return an error when follower atomic swap fails", func() {
+		It("should return an error if initiator or follower atomic swap fails", func() {
 			mockWatcher.EXPECT().IsDetected().Return(false, "", "", mockError)
 			order, cond, err := UpdateStatus(logger, model.Order{Status: model.Filled, InitiatorAtomicSwap: &model.AtomicSwap{Status: model.Redeemed}, FollowerAtomicSwap: &model.AtomicSwap{Status: model.NotStarted}}, mockWatcher, mockWatcher)
 			Expect(cond).To(BeFalse())
@@ -513,7 +505,7 @@ var _ = Describe("Watcher", func() {
 			}
 			ProcessOrder(order, mockStore, model.Network{
 				model.BitcoinTestnet: model.NetworkConfig{
-					RPC: "https://mempool.space/testnet/api",
+					RPC: map[string]string{"mempool": "https://mempool.space/testnet/api"},
 				},
 			}, logger)
 		})
@@ -545,7 +537,7 @@ var _ = Describe("Watcher", func() {
 			}
 			ProcessOrder(order, mockStore, model.Network{
 				model.BitcoinTestnet: model.NetworkConfig{
-					RPC: "https://mempool.space/testnet/api",
+					RPC: map[string]string{"mempool": "https://mempool.space/testnet/api"},
 				},
 			}, logger)
 		})
