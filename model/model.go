@@ -154,7 +154,9 @@ type AtomicSwap struct {
 	gorm.Model
 
 	Status               SwapStatus `json:"swapStatus"`
+	SecretHash           string     `json:"secretHash"`
 	Secret               string     `json:"secret"`
+	OnChainIdentifier    string     `json:"onChainIdentifier"`
 	InitiatorAddress     string     `json:"initiatorAddress"`
 	RedeemerAddress      string     `json:"redeemerAddress"`
 	Timelock             string     `json:"timelock"`

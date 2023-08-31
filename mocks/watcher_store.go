@@ -49,6 +49,36 @@ func (mr *MockStoreMockRecorder) GetActiveOrders() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveOrders", reflect.TypeOf((*MockStore)(nil).GetActiveOrders))
 }
 
+// GetActiveSwaps mocks base method.
+func (m *MockStore) GetActiveSwaps(chain model.Chain) ([]model.AtomicSwap, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetActiveSwaps", chain)
+	ret0, _ := ret[0].([]model.AtomicSwap)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetActiveSwaps indicates an expected call of GetActiveSwaps.
+func (mr *MockStoreMockRecorder) GetActiveSwaps(chain interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveSwaps", reflect.TypeOf((*MockStore)(nil).GetActiveSwaps), chain)
+}
+
+// SwapByOCID mocks base method.
+func (m *MockStore) SwapByOCID(ocID string) (model.AtomicSwap, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SwapByOCID", ocID)
+	ret0, _ := ret[0].(model.AtomicSwap)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SwapByOCID indicates an expected call of SwapByOCID.
+func (mr *MockStoreMockRecorder) SwapByOCID(ocID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SwapByOCID", reflect.TypeOf((*MockStore)(nil).SwapByOCID), ocID)
+}
+
 // UpdateOrder mocks base method.
 func (m *MockStore) UpdateOrder(order *model.Order) error {
 	m.ctrl.T.Helper()
@@ -61,4 +91,18 @@ func (m *MockStore) UpdateOrder(order *model.Order) error {
 func (mr *MockStoreMockRecorder) UpdateOrder(order interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateOrder", reflect.TypeOf((*MockStore)(nil).UpdateOrder), order)
+}
+
+// UpdateSwap mocks base method.
+func (m *MockStore) UpdateSwap(swap *model.AtomicSwap) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateSwap", swap)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateSwap indicates an expected call of UpdateSwap.
+func (mr *MockStoreMockRecorder) UpdateSwap(swap interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateSwap", reflect.TypeOf((*MockStore)(nil).UpdateSwap), swap)
 }
