@@ -471,6 +471,32 @@ func (s *store) GetActiveOrders() ([]model.Order, error) {
 	return orders, nil
 }
 
+// get all the swaps that are active
+func (s *store) GetActiveSwaps(chain model.Chain) ([]model.AtomicSwap, error) {
+	swaps := []model.AtomicSwap{}
+	if tx := s.db.Where("status IN ? AND chain = ?", []model.SwapStatus{model.NotStarted, model.Initiated, model.Detected, model.Expired}, chain).Find(&swaps); tx.Error != nil {
+		return nil, tx.Error
+	}
+	return swaps, nil
+}
+
+func (s *store) SwapByOCID(ocID string) (model.AtomicSwap, error) {
+	swap := model.AtomicSwap{}
+	if tx := s.db.Where("on_chain_identifier = ?", ocID).First(&swap); tx.Error != nil {
+		return model.AtomicSwap{}, tx.Error
+	}
+	return swap, nil
+}
+
+// update the given atomic swap objects on the db
+// @dev should only be used internally and cannot be called by an end user
+func (s *store) UpdateSwap(swap *model.AtomicSwap) error {
+	if tx := s.db.Save(swap); tx.Error != nil {
+		return tx.Error
+	}
+	return nil
+}
+
 // get the order with the given order id
 func (s *store) GetOrder(orderID uint) (*model.Order, error) {
 	order := &model.Order{

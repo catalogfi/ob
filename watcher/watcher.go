@@ -20,6 +20,10 @@ type Store interface {
 	UpdateOrder(order *model.Order) error
 	// GetActiveOrders fetches all orders which are active.
 	GetActiveOrders() ([]model.Order, error)
+
+	UpdateSwap(swap *model.AtomicSwap) error
+	GetActiveSwaps(chain model.Chain) ([]model.AtomicSwap, error)
+	SwapByOCID(ocID string) (model.AtomicSwap, error)
 }
 
 // Watcher watches the blockchain and update order status accordingly.
