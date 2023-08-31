@@ -204,6 +204,7 @@ func (w *EthereumWatcher) handleInitiate(log types.Log) error {
 	}
 	swap.InitiateTxHash = log.TxHash.String()
 	swap.InitiateBlockNumber = log.BlockNumber
+	swap.OnChainIdentifier = log.Topics[1].Hex()
 
 	return w.store.UpdateSwap(&swap)
 }
