@@ -27,6 +27,7 @@ type RedeemerSwap interface {
 }
 
 type Watcher interface {
+	Identifier() string
 	Expired() (bool, error)
 	Status(initiateTxHash string) (uint64, uint64, error)
 	IsDetected() (bool, string, string, error)

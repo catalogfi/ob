@@ -36,6 +36,10 @@ func NewWatcher(scriptAddr btcutil.Address, waitBlocks int64, minConfirmations, 
 	}, nil
 }
 
+func (w *watcher) Identifier() string {
+	return w.scriptAddr.EncodeAddress()
+}
+
 func (w *watcher) Expired() (bool, error) {
 	// Check if the swap has been initiated
 	initiated, txHash, _, _, err := w.IsInitiated()

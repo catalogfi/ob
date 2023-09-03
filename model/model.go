@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"gorm.io/gorm"
 )
 
@@ -40,6 +41,10 @@ const (
 	EthereumOptimism Chain = "ethereum_optimism"
 )
 
+type BtcCompatChain interface {
+	Params() *chaincfg.Params
+}
+
 func ParseChain(c string) (Chain, error) {
 	switch strings.ToLower(c) {
 	case "bitcoin":
@@ -70,7 +75,20 @@ func (c Chain) IsEVM() bool {
 }
 
 func (c Chain) IsBTC() bool {
-	return c == Bitcoin || c == BitcoinTestnet || c == BitcoinRegtest
+	return c.Params() != nil
+}
+
+func (c Chain) Params() *chaincfg.Params {
+	switch c {
+	case Bitcoin:
+		return &chaincfg.MainNetParams
+	case BitcoinTestnet:
+		return &chaincfg.TestNet3Params
+	case BitcoinRegtest:
+		return &chaincfg.RegressionNetParams
+	default:
+		return nil
+	}
 }
 
 func (c Chain) IsTestnet() bool {

@@ -1,14 +1,18 @@
 package store
 
 import (
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/catalogfi/wbtc-garden/blockchain"
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/catalogfi/wbtc-garden/watcher"
@@ -18,7 +22,7 @@ import (
 type store struct {
 	mu    *sync.RWMutex
 	db    *gorm.DB
-	cache map[string]blockchain.Price
+	cache map[string]Price
 }
 
 type Store interface {
@@ -36,25 +40,25 @@ func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 	if err := db.AutoMigrate(&model.Order{}, &model.AtomicSwap{}, &model.Blacklist{}); err != nil {
 		return nil, err
 	}
-	return &store{mu: new(sync.RWMutex), cache: make(map[string]blockchain.Price), db: db}, nil
+	return &store{mu: new(sync.RWMutex), cache: make(map[string]Price), db: db}, nil
 }
 
 // maintain a cache for the price and refresh it at the TTL interval
-func (s *store) price(chain model.Chain, asset model.Asset, config model.Config) (blockchain.Price, error) {
+func (s *store) price(chain model.Chain, asset model.Asset, config model.Config) (Price, error) {
 	_, ok := config.Network[chain]
 	if !ok {
-		return blockchain.Price{}, fmt.Errorf("unsupported chain: %s", chain)
+		return Price{}, fmt.Errorf("unsupported chain: %s", chain)
 	}
 	_, ok = config.Network[chain].Assets[asset]
 	if !ok {
-		return blockchain.Price{}, fmt.Errorf("unsupported asset: %s", asset)
+		return Price{}, fmt.Errorf("unsupported asset: %s", asset)
 	}
 
 	priceObj, ok := s.cache[config.Network[chain].Assets[asset].Oracle]
 	if !ok || time.Now().Unix()-priceObj.Timestamp > config.PriceTTL {
-		updatedPrice, err := blockchain.GetPrice(config.Network[chain].Assets[asset].Oracle)
+		updatedPrice, err := GetPrice(config.Network[chain].Assets[asset].Oracle)
 		if err != nil {
-			return blockchain.Price{}, err
+			return Price{}, err
 		}
 		s.cache[config.Network[chain].Assets[asset].Oracle] = updatedPrice
 		priceObj = updatedPrice
@@ -145,7 +149,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// check if creatorAddress is valid eth address
-	if err := blockchain.CheckAddress(model.Ethereum, creator); err != nil {
+	if err := CheckAddress(model.Ethereum, creator); err != nil {
 		return 0, err
 	}
 	sendChain, receiveChain, sendAsset, receiveAsset, err := model.ParseOrderPair(orderPair)
@@ -162,17 +166,17 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	}
 
 	// check if send address and receive address are proper addresses for respective chains
-	if err := blockchain.CheckAddress(receiveChain, receiveAddress); err != nil {
+	if err := CheckAddress(receiveChain, receiveAddress); err != nil {
 		return 0, fmt.Errorf("invalid recieve address: %v", err)
 	}
-	if err := blockchain.CheckAddress(sendChain, sendAddress); err != nil {
+	if err := CheckAddress(sendChain, sendAddress); err != nil {
 		return 0, fmt.Errorf("invalid send address: %v", err)
 	}
 
 	// TODO: can we make this more generic userBtcWalletAddress
 
 	// validate secretHash
-	if err := blockchain.CheckHash(secretHash); err != nil {
+	if err := CheckHash(secretHash); err != nil {
 		return 0, err
 	}
 	sendAmt, ok := new(big.Int).SetString(sendAmount, 10)
@@ -307,10 +311,10 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	if err != nil {
 		return fmt.Errorf("constraint violation: corrupted order pair: %v", err)
 	}
-	if err := blockchain.CheckAddress(fromChain, receiveAddress); err != nil {
+	if err := CheckAddress(fromChain, receiveAddress); err != nil {
 		return fmt.Errorf("invalid recieve address: %v", err)
 	}
-	if err := blockchain.CheckAddress(toChain, sendAddress); err != nil {
+	if err := CheckAddress(toChain, sendAddress); err != nil {
 		return fmt.Errorf("invalid send address: %v", err)
 	}
 	initiateAtomicSwap := &model.AtomicSwap{}
@@ -331,10 +335,10 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	}
 	initiateAtomicSwap.RedeemerAddress = receiveAddress
 	initiateAtomicSwap.Timelock = strconv.FormatInt(config[fromChain].Expiry*2, 10)
-	initiateAtomicSwap.MinimumConfirmations = blockchain.GetMinConfirmations(fromChainAmount, fromChain)
+	initiateAtomicSwap.MinimumConfirmations = GetMinConfirmations(fromChainAmount, fromChain)
 	followerAtomicSwap.InitiatorAddress = sendAddress
 	followerAtomicSwap.Timelock = strconv.FormatInt(config[toChain].Expiry, 10)
-	followerAtomicSwap.MinimumConfirmations = blockchain.GetMinConfirmations(toChainAmount, toChain)
+	followerAtomicSwap.MinimumConfirmations = GetMinConfirmations(toChainAmount, toChain)
 	order.Taker = filler
 	order.Status = model.Filled
 	if tx := s.db.Save(order); tx.Error != nil {
@@ -539,4 +543,129 @@ func (s *store) fillSwapDetails(order *model.Order) error {
 
 func (s *store) Gorm() *gorm.DB {
 	return s.db
+}
+
+func CheckAddress(chain model.Chain, address string) error {
+	if chain.IsEVM() {
+		if address[:2] == "0x" {
+			if len(address) != 42 {
+				return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
+			}
+		} else {
+			if len(address) == 40 {
+				return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
+			}
+		}
+	} else if chain.IsBTC() {
+		_, err := btcutil.DecodeAddress(address, getParams(chain))
+		if err != nil {
+			return fmt.Errorf("invalid bitcoin (%v) address: %v", chain, address)
+		}
+	} else {
+		return fmt.Errorf("unknown chain: %v", chain)
+	}
+	return nil
+}
+
+func CheckHash(hash string) error {
+	if len(hash) >= 2 && hash[0] == '0' && (hash[1] == 'x' || hash[1] == 'X') {
+		hash = hash[2:]
+	}
+	_, err := hex.DecodeString(hash)
+	if err != nil {
+		return fmt.Errorf("not a valid hash %s", hash)
+	}
+	return nil
+}
+
+// value is in USD
+func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
+	if chain.IsTestnet() {
+		return 0
+	}
+	if chain.IsBTC() {
+		switch {
+		case value.Cmp(big.NewInt(10000)) < 1:
+			return 1
+
+		case value.Cmp(big.NewInt(100000)) < 1:
+			return 2
+
+		case value.Cmp(big.NewInt(1000000)) < 1:
+			return 4
+
+		case value.Cmp(big.NewInt(10000000)) < 1:
+			return 6
+
+		case value.Cmp(big.NewInt(100000000)) < 1:
+			return 8
+
+		default:
+			return 12
+		}
+	} else if chain.IsEVM() {
+		switch {
+		case value.Cmp(big.NewInt(10000)) < 1:
+			return 6
+
+		case value.Cmp(big.NewInt(100000)) < 1:
+			return 12
+
+		case value.Cmp(big.NewInt(1000000)) < 1:
+			return 18
+
+		case value.Cmp(big.NewInt(10000000)) < 1:
+			return 24
+
+		case value.Cmp(big.NewInt(100000000)) < 1:
+			return 30
+
+		default:
+			return 100
+		}
+	}
+	return 0
+}
+
+type Price struct {
+	Price     float64
+	Timestamp int64
+}
+
+func GetPrice(oracle string) (Price, error) {
+	resp, err := http.Get(oracle)
+	if err != nil {
+		return Price{}, fmt.Errorf("failed to build get request: %v", err)
+	}
+	defer resp.Body.Close()
+	var apiResponse struct {
+		Data      map[string]interface{} `json:"data"`
+		Timestamp int64                  `json:"timestamp"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
+		return Price{}, fmt.Errorf("failed to decode response: %v", err)
+	}
+	priceUsdStr, ok := apiResponse.Data["priceUsd"].(string)
+	if !ok {
+		return Price{}, fmt.Errorf("failed to parse price from: %v", apiResponse.Data)
+	}
+	priceUsd, err := strconv.ParseFloat(priceUsdStr, 64)
+	if err != nil {
+		return Price{}, fmt.Errorf("failed to convert priceUsd to float64: %v", err)
+	}
+	return Price{priceUsd, apiResponse.Timestamp}, nil
+}
+
+func getParams(chain model.Chain) *chaincfg.Params {
+	switch chain {
+	case model.Bitcoin:
+		return &chaincfg.MainNetParams
+	case model.BitcoinTestnet:
+		return &chaincfg.TestNet3Params
+	case model.BitcoinRegtest:
+		return &chaincfg.RegressionNetParams
+	default:
+		panic("constraint violation: unknown chain")
+	}
 }

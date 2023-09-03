@@ -11,9 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"go.uber.org/zap"
 )
 
 var (
@@ -28,6 +28,7 @@ type Client interface {
 	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
 	GetDecimals(tokenAddr common.Address) (uint8, error)
 	GetConfirmations(txHash string) (uint64, uint64, error)
+	GetLogs(contract common.Address, fromBlock, toBlock uint64, eventIds [][]common.Hash) ([]types.Log, error)
 	ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
 	InitiateAtomicSwap(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error)
 	RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte, secret []byte) (string, error)
@@ -37,25 +38,23 @@ type Client interface {
 }
 
 type client struct {
-	logger   *zap.Logger
-	url      string
-	provider *ethclient.Client
-	chainID  *big.Int
+	eventWindow int64
+	url         string
+	provider    *ethclient.Client
+	chainID     *big.Int
 }
 
-func NewClient(logger *zap.Logger, url string) (Client, error) {
+func NewClient(url string) (Client, error) {
 	provider, err := ethclient.Dial(url)
 	if err != nil {
 		return nil, err
 	}
-	childLogger := logger.With(zap.String("service", "ethClient"))
 	chainID, err := provider.ChainID(context.Background())
 	if err != nil {
 		return nil, err
 	}
 
 	return &client{
-		logger:   childLogger,
 		url:      url,
 		provider: provider,
 		chainID:  chainID,
@@ -114,11 +113,6 @@ func (client *client) ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, t
 	if err != nil {
 		return "", err
 	}
-	client.logger.Debug("approve erc20",
-		zap.String("amount", amount.String()),
-		zap.String("token address", tokenAddr.Hex()),
-		zap.String("to address", toAddr.Hex()),
-		zap.String("txHash", tx.Hash().Hex()))
 	receipt, err := bind.WaitMined(context.Background(), client.provider, tx)
 	if err != nil {
 		return "", err
@@ -162,7 +156,6 @@ func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecd
 	if err != nil {
 		return "", err
 	}
-	client.logger.Info("initiate swap", zap.String("txHash", initTx.Hash().Hex()))
 	return receipt.TxHash.Hex(), nil
 }
 
@@ -297,4 +290,51 @@ func (client *client) simulateRefund(contract common.Address, auth *bind.Transac
 
 func (client *client) ChainID() *big.Int {
 	return client.chainID
+}
+
+func (client *client) GetLogs(contract common.Address, fromBlock, toBlock uint64, eventIds [][]common.Hash) ([]types.Log, error) {
+	intermediateToBlock := toBlock
+	if client.eventWindow < int64(fromBlock)-int64(toBlock) {
+		intermediateToBlock = fromBlock + uint64(client.eventWindow)
+	}
+	eventlogs := []types.Log{}
+	for {
+		query := ethereum.FilterQuery{
+			FromBlock: big.NewInt(int64(fromBlock)),
+			ToBlock:   big.NewInt(int64(intermediateToBlock)),
+			Addresses: []common.Address{
+				contract,
+			},
+			Topics: eventIds,
+		}
+		logs, err := client.GetProvider().FilterLogs(context.Background(), query)
+		if len(logs) > 0 {
+			return logs, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		eventlogs = append(eventlogs, logs...)
+		if intermediateToBlock == toBlock {
+			break
+		}
+		fromBlock = intermediateToBlock + 1
+		intermediateToBlock = fromBlock + uint64(client.eventWindow)
+		if intermediateToBlock > toBlock {
+			intermediateToBlock = toBlock
+		}
+	}
+	return eventlogs, nil
+}
+
+func tryMulti(caller func(client *ethclient.Client) error, clients []*ethclient.Client) error {
+	var retErr error
+	for _, client := range clients {
+		err := caller(client)
+		if err == nil {
+			return nil
+		}
+		retErr = fmt.Errorf("%v: %v", retErr, err)
+	}
+	return retErr
 }
