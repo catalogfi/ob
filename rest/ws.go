@@ -19,7 +19,7 @@ func (s *Server) socket() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// upgrade get request to websocket protocol
 		ctx, cancel := context.WithCancel(context.Background())
-		wg := sync.WaitGroup{}
+		mx := new(sync.RWMutex)
 		ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to upgrade to websocket %v", err)})
@@ -28,9 +28,25 @@ func (s *Server) socket() gin.HandlerFunc {
 		}
 		pinger := time.NewTicker(time.Second * 60)
 		defer func() {
+			cancel()
 			pinger.Stop()
 			ws.Close()
-			wg.Wait()
+		}()
+
+		go func() {
+			for range pinger.C {
+				mx.Lock()
+				err = ws.WriteJSON(map[string]interface{}{
+					"type": "ping",
+					"msg":  "ping",
+				})
+				mx.Unlock()
+				if err != nil {
+					s.logger.Debug("failed to write ping message", zap.Error(err))
+					cancel()
+					return
+				}
+			}
 		}()
 		for {
 			// Read Message from client
@@ -40,36 +56,21 @@ func (s *Server) socket() gin.HandlerFunc {
 				cancel()
 				return
 			}
-			wg.Add(1)
-			subscription := s.subscribe(message, ctx, &wg)
+			subscription := s.subscribe(message, ctx)
 
 			go func() {
-				for {
-					select {
-					case resp, ok := <-subscription:
-						if !ok {
-							return
-						}
+				for resp := range subscription {
 
-						err = ws.WriteJSON(map[string]interface{}{
-							"type": fmt.Sprintf("%T", resp),
-							"msg":  resp,
-						})
-						if err != nil {
-							s.logger.Debug("failed to write message", zap.Error(err))
-							cancel()
-							return
-						}
-					case <-pinger.C:
-						err = ws.WriteJSON(map[string]interface{}{
-							"type": "ping",
-							"msg":  "ping",
-						})
-						if err != nil {
-							s.logger.Debug("failed to write ping message", zap.Error(err))
-							cancel()
-							return
-						}
+					mx.Lock()
+					err = ws.WriteJSON(map[string]interface{}{
+						"type": fmt.Sprintf("%T", resp),
+						"msg":  resp,
+					})
+					mx.Unlock()
+					if err != nil {
+						s.logger.Debug("failed to write message", zap.Error(err))
+						cancel()
+						return
 					}
 				}
 			}()
@@ -77,14 +78,13 @@ func (s *Server) socket() gin.HandlerFunc {
 	}
 }
 
-func (s *Server) subscribe(msg []byte, ctx context.Context, wg *sync.WaitGroup) <-chan interface{} {
+func (s *Server) subscribe(msg []byte, ctx context.Context) <-chan interface{} {
 	responses := make(chan interface{})
 	fmt.Println("subscribing to ", string(msg))
 
 	go func() {
 		defer func() {
 			close(responses)
-			wg.Done()
 		}()
 
 		values := strings.Split(string(msg), "_")
