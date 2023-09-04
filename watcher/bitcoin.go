@@ -17,11 +17,11 @@ import (
 	"github.com/catalogfi/wbtc-garden/swapper/bitcoin"
 	"github.com/ethereum/go-ethereum/common/math"
 	"go.uber.org/zap"
-	"gorm.io/gorm"
 )
 
 type BTCWatcher struct {
 	store    Store
+	btcStore bitcoin.Store
 	config   model.Config
 	screener screener.Screener
 	interval time.Duration
@@ -29,10 +29,11 @@ type BTCWatcher struct {
 	chain    model.Chain
 }
 
-func NewBTCWatcher(store Store, chain model.Chain, config model.Config, screener screener.Screener, interval time.Duration, logger *zap.Logger) *BTCWatcher {
+func NewBTCWatcher(store Store, btcStore bitcoin.Store, chain model.Chain, config model.Config, screener screener.Screener, interval time.Duration, logger *zap.Logger) *BTCWatcher {
 	return &BTCWatcher{
 		chain:    chain,
 		store:    store,
+		btcStore: btcStore,
 		config:   config,
 		logger:   logger,
 		screener: screener,
@@ -60,11 +61,11 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 		return fmt.Errorf("failed to fetch active orders %v", err)
 	}
 	for _, swap := range swaps {
-		btcClient, err := LoadBTCClient(swap.Chain, w.config.Network[swap.Chain])
+		btcClient, err := LoadBTCClient(swap.Chain, w.config.Network[swap.Chain], w.btcStore)
 		if err != nil {
 			return fmt.Errorf("failed to load btc client %v", err)
 		}
-		watcher, err := LoadBTCWatcher(swap, w.config.Network[swap.Chain])
+		watcher, err := LoadBTCWatcher(swap, w.config.Network[swap.Chain], w.btcStore)
 		if err != nil {
 			return fmt.Errorf("failed to load watcher %v", err)
 		}
@@ -207,7 +208,7 @@ func GetBTCConfirmations(btcClient bitcoin.Client, txHash string) (uint64, uint6
 	return latestDepositBlockHeight, latestDepositConfirmations, nil
 }
 
-func LoadBTCClient(chain model.Chain, config model.NetworkConfig, iwConfig ...model.InstantWalletConfig) (bitcoin.Client, error) {
+func LoadBTCClient(chain model.Chain, config model.NetworkConfig, btcStore bitcoin.Store) (bitcoin.Client, error) {
 	indexers := []bitcoin.Indexer{}
 	for iType, url := range config.RPC {
 		switch iType {
@@ -224,18 +225,14 @@ func LoadBTCClient(chain model.Chain, config model.NetworkConfig, iwConfig ...mo
 		return nil, fmt.Errorf("failed to create indexer: %v", err)
 	}
 	client := bitcoin.NewClient(indexer, chain.Params())
-	if model.ValidateIWCOnfig(iwConfig) {
-		store, err := bitcoin.NewStore(iwConfig[0].Dialector, &gorm.Config{})
-		if err != nil {
-			return nil, err
-		}
-		return bitcoin.InstantWalletWrapper(config.IWRPC, store, client), nil
+	if btcStore != nil {
+		return bitcoin.InstantWalletWrapper(config.IWRPC, btcStore, client), nil
 	}
 	return client, nil
 }
 
-func LoadBTCWatcher(swap model.AtomicSwap, config model.NetworkConfig, iwConfig ...model.InstantWalletConfig) (swapper.Watcher, error) {
-	client, err := LoadBTCClient(swap.Chain, config, iwConfig...)
+func LoadBTCWatcher(swap model.AtomicSwap, config model.NetworkConfig, btcStore bitcoin.Store) (swapper.Watcher, error) {
+	client, err := LoadBTCClient(swap.Chain, config, btcStore)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
 	}

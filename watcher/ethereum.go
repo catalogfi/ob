@@ -172,7 +172,7 @@ func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener
 		return fmt.Errorf("failed to decode timelock: %s", err)
 	}
 
-	if cSwap.Expiry.Cmp(expiry) == 0 {
+	if cSwap.Expiry.Cmp(expiry) != 0 {
 		return fmt.Errorf("incorrect expiry: %s", swap.Amount)
 	}
 	swap.InitiateTxHash = log.TxHash.String()
