@@ -232,7 +232,7 @@ func (client *client) CalculateRedeemFee() (uint64, error) {
 		return 0, err
 	}
 	// 141.5 is size in vbytes for the redeem transaction
-	return 150 * uint64(feeRates.FastestFee), nil
+	return 150 * uint64(feeRates.FastestFee) * 2, nil
 }
 
 type FeeRates struct {
