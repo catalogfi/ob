@@ -286,6 +286,8 @@ func updatedOrders(orders map[uint]model.Order, newOrders []model.Order) (Update
 
 func isDifferent(a, b model.Order) bool {
 	return a.Status != b.Status ||
+		(a.FollowerAtomicSwap.Status != b.FollowerAtomicSwap.Status) ||
+		(a.InitiatorAtomicSwap.Status != b.InitiatorAtomicSwap.Status) ||
 		(a.FollowerAtomicSwap.CurrentConfirmations != b.FollowerAtomicSwap.CurrentConfirmations || a.InitiatorAtomicSwap.CurrentConfirmations != b.InitiatorAtomicSwap.CurrentConfirmations) ||
 		(a.FollowerAtomicSwap.FilledAmount != b.FollowerAtomicSwap.FilledAmount || a.InitiatorAtomicSwap.FilledAmount != b.InitiatorAtomicSwap.FilledAmount)
 }
