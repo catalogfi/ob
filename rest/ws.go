@@ -1,11 +1,13 @@
 package rest
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/catalogfi/wbtc-garden/model"
@@ -16,28 +18,30 @@ import (
 func (s *Server) socket() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// upgrade get request to websocket protocol
+		ctx, cancel := context.WithCancel(context.Background())
+		wg := sync.WaitGroup{}
 		ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to upgrade to websocket %v", err)})
+			cancel()
 			return
 		}
-		defer ws.Close()
-
 		pinger := time.NewTicker(time.Second * 60)
+		defer func() {
+			pinger.Stop()
+			ws.Close()
+			wg.Wait()
+		}()
 		for {
 			// Read Message from client
 			_, message, err := ws.ReadMessage()
 			if err != nil {
 				s.logger.Debug("failed to read a message", zap.Error(err))
-				err = ws.WriteJSON(map[string]interface{}{
-					"type":  fmt.Sprintf("%T", WebsocketError{Code: 101, Error: err.Error()}),
-					"error": WebsocketError{Code: 101, Error: err.Error()},
-				})
-				if err != nil {
-					ws.Close()
-				}
+				cancel()
+				return
 			}
-			subscription := s.subscribe(message)
+			wg.Add(1)
+			subscription := s.subscribe(message, ctx, &wg)
 
 			go func() {
 				for {
@@ -46,13 +50,15 @@ func (s *Server) socket() gin.HandlerFunc {
 						if !ok {
 							return
 						}
-						ws.WriteJSON(map[string]interface{}{
+
+						err = ws.WriteJSON(map[string]interface{}{
 							"type": fmt.Sprintf("%T", resp),
 							"msg":  resp,
 						})
 						if err != nil {
 							s.logger.Debug("failed to write message", zap.Error(err))
-							ws.Close()
+							cancel()
+							return
 						}
 					case <-pinger.C:
 						err = ws.WriteJSON(map[string]interface{}{
@@ -61,7 +67,8 @@ func (s *Server) socket() gin.HandlerFunc {
 						})
 						if err != nil {
 							s.logger.Debug("failed to write ping message", zap.Error(err))
-							ws.Close()
+							cancel()
+							return
 						}
 					}
 				}
@@ -70,12 +77,15 @@ func (s *Server) socket() gin.HandlerFunc {
 	}
 }
 
-func (s *Server) subscribe(msg []byte) <-chan interface{} {
+func (s *Server) subscribe(msg []byte, ctx context.Context, wg *sync.WaitGroup) <-chan interface{} {
 	responses := make(chan interface{})
 	fmt.Println("subscribing to ", string(msg))
 
 	go func() {
-		defer close(responses)
+		defer func() {
+			close(responses)
+			wg.Done()
+		}()
 
 		values := strings.Split(string(msg), "_")
 		if len(values) != 2 || strings.ToLower(values[0]) != "subscribe" {
@@ -85,7 +95,7 @@ func (s *Server) subscribe(msg []byte) <-chan interface{} {
 
 		isAddress, err := regexp.Match("0x[0-9a-fA-F]{40}", []byte(values[1]))
 		if err == nil && isAddress {
-			for order := range s.subscribeToUpdatedOrders(values[1]) {
+			for order := range s.subscribeToUpdatedOrders(strings.ToLower(values[1]), ctx) {
 				responses <- order
 			}
 			return
@@ -98,7 +108,7 @@ func (s *Server) subscribe(msg []byte) <-chan interface{} {
 				responses <- WebsocketError{Code: 2, Error: fmt.Sprintf("failed to parse order id %s: %v", values[1], err)}
 				return
 			}
-			for order := range s.subscribeToOrderUpdates(uint(orderID)) {
+			for order := range s.subscribeToOrderUpdates(uint(orderID), ctx) {
 				responses <- order
 			}
 			return
@@ -106,7 +116,7 @@ func (s *Server) subscribe(msg []byte) <-chan interface{} {
 
 		isOrderPair, err := regexp.Match("^[a-zA-Z:]+-[a-zA-Z:]+", []byte(values[1]))
 		if err == nil && isOrderPair {
-			for response := range s.subscribeToOpenOrders(values[1]) {
+			for response := range s.subscribeToOpenOrders(values[1], ctx) {
 				responses <- response
 			}
 			return
@@ -121,7 +131,7 @@ type WebsocketError struct {
 	Error string `json:"error"`
 }
 
-func (s *Server) subscribeToOrderUpdates(id uint) <-chan UpdatedOrder {
+func (s *Server) subscribeToOrderUpdates(id uint, ctx context.Context) <-chan UpdatedOrder {
 	responses := make(chan UpdatedOrder)
 	go func() {
 		defer close(responses)
@@ -138,28 +148,33 @@ func (s *Server) subscribeToOrderUpdates(id uint) <-chan UpdatedOrder {
 		}
 
 		for {
-			newOrder, err := s.store.GetOrder(id)
-			if err != nil {
-				responses <- UpdatedOrder{Error: fmt.Sprintf("failed to get order %d: %v", id, err)}
-				s.logger.Error("failed to get order", zap.Error(err))
+			select {
+			case <-ctx.Done():
 				return
-			}
-			if order.Status == newOrder.Status && order.FollowerAtomicSwap.Status == newOrder.FollowerAtomicSwap.Status && order.InitiatorAtomicSwap.Status == newOrder.InitiatorAtomicSwap.Status {
-				time.Sleep(time.Second * 2)
-				continue
-			}
-			order = newOrder
-			fmt.Println(order)
-			responses <- UpdatedOrder{Order: *order}
-			if order.Status >= model.Executed {
-				return
+			default:
+				newOrder, err := s.store.GetOrder(id)
+				if err != nil {
+					responses <- UpdatedOrder{Error: fmt.Sprintf("failed to get order %d: %v", id, err)}
+					s.logger.Error("failed to get order", zap.Error(err))
+					return
+				}
+				if order.Status == newOrder.Status && order.FollowerAtomicSwap.Status == newOrder.FollowerAtomicSwap.Status && order.InitiatorAtomicSwap.Status == newOrder.InitiatorAtomicSwap.Status {
+					time.Sleep(time.Second * 2)
+					continue
+				}
+				order = newOrder
+				fmt.Println(order)
+				responses <- UpdatedOrder{Order: *order}
+				if order.Status >= model.Executed {
+					return
+				}
 			}
 		}
 	}()
 	return responses
 }
 
-func (s *Server) subscribeToUpdatedOrders(creator string) <-chan UpdatedOrders {
+func (s *Server) subscribeToUpdatedOrders(creator string, ctx context.Context) <-chan UpdatedOrders {
 	responses := make(chan UpdatedOrders)
 
 	go func() {
@@ -179,47 +194,57 @@ func (s *Server) subscribeToUpdatedOrders(creator string) <-chan UpdatedOrders {
 			responses <- newOrders
 
 			for {
-				newOrdersByAddr, err := s.store.GetOrdersByAddress(creator)
-				if err != nil {
-					responses <- UpdatedOrders{Error: fmt.Sprintf("failed to get orders for %s: %v", creator, err)}
-					s.logger.Error("failed to get order", zap.Error(err))
+				select {
+				case <-ctx.Done():
 					return
-				}
+				default:
+					newOrdersByAddr, err := s.store.GetOrdersByAddress(creator)
+					if err != nil {
+						responses <- UpdatedOrders{Error: fmt.Sprintf("failed to get orders for %s: %v", creator, err)}
+						s.logger.Error("failed to get order", zap.Error(err))
+						return
+					}
 
-				newOrders, hasUpdated := updatedOrders(orderMap, newOrdersByAddr)
-				if !hasUpdated {
-					time.Sleep(time.Second * 2)
-					continue
-				}
+					newOrders, hasUpdated := updatedOrders(orderMap, newOrdersByAddr)
+					if !hasUpdated {
+						time.Sleep(time.Second * 2)
+						continue
+					}
 
-				responses <- newOrders
+					responses <- newOrders
+				}
 			}
 		}
 	}()
 	return responses
 }
 
-func (s *Server) subscribeToOpenOrders(orderPair string) <-chan OpenOrder {
+func (s *Server) subscribeToOpenOrders(orderPair string, ctx context.Context) <-chan OpenOrder {
 	responses := make(chan OpenOrder)
 	go func() {
 		defer close(responses)
 		processed := map[uint]bool{}
 
 		for {
-			orders, err := s.store.FilterOrders("", "", "", orderPair, "", model.Created, 0.0, 0.0, 0.0, 0.0, 0, 0, true)
-			if err != nil {
-				responses <- OpenOrder{Error: fmt.Sprintf("failed to get orders on pair %s: %v", orderPair, err)}
-				s.logger.Error("failed to get open orders", zap.Error(err))
-				break
-			}
-
-			for _, order := range orders {
-				if _, ok := processed[order.ID]; ok {
-					continue
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				orders, err := s.store.FilterOrders("", "", "", orderPair, "", model.Created, 0.0, 0.0, 0.0, 0.0, 0, 0, true)
+				if err != nil {
+					responses <- OpenOrder{Error: fmt.Sprintf("failed to get orders on pair %s: %v", orderPair, err)}
+					s.logger.Error("failed to get open orders", zap.Error(err))
+					break
 				}
 
-				processed[order.ID] = true
-				responses <- OpenOrder{Order: order}
+				for _, order := range orders {
+					if _, ok := processed[order.ID]; ok {
+						continue
+					}
+
+					processed[order.ID] = true
+					responses <- OpenOrder{Order: order}
+				}
 			}
 		}
 	}()
