@@ -258,6 +258,9 @@ func (w *watcher) IsRefunded() (bool, string, error) {
 }
 
 func (w *watcher) IsInstantWallet(txHash string) (bool, error) {
+	if w.iwRpc == "" {
+		return false, nil
+	}
 	resp, err := http.Get(w.iwRpc + "/validateTransaction/" + txHash)
 	if err != nil {
 		return false, err

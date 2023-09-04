@@ -255,6 +255,21 @@ func (mr *MockWatcherMockRecorder) IsInitiated() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsInitiated", reflect.TypeOf((*MockWatcher)(nil).IsInitiated))
 }
 
+// IsInstantWallet mocks base method.
+func (m *MockWatcher) IsInstantWallet(txHash string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsInstantWallet", txHash)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsInstantWallet indicates an expected call of IsInstantWallet.
+func (mr *MockWatcherMockRecorder) IsInstantWallet(txHash interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsInstantWallet", reflect.TypeOf((*MockWatcher)(nil).IsInstantWallet), txHash)
+}
+
 // IsRedeemed mocks base method.
 func (m *MockWatcher) IsRedeemed() (bool, []byte, string, error) {
 	m.ctrl.T.Helper()
@@ -289,13 +304,14 @@ func (mr *MockWatcherMockRecorder) IsRefunded() *gomock.Call {
 }
 
 // Status mocks base method.
-func (m *MockWatcher) Status(initiateTxHash string) (uint64, uint64, error) {
+func (m *MockWatcher) Status(initiateTxHash string) (uint64, uint64, bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Status", initiateTxHash)
 	ret0, _ := ret[0].(uint64)
 	ret1, _ := ret[1].(uint64)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret2, _ := ret[2].(bool)
+	ret3, _ := ret[3].(error)
+	return ret0, ret1, ret2, ret3
 }
 
 // Status indicates an expected call of Status.

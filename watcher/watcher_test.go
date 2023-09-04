@@ -82,14 +82,14 @@ var _ = Describe("Watcher", func() {
 
 	Describe("update swap status when status is Detected", func() {
 		It("should return an error when Status fails", func() {
-			mockWatcher.EXPECT().Status(mockTxHash).Return(uint64(0), uint64(0), mockError)
+			mockWatcher.EXPECT().Status(mockTxHash).Return(uint64(0), uint64(0), false, mockError)
 			_, cond, err := UpdateSwapStatus(logger, model.AtomicSwap{Status: model.Detected, InitiateTxHash: mockTxHash}, mockWatcher)
 			Expect(cond).To(BeFalse())
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("should update confirmations and block number when status returns valid values", func() {
-			mockWatcher.EXPECT().Status(mockTxHash).Return(uint64(10), uint64(1), nil)
+			mockWatcher.EXPECT().Status(mockTxHash).Return(uint64(10), uint64(1), false, nil)
 			swap, cond, err := UpdateSwapStatus(logger, model.AtomicSwap{Status: model.Detected, InitiateTxHash: mockTxHash, CurrentConfirmations: 0, MinimumConfirmations: 2}, mockWatcher)
 			Expect(cond).To(BeTrue())
 			Expect(swap.CurrentConfirmations).Should(Equal(uint64(1)))
@@ -99,7 +99,7 @@ var _ = Describe("Watcher", func() {
 		})
 
 		It("should update confirmations to min confirmations even if the confirmations are higher", func() {
-			mockWatcher.EXPECT().Status(mockTxHash).Return(uint64(10), uint64(3), nil)
+			mockWatcher.EXPECT().Status(mockTxHash).Return(uint64(10), uint64(3), false, nil)
 			swap, cond, err := UpdateSwapStatus(logger, model.AtomicSwap{Status: model.Detected, InitiateTxHash: mockTxHash, CurrentConfirmations: 1, MinimumConfirmations: 2}, mockWatcher)
 			Expect(cond).To(BeTrue())
 			Expect(swap.CurrentConfirmations).Should(Equal(uint64(2)))
@@ -109,7 +109,7 @@ var _ = Describe("Watcher", func() {
 		})
 
 		It("should update status to Initiated when confirmations are equal to min confirmations", func() {
-			mockWatcher.EXPECT().Status(mockTxHash).Return(uint64(10), uint64(2), nil)
+			mockWatcher.EXPECT().Status(mockTxHash).Return(uint64(10), uint64(2), false, nil)
 			swap, cond, err := UpdateSwapStatus(logger, model.AtomicSwap{Status: model.Detected, InitiateTxHash: mockTxHash, CurrentConfirmations: 1, MinimumConfirmations: 2}, mockWatcher)
 			Expect(cond).To(BeTrue())
 			Expect(swap.CurrentConfirmations).Should(Equal(uint64(2)))
@@ -119,7 +119,7 @@ var _ = Describe("Watcher", func() {
 		})
 
 		It("should not update status to Initiated when confirmations are less than min confirmations", func() {
-			mockWatcher.EXPECT().Status(mockTxHash).Return(uint64(10), uint64(1), nil)
+			mockWatcher.EXPECT().Status(mockTxHash).Return(uint64(10), uint64(1), false, nil)
 			swap, cond, err := UpdateSwapStatus(logger, model.AtomicSwap{Status: model.Detected, InitiateTxHash: mockTxHash, CurrentConfirmations: 1, MinimumConfirmations: 2}, mockWatcher)
 			Expect(cond).To(BeFalse())
 			Expect(swap.Status).Should(Equal(model.Detected))
