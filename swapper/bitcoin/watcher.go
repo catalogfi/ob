@@ -37,7 +37,6 @@ func NewWatcher(scriptAddr btcutil.Address, waitBlocks int64, minConfirmations, 
 		waitBlocks:       waitBlocks,
 		minConfirmations: minConfirmations,
 		client:           client,
-		iwRpc:            iwRpc,
 	}, nil
 }
 
@@ -259,7 +258,6 @@ func (w *watcher) IsRefunded() (bool, string, error) {
 }
 
 func (w *watcher) IsInstantWallet(txHash string) (bool, error) {
-	fmt.Println(w.iwRpc, txHash)
 	if w.iwRpc == "" {
 		return false, nil
 	}

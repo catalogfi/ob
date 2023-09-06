@@ -80,6 +80,7 @@ require (
 
 require (
 	github.com/TheZeroSlave/zapsentry v1.17.0
+	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.3
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/fatih/color v1.7.0
