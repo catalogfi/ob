@@ -372,7 +372,7 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 	orders := []model.Order{}
 	tx := s.db.Table("orders")
 	if orderPair != "" {
-		tx = tx.Where("order_pair = ?", orderPair)
+		tx = tx.Where("order_pair ilike ?", orderPair)
 	}
 	joinAtomicSwaps := false
 	if minAmount != 0 {
