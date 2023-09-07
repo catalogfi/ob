@@ -37,6 +37,7 @@ func NewWatcher(scriptAddr btcutil.Address, waitBlocks int64, minConfirmations, 
 		waitBlocks:       waitBlocks,
 		minConfirmations: minConfirmations,
 		client:           client,
+		iwRpc:            iwRpc,
 	}, nil
 }
 
