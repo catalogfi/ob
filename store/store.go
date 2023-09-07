@@ -334,20 +334,22 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	if err != nil {
 		return fmt.Errorf("failed to calculate value locked on %s: %v", toChain, err)
 	}
-	initiatorSwapID, err := GetSwapId(*initiateAtomicSwap)
+	initiatorTimeLock := strconv.FormatInt(config[fromChain].Expiry*2, 10)
+	followerTimelock := strconv.FormatInt(config[toChain].Expiry, 10)
+	initiatorSwapID, err := GetSwapId(fromChain, initiateAtomicSwap.InitiatorAddress, receiveAddress, initiatorTimeLock, order.SecretHash)
 	if err != nil {
 		return fmt.Errorf("failed to calculate on-chain identifier %s: %v", fromChain, err)
 	}
-	followerSwapID, err := GetSwapId(*followerAtomicSwap)
+	followerSwapID, err := GetSwapId(toChain, sendAddress, followerAtomicSwap.RedeemerAddress, followerTimelock, order.SecretHash)
 	if err != nil {
 		return fmt.Errorf("failed to calculate on-chain identifier %s: %v", toChain, err)
 	}
 	initiateAtomicSwap.RedeemerAddress = receiveAddress
-	initiateAtomicSwap.Timelock = strconv.FormatInt(config[fromChain].Expiry*2, 10)
+	initiateAtomicSwap.Timelock = initiatorTimeLock
 	initiateAtomicSwap.MinimumConfirmations = blockchain.GetMinConfirmations(fromChainAmount, fromChain)
 	initiateAtomicSwap.OnChainIdentifier = initiatorSwapID
 	followerAtomicSwap.InitiatorAddress = sendAddress
-	followerAtomicSwap.Timelock = strconv.FormatInt(config[toChain].Expiry, 10)
+	followerAtomicSwap.Timelock = followerTimelock
 	followerAtomicSwap.MinimumConfirmations = blockchain.GetMinConfirmations(toChainAmount, toChain)
 	followerAtomicSwap.OnChainIdentifier = followerSwapID
 	order.Taker = filler
@@ -556,23 +558,23 @@ func (s *store) Gorm() *gorm.DB {
 	return s.db
 }
 
-func GetSwapId(swap model.AtomicSwap) (string, error) {
-	secHash, err := hex.DecodeString(swap.SecretHash)
+func GetSwapId(Chain model.Chain, InitiatorAddress string, RedeemerAddress string, Timelock string, SecretHash string) (string, error) {
+	secHash, err := hex.DecodeString(SecretHash)
 	if err != nil {
 		return "", err
 	}
-	if swap.Chain.IsBTC() {
-		chainConfig := blockchain.GetParams(swap.Chain)
+	if Chain.IsBTC() {
+		chainConfig := blockchain.GetParams(Chain)
 
-		initiatorAddress, err := btcutil.DecodeAddress(swap.InitiatorAddress, chainConfig)
+		initiatorAddress, err := btcutil.DecodeAddress(InitiatorAddress, chainConfig)
 		if err != nil {
 			return "", err
 		}
-		redeemerAddress, err := btcutil.DecodeAddress(swap.InitiatorAddress, chainConfig)
+		redeemerAddress, err := btcutil.DecodeAddress(RedeemerAddress, chainConfig)
 		if err != nil {
 			return "", err
 		}
-		timelock, _ := strconv.ParseInt(swap.Timelock, 10, 64)
+		timelock, _ := strconv.ParseInt(Timelock, 10, 64)
 		htlcScript, err := bitcoin.NewHTLCScript(initiatorAddress, redeemerAddress, secHash, timelock)
 		if err != nil {
 			return "", fmt.Errorf("failed to create HTLC script: %w", err)
@@ -584,8 +586,8 @@ func GetSwapId(swap model.AtomicSwap) (string, error) {
 			return "", err
 		}
 		return scriptAddr.EncodeAddress(), nil
-	} else if swap.Chain.IsEVM() {
-		orderId := sha256.Sum256(append(secHash, common.HexToAddress(swap.InitiatorAddress).Hash().Bytes()...))
+	} else if Chain.IsEVM() {
+		orderId := sha256.Sum256(append(secHash, common.HexToAddress(InitiatorAddress).Hash().Bytes()...))
 		return hex.EncodeToString(orderId[:]), nil
 	}
 	return "", nil
