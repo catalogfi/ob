@@ -43,6 +43,43 @@ func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
 	return &store{mu: new(sync.RWMutex), cache: make(map[string]Price), db: db}, nil
 }
 
+func (s *store) totalVolume(from, to time.Time, config model.Network) (*big.Int, error) {
+	orders := []model.Order{}
+	if err := s.db.Where("created_at BETWEEN ? AND ? AND status = ?", from, to, model.Executed).Find(&orders).Error; err != nil {
+		return nil, err
+	}
+	swapIDs := make([]uint, 2*len(orders))
+	for i, order := range orders {
+		swapIDs[2*i] = order.InitiatorAtomicSwapID
+		swapIDs[2*i+1] = order.FollowerAtomicSwapID
+	}
+	swaps := []model.AtomicSwap{}
+	if err := s.db.Find(&swaps, swapIDs).Error; err != nil {
+		return nil, err
+	}
+	return s.usdValue(swaps, config)
+}
+
+func (s *store) userVolume(from, to time.Time, user string, config model.Network) (*big.Int, error) {
+	orders := []model.Order{}
+	if err := s.db.Where("created_at BETWEEN ? AND ? AND status = ? AND (maker = ? OR taker = ?)", from, to, model.Executed, user, user).Find(&orders).Error; err != nil {
+		return nil, err
+	}
+	swapIDs := make([]uint, len(orders))
+	for i, order := range orders {
+		if order.Maker == user {
+			swapIDs[i] = order.InitiatorAtomicSwapID
+		} else {
+			swapIDs[i] = order.FollowerAtomicSwapID
+		}
+	}
+	swaps := []model.AtomicSwap{}
+	if err := s.db.Find(&swaps, swapIDs).Error; err != nil {
+		return nil, err
+	}
+	return s.usdValue(swaps, config)
+}
+
 // maintain a cache for the price and refresh it at the TTL interval
 func (s *store) price(chain model.Chain, asset model.Asset, config model.Config) (Price, error) {
 	_, ok := config.Network[chain]

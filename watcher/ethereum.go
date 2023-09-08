@@ -39,6 +39,21 @@ type Swap struct {
 	IsFulfilled bool
 }
 
+func NewEthereumWatchers(store Store, config model.Config, screener screener.Screener, logger *zap.Logger) ([]*EthereumWatcher, error) {
+	var watchers []*EthereumWatcher
+	for chain, netConfig := range config.Network {
+		for asset, token := range netConfig.Assets {
+			swapAddr := common.HexToAddress(asset.SecondaryID())
+			watcher, err := NewEthereumWatcher(store, chain, netConfig, swapAddr, token.StartBlock, screener, logger)
+			if err != nil {
+				return nil, err
+			}
+			watchers = append(watchers, watcher)
+		}
+	}
+	return watchers, nil
+}
+
 func NewEthereumWatcher(store Store, chain model.Chain, config model.NetworkConfig, address common.Address, startBlock uint64, screener screener.Screener, logger *zap.Logger) (*EthereumWatcher, error) {
 	ethClient, err := ethereum.NewClient(config.RPC["ethrpc"])
 	if err != nil {
