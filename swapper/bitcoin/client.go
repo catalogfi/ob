@@ -77,7 +77,7 @@ func (client *client) GetConfirmations(txHash string) (uint64, uint64, error) {
 		if err != nil {
 			return 0, 0, nil
 		}
-		return status.Status.BlockHeight, tip - status.Status.BlockHeight, nil
+		return status.Status.BlockHeight, tip - status.Status.BlockHeight + 1, nil
 	}
 	return 0, 0, nil
 }

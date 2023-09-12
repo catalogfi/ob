@@ -163,8 +163,6 @@ func UpdateSwapStatus(log *zap.Logger, swap model.AtomicSwap, watcher swapper.Wa
 		if err != nil {
 			return swap, false, err
 		}
-		//1 is added to specify that when tip == initated block ,status is 1 confirmation
-		conf += 1
 		if isIw {
 			swap.MinimumConfirmations = 0
 			swap.IsInstantWallet = true
@@ -198,7 +196,7 @@ func UpdateSwapStatus(log *zap.Logger, swap model.AtomicSwap, watcher swapper.Wa
 		}
 
 		// Swap Expired
-		watcher.Expired()
+		// watcher.Expired()
 		expired, err := watcher.Expired()
 		if err != nil {
 			return swap, false, err
