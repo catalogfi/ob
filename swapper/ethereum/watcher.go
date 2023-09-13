@@ -2,6 +2,7 @@ package ethereum
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strings"
@@ -48,6 +49,10 @@ func NewWatcher(atomicSwapAddr common.Address, secretHash, orderId []byte, expir
 		eventWindow:      big.NewInt(eventWindow),
 		atomicSwap:       atomicSwapInstance,
 	}, nil
+}
+
+func (watcher *watcher) Identifier() string {
+	return hex.EncodeToString(watcher.orderId)
 }
 
 func (watcher *watcher) Expired() (bool, error) {

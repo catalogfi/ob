@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"gorm.io/gorm"
 )
 
@@ -45,6 +46,10 @@ const (
 	EthereumBNB       Chain = "ethereum_bnb"
 )
 
+type BtcCompatChain interface {
+	Params() *chaincfg.Params
+}
+
 func ParseChain(c string) (Chain, error) {
 	switch strings.ToLower(c) {
 	case "bitcoin":
@@ -74,16 +79,25 @@ func ParseChain(c string) (Chain, error) {
 	}
 }
 
-func ValidateIWCOnfig(iwConfig []InstantWalletConfig) bool {
-	return iwConfig != nil && len(iwConfig) != 0 && iwConfig[0].Dialector != nil
-}
-
 func (c Chain) IsEVM() bool {
 	return c == Ethereum || c == EthereumSepolia || c == EthereumLocalnet || c == EthereumOptimism || c == EthereumArbitrum || c == EthereumPolygon || c == EthereumAvalanche || c == EthereumBNB
 }
 
 func (c Chain) IsBTC() bool {
-	return c == Bitcoin || c == BitcoinTestnet || c == BitcoinRegtest
+	return c.Params() != nil
+}
+
+func (c Chain) Params() *chaincfg.Params {
+	switch c {
+	case Bitcoin:
+		return &chaincfg.MainNetParams
+	case BitcoinTestnet:
+		return &chaincfg.TestNet3Params
+	case BitcoinRegtest:
+		return &chaincfg.RegressionNetParams
+	default:
+		return nil
+	}
 }
 
 func (c Chain) IsTestnet() bool {
@@ -94,6 +108,7 @@ type Token struct {
 	Oracle       string
 	TokenAddress string
 	Decimals     int64
+	StartBlock   int64
 }
 
 type Asset string

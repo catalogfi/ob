@@ -290,28 +290,37 @@ var _ = Describe("Store", func() {
 	It("Error, manually changing the daily limit to a wrong value", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
-		// var config = model.Config{
-		// 	Network: model.Network{
-		// 		"bitcoin": model.NetworkConfig{RPC: "https://mempool.space/api", Expiry: 0},
-		// 		"bitcoin_testnet": model.NetworkConfig{
-		// 			Oracles: map[model.Asset]string{
-		// 				model.Primary: "https://api.coincap.io/v2/assets/bitcoin",
-		// 			},
-		// 			RPC:    "https://mempool.space/testnet/api",
-		// 			Expiry: 0},
-		// 		"ethereum_sepolia": model.NetworkConfig{
-		// 			Oracles: map[model.Asset]string{
-		// 				model.NewSecondary("0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF"): "https://api.coincap.io/v2/assets/bitcoin",
-		// 			},
-		// 			RPC:    "https://gateway.tenderly.co/public/sepolia",
-		// 			Expiry: 0},
-		// 		"ethereum": model.NetworkConfig{RPC: "https://mainnet.infura.io/v3/47b89f1cf0cd47419f9a57674278610b", Expiry: 0},
-		// 	},
-		// 	DailyLimit: "3,50000",
-		// 	MinTxLimit: "3000",
-		// 	MaxTxLimit: "10000000000",
-		// }
-		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
+		var tconfig = model.Config{
+			Network: model.Network{
+				"bitcoin": model.NetworkConfig{RPC: map[string]string{"mempool": "https://mempool.space/api"}, Expiry: 0},
+				"bitcoin_testnet": model.NetworkConfig{
+					Assets: map[model.Asset]model.Token{
+						model.Primary: {
+							Oracle:   "https://api.coincap.io/v2/assets/bitcoin",
+							Decimals: 8,
+						},
+					},
+					RPC:    map[string]string{"mempool": "https://mempool.space/testnet/api"},
+					Expiry: 0},
+
+				"ethereum_sepolia": model.NetworkConfig{
+					Assets: map[model.Asset]model.Token{
+						model.NewSecondary("0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF"): {
+							Oracle:       "https://api.coincap.io/v2/assets/bitcoin",
+							TokenAddress: "0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF",
+							Decimals:     8,
+						}},
+					RPC:    map[string]string{"ethrpc": "https://gateway.tenderly.co/public/sepolia"},
+					Expiry: 0},
+				"ethereum": model.NetworkConfig{
+					RPC:    map[string]string{"ethrpc": "https://mainnet.infura.io/v3/47b89f1cf0cd47419f9a57674278610b"},
+					Expiry: 0},
+			},
+			DailyLimit: "3,50000",
+			MinTxLimit: "3000",
+			MaxTxLimit: "10000000000",
+		}
+		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", tconfig)
 		Expect(err).Should(HaveOccurred())
 		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
 	})
@@ -319,57 +328,74 @@ var _ = Describe("Store", func() {
 	It("Error, manually changing the Min limit to a wrong value", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
-		// var config = model.Config{
-		// 	Network: model.Network{
-		// 		"bitcoin": model.NetworkConfig{RPC: "https://mempool.space/api", Expiry: 0},
-		// 		"bitcoin_testnet": model.NetworkConfig{
-		// 			Oracles: map[model.Asset]string{
-		// 				model.Primary: "https://api.coincap.io/v2/assets/bitcoin",
-		// 			},
-		// 			RPC:    "https://mempool.space/testnet/api",
-		// 			Expiry: 0},
-		// 		"ethereum_sepolia": model.NetworkConfig{
-		// 			Oracles: map[model.Asset]string{
-		// 				model.NewSecondary("0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF"): "https://api.coincap.io/v2/assets/bitcoin",
-		// 			},
-		// 			RPC:    "https://gateway.tenderly.co/public/sepolia",
-		// 			Expiry: 0},
-		// 		"ethereum": model.NetworkConfig{RPC: "https://mainnet.infura.io/v3/47b89f1cf0cd47419f9a57674278610b", Expiry: 0},
-		// 	},
-		// 	DailyLimit: "350000",
-		// 	MinTxLimit: "3,000",
-		// 	MaxTxLimit: "10000000000",
-		// }
-		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
+		var tconfig = model.Config{
+			Network: model.Network{
+				"bitcoin": model.NetworkConfig{RPC: map[string]string{"mempool": "https://mempool.space/api"}, Expiry: 0},
+				"bitcoin_testnet": model.NetworkConfig{
+					Assets: map[model.Asset]model.Token{
+						model.Primary: {
+							Oracle:   "https://api.coincap.io/v2/assets/bitcoin",
+							Decimals: 8,
+						},
+					},
+					RPC:    map[string]string{"mempool": "https://mempool.space/testnet/api"},
+					Expiry: 0},
+
+				"ethereum_sepolia": model.NetworkConfig{
+					Assets: map[model.Asset]model.Token{
+						model.NewSecondary("0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF"): {
+							Oracle:       "https://api.coincap.io/v2/assets/bitcoin",
+							TokenAddress: "0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF",
+							Decimals:     8,
+						}},
+					RPC:    map[string]string{"ethrpc": "https://gateway.tenderly.co/public/sepolia"},
+					Expiry: 0},
+				"ethereum": model.NetworkConfig{
+					RPC:    map[string]string{"ethrpc": "https://mainnet.infura.io/v3/47b89f1cf0cd47419f9a57674278610b"},
+					Expiry: 0},
+			},
+			DailyLimit: "350000",
+			MinTxLimit: "3,000",
+			MaxTxLimit: "10000000000",
+		}
+		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", tconfig)
 		Expect(err).Should(HaveOccurred())
 		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
 	})
-
-	It("Error, manually changing the daily limit to a wrong value", func() {
+	It("Error, manually changing the Max limit to a wrong value", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
-		// var config = model.Config{
-		// 	Network: model.Network{
-		// 		"bitcoin": model.NetworkConfig{RPC: "https://mempool.space/api", Expiry: 0},
-		// 		"bitcoin_testnet": model.NetworkConfig{
-		// 			Oracles: map[model.Asset]string{
-		// 				model.Primary: "https://api.coincap.io/v2/assets/bitcoin",
-		// 			},
-		// 			RPC:    "https://mempool.space/testnet/api",
-		// 			Expiry: 0},
-		// 		"ethereum_sepolia": model.NetworkConfig{
-		// 			Oracles: map[model.Asset]string{
-		// 				model.NewSecondary("0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF"): "https://api.coincap.io/v2/assets/bitcoin",
-		// 			},
-		// 			RPC:    "https://gateway.tenderly.co/public/sepolia",
-		// 			Expiry: 0},
-		// 		"ethereum": model.NetworkConfig{RPC: "https://mainnet.infura.io/v3/47b89f1cf0cd47419f9a57674278610b", Expiry: 0},
-		// 	},
-		// 	DailyLimit: "350000",
-		// 	MinTxLimit: "3000",
-		// 	MaxTxLimit: "10,000000000",
-		// }
-		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
+		var tconfig = model.Config{
+			Network: model.Network{
+				"bitcoin": model.NetworkConfig{RPC: map[string]string{"mempool": "https://mempool.space/api"}, Expiry: 0},
+				"bitcoin_testnet": model.NetworkConfig{
+					Assets: map[model.Asset]model.Token{
+						model.Primary: {
+							Oracle:   "https://api.coincap.io/v2/assets/bitcoin",
+							Decimals: 8,
+						},
+					},
+					RPC:    map[string]string{"mempool": "https://mempool.space/testnet/api"},
+					Expiry: 0},
+
+				"ethereum_sepolia": model.NetworkConfig{
+					Assets: map[model.Asset]model.Token{
+						model.NewSecondary("0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF"): {
+							Oracle:       "https://api.coincap.io/v2/assets/bitcoin",
+							TokenAddress: "0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF",
+							Decimals:     8,
+						}},
+					RPC:    map[string]string{"ethrpc": "https://gateway.tenderly.co/public/sepolia"},
+					Expiry: 0},
+				"ethereum": model.NetworkConfig{
+					RPC:    map[string]string{"ethrpc": "https://mainnet.infura.io/v3/47b89f1cf0cd47419f9a57674278610b"},
+					Expiry: 0},
+			},
+			DailyLimit: "350000",
+			MinTxLimit: "3000",
+			MaxTxLimit: "1,0,000000000",
+		}
+		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", tconfig)
 		Expect(err).Should(HaveOccurred())
 		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
 	})
@@ -424,6 +450,36 @@ var _ = Describe("Store", func() {
 	It("Error, trying to fill an order with wrong config file for sendChain", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
+		var tconfig = model.Config{
+			Network: model.Network{
+				"bitcoin": model.NetworkConfig{RPC: map[string]string{"mempool": "https://mempool.space/api"}, Expiry: 0},
+				"bitcoin_testnet": model.NetworkConfig{
+					Assets: map[model.Asset]model.Token{
+						model.Primary: {
+							Oracle:   "https://api.coincap.io/v2/assets/bitcoin",
+							Decimals: 8,
+						},
+					},
+					RPC:    map[string]string{"mempool": "https://mempool.space/testnet/api"},
+					Expiry: 0},
+
+				"ethereum_sepolia": model.NetworkConfig{
+					// Assets: map[model.Asset]model.Token{
+					// 	model.NewSecondary("0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF"): {
+					// 		Oracle:       "https://api.coincap.io/v2/assets/bitcoin",
+					// 		TokenAddress: "0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF",
+					// 		Decimals:     8,
+					// 	}},
+					RPC:    map[string]string{"ethrpc": "https://gateway.tenderly.co/public/sepolia"},
+					Expiry: 0},
+				"ethereum": model.NetworkConfig{
+					RPC:    map[string]string{"ethrpc": "https://mainnet.infura.io/v3/47b89f1cf0cd47419f9a57674278610b"},
+					Expiry: 0},
+			},
+			DailyLimit: "350000",
+			MinTxLimit: "3000",
+			MaxTxLimit: "10000000000",
+		}
 		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
 		order1, err := store.GetOrder(id)
@@ -431,7 +487,52 @@ var _ = Describe("Store", func() {
 		order1.InitiatorAtomicSwap.Status = 1
 		err = store.UpdateOrder(order1)
 		Expect(err).NotTo(HaveOccurred())
-		err = store.FillOrder(id, "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", config.Network)
+		err = store.FillOrder(id, "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", tconfig.Network)
+		Expect(err).Should(HaveOccurred())
+		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
+
+	})
+	It("Error, trying to fill an order with wrong config file for recieverChain", func() {
+		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		Expect(err).NotTo(HaveOccurred())
+		var tconfig = model.Config{
+			Network: model.Network{
+				"bitcoin": model.NetworkConfig{RPC: map[string]string{"mempool": "https://mempool.space/api"}, Expiry: 0},
+				"bitcoin_testnet": model.NetworkConfig{
+					Assets: map[model.Asset]model.Token{
+						model.Primary: {
+							Oracle:   "https://api.coincap.io/v2/assets/bitcoin",
+							Decimals: 8,
+						},
+					},
+					RPC:    map[string]string{"mempool": "https://mempool.space/testnet/api"},
+					Expiry: 0},
+
+				"ethereum_sepolia": model.NetworkConfig{
+					// Assets: map[model.Asset]model.Token{
+					// 	model.NewSecondary("0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF"): {
+					// 		Oracle:       "https://api.coincap.io/v2/assets/bitcoin",
+					// 		TokenAddress: "0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF",
+					// 		Decimals:     8,
+					// 	}},
+					RPC:    map[string]string{"ethrpc": "https://gateway.tenderly.co/public/sepolia"},
+					Expiry: 0},
+				"ethereum": model.NetworkConfig{
+					RPC:    map[string]string{"ethrpc": "https://mainnet.infura.io/v3/47b89f1cf0cd47419f9a57674278610b"},
+					Expiry: 0},
+			},
+			DailyLimit: "350000",
+			MinTxLimit: "3000",
+			MaxTxLimit: "10000000000",
+		}
+		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF-bitcoin_testnet", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
+		Expect(err).NotTo(HaveOccurred())
+		order1, err := store.GetOrder(id)
+		Expect(err).NotTo(HaveOccurred())
+		order1.InitiatorAtomicSwap.Status = 1
+		err = store.UpdateOrder(order1)
+		Expect(err).NotTo(HaveOccurred())
+		err = store.FillOrder(id, "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", tconfig.Network)
 		Expect(err).Should(HaveOccurred())
 		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
 
@@ -505,31 +606,76 @@ var _ = Describe("Store", func() {
 	It("Error, failed to get send price", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
-		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF-bitcoin_testnet", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
-		Expect(err).NotTo(HaveOccurred())
-		order1, err := store.GetOrder(id)
-		Expect(err).NotTo(HaveOccurred())
-		order1.InitiatorAtomicSwap.Status = 1
-		err = store.UpdateOrder(order1)
-		Expect(err).NotTo(HaveOccurred())
+		var tconfig = model.Config{
+			Network: model.Network{
+				"bitcoin": model.NetworkConfig{RPC: map[string]string{"mempool": "https://mempool.space/api"}, Expiry: 0},
+				"bitcoin_testnet": model.NetworkConfig{
+					Assets: map[model.Asset]model.Token{
+						model.Primary: {
+							Oracle:   "https://api.coincap.io/v2/assets/bitcoin",
+							Decimals: 8,
+						},
+					},
+					RPC:    map[string]string{"mempool": "https://mempool.space/testnet/api"},
+					Expiry: 0},
 
-		err = store.FillOrder(id, "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", config.Network)
+				"ethereum_sepolia": model.NetworkConfig{
+					// Assets: map[model.Asset]model.Token{
+					// 	model.NewSecondary("0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF"): {
+					// 		Oracle:       "https://api.coincap.io/v2/assets/bitcoin",
+					// 		TokenAddress: "0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF",
+					// 		Decimals:     8,
+					// 	}},
+					RPC:    map[string]string{"ethrpc": "https://gateway.tenderly.co/public/sepolia"},
+					Expiry: 0},
+				"ethereum": model.NetworkConfig{
+					RPC:    map[string]string{"ethrpc": "https://mainnet.infura.io/v3/47b89f1cf0cd47419f9a57674278610b"},
+					Expiry: 0},
+			},
+			DailyLimit: "350000",
+			MinTxLimit: "3000",
+			MaxTxLimit: "10000000000",
+		}
+		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF-bitcoin_testnet", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", tconfig)
 		Expect(err).Should(HaveOccurred())
+
 		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
 	})
 
 	It("Error, failed to get recieve price", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
-		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF-bitcoin_testnet", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
-		Expect(err).NotTo(HaveOccurred())
-		order1, err := store.GetOrder(id)
-		Expect(err).NotTo(HaveOccurred())
-		order1.InitiatorAtomicSwap.Status = 1
-		err = store.UpdateOrder(order1)
-		Expect(err).NotTo(HaveOccurred())
+		var tconfig = model.Config{
+			Network: model.Network{
+				"bitcoin": model.NetworkConfig{RPC: map[string]string{"mempool": "https://mempool.space/api"}, Expiry: 0},
+				"bitcoin_testnet": model.NetworkConfig{
+					// Assets: map[model.Asset]model.Token{
+					// 	model.Primary: {
+					// 		Oracle:   "https://api.coincap.io/v2/assets/bitcoin",
+					// 		Decimals: 8,
+					// 	},
+					// },
+					RPC:    map[string]string{"mempool": "https://mempool.space/testnet/api"},
+					Expiry: 0},
 
-		err = store.FillOrder(id, "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", config.Network)
+				"ethereum_sepolia": model.NetworkConfig{
+					Assets: map[model.Asset]model.Token{
+						model.NewSecondary("0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF"): {
+							Oracle:       "https://api.coincap.io/v2/assets/bitcoin",
+							TokenAddress: "0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF",
+							Decimals:     8,
+						}},
+					RPC:    map[string]string{"ethrpc": "https://gateway.tenderly.co/public/sepolia"},
+					Expiry: 0},
+				"ethereum": model.NetworkConfig{
+					RPC:    map[string]string{"ethrpc": "https://mainnet.infura.io/v3/47b89f1cf0cd47419f9a57674278610b"},
+					Expiry: 0},
+			},
+			DailyLimit: "350000",
+			MinTxLimit: "3000",
+			MaxTxLimit: "10000000000",
+		}
+		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF-bitcoin_testnet", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", tconfig)
 		Expect(err).Should(HaveOccurred())
 		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
 	})
@@ -623,4 +769,93 @@ var _ = Describe("Store", func() {
 
 	})
 
+	It("Getting order by the specifying address", func() {
+		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
+		Expect(err).NotTo(HaveOccurred())
+		orders, err := store.GetOrdersByAddress("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(orders)).Should(Equal(1))
+		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
+
+	})
+
+	It("Getting active swaps", func() {
+		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
+		Expect(err).NotTo(HaveOccurred())
+		swaps, err := store.GetActiveSwaps(model.EthereumSepolia)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(swaps)).Should(Equal(1))
+		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
+
+	})
+
+	It("Updating a swap", func() {
+		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		Expect(err).NotTo(HaveOccurred())
+		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
+		Expect(err).NotTo(HaveOccurred())
+		order, err := store.GetOrder(id)
+		Expect(err).NotTo(HaveOccurred())
+		order.InitiatorAtomicSwap.FilledAmount = "1000"
+		err = store.UpdateSwap(order.InitiatorAtomicSwap)
+		Expect(err).NotTo(HaveOccurred())
+		order, err = store.GetOrder(id)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(order.InitiatorAtomicSwap.FilledAmount).Should(Equal("1000"))
+		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
+
+	})
+
+	It("Getting the database", func() {
+		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = store.Gorm().DB()
+		Expect(err).NotTo(HaveOccurred())
+
+	})
+
+	It("Error, Updating a swap in a deleted database", func() {
+		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		Expect(err).NotTo(HaveOccurred())
+		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
+		Expect(err).NotTo(HaveOccurred())
+		order, err := store.GetOrder(id)
+		Expect(err).NotTo(HaveOccurred())
+		order.InitiatorAtomicSwap.FilledAmount = "1000"
+		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
+
+		err = store.UpdateSwap(order.InitiatorAtomicSwap)
+		Expect(err).Should(HaveOccurred())
+
+	})
+
+	It("Getting swap usng onchain indentifiers", func() {
+
+		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		Expect(err).NotTo(HaveOccurred())
+		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
+		Expect(err).NotTo(HaveOccurred())
+		err = store.FillOrder(id, "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config.Network)
+		Expect(err).NotTo(HaveOccurred())
+		order, err := store.GetOrder(id)
+		Expect(err).NotTo(HaveOccurred())
+
+		order.InitiatorAtomicSwap.OnChainIdentifier = "tb1qxsjun3psna8j8an3uymf3gw66rj7nax9vw2j805942qwlpvltnaqdntrgr"
+		order.FollowerAtomicSwap.OnChainIdentifier = "16345785D8A0000"
+
+		err = store.UpdateOrder(order)
+		Expect(err).NotTo(HaveOccurred())
+
+		swap, err := store.SwapByOCID("16345785D8A0000")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(swap.Chain).Should(Equal(model.EthereumSepolia))
+		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
+
+	})
 })

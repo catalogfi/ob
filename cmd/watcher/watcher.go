@@ -65,6 +65,6 @@ func main() {
 		defer logger.Sync()
 	}
 
-	watcher := watcher.NewWatcher(logger, store, env.CONFIG, 4)
+	watcher := watcher.NewWatcher(logger, store, 4)
 	watcher.Run(context.Background())
 }

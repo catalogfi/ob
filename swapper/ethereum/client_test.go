@@ -14,11 +14,11 @@ import (
 )
 
 var _ = Describe("Ethereum", func() {
+	logger, _ := zap.NewDevelopment()
 	Context("Client", func() {
 		It("should be able to read data from the blockchain", func() {
 			By("Initialise client")
 			localRPC := "http://127.0.0.1:7545"
-			logger, _ := zap.NewDevelopment()
 			client, err := ethereum.NewClient(logger, localRPC)
 			Expect(err).Should(BeNil())
 
@@ -30,7 +30,6 @@ var _ = Describe("Ethereum", func() {
 		It("should read ERC20 related data", func() {
 			By("Initialise client")
 			localRPC := "http://127.0.0.1:7545"
-			logger, _ := zap.NewDevelopment()
 			client, err := ethereum.NewClient(logger, localRPC)
 			Expect(err).Should(BeNil())
 
