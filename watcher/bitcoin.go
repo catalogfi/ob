@@ -78,7 +78,7 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 
 func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screener screener.Screener, store Store, swap *model.AtomicSwap) error {
 
-	if swap.InitiateTxHash == "" {
+	if swap.InitiateTxHash == "" || (swap.InitiateTxHash != "" && swap.FilledAmount < swap.Amount && swap.Chain.IsBTC()) {
 		filledAmount, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
 		if err != nil {
 			return err
