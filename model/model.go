@@ -18,10 +18,6 @@ type NetworkConfig struct {
 	Expiry      int64
 	EventWindow int64
 }
-type InstantWalletConfig struct {
-	Dialector gorm.Dialector
-	Opts      gorm.Option
-}
 type Config struct {
 	Network    Network
 	MinTxLimit string
@@ -108,7 +104,7 @@ type Token struct {
 	Oracle       string
 	TokenAddress string
 	Decimals     int64
-	StartBlock   int64
+	StartBlock   uint64
 }
 
 type Asset string
