@@ -31,17 +31,15 @@ type Watcher interface {
 type watcher struct {
 	logger  *zap.Logger
 	store   Store
-	config  model.Network
 	workers int
 	orders  chan model.Order
 }
 
 // NewWatcher returns a new Watcher
-func NewWatcher(logger *zap.Logger, store Store, config model.Network, workers int) Watcher {
+func NewWatcher(logger *zap.Logger, store Store, workers int) Watcher {
 	return &watcher{
 		logger:  logger.With(zap.String("service", "watcher")),
 		store:   store,
-		config:  config,
 		workers: workers,
 		orders:  make(chan model.Order, 32),
 	}
@@ -83,7 +81,7 @@ func (w *watcher) RunWorker(ctx context.Context) {
 			return
 		case order := <-w.orders:
 			logger := w.logger.With(zap.Uint("order id", order.ID))
-			order, hasUpdated := ProcessOrder(order, w.store, w.config, logger)
+			order, hasUpdated := ProcessOrder(order, w.store, logger)
 			if hasUpdated {
 				if err := w.store.UpdateOrder(&order); err != nil {
 					logger.Error("update order failed with", zap.Error(err))
@@ -93,7 +91,7 @@ func (w *watcher) RunWorker(ctx context.Context) {
 	}
 }
 
-func ProcessOrder(order model.Order, store Store, config model.Network, logger *zap.Logger) (model.Order, bool) {
+func ProcessOrder(order model.Order, store Store, logger *zap.Logger) (model.Order, bool) {
 	// copy secret from follower atomic swap
 	if order.Secret != order.FollowerAtomicSwap.Secret {
 		order.Secret = order.FollowerAtomicSwap.Secret

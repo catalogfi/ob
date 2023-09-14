@@ -1,6 +1,7 @@
 package store
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -15,7 +16,9 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/rest"
+	"github.com/catalogfi/wbtc-garden/swapper/bitcoin"
 	"github.com/catalogfi/wbtc-garden/watcher"
+	"github.com/ethereum/go-ethereum/common"
 	"gorm.io/gorm"
 )
 
@@ -370,12 +373,24 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	if err != nil {
 		return fmt.Errorf("failed to calculate value locked on %s: %v", toChain, err)
 	}
+	initiatorTimeLock := strconv.FormatInt(config[fromChain].Expiry*2, 10)
+	followerTimelock := strconv.FormatInt(config[toChain].Expiry, 10)
+	initiatorSwapID, err := GetSwapId(fromChain, initiateAtomicSwap.InitiatorAddress, receiveAddress, initiatorTimeLock, order.SecretHash)
+	if err != nil {
+		return fmt.Errorf("failed to calculate on-chain identifier %s: %v", fromChain, err)
+	}
+	followerSwapID, err := GetSwapId(toChain, sendAddress, followerAtomicSwap.RedeemerAddress, followerTimelock, order.SecretHash)
+	if err != nil {
+		return fmt.Errorf("failed to calculate on-chain identifier %s: %v", toChain, err)
+	}
 	initiateAtomicSwap.RedeemerAddress = receiveAddress
-	initiateAtomicSwap.Timelock = strconv.FormatInt(config[fromChain].Expiry*2, 10)
+	initiateAtomicSwap.Timelock = initiatorTimeLock
 	initiateAtomicSwap.MinimumConfirmations = GetMinConfirmations(fromChainAmount, fromChain)
+	initiateAtomicSwap.OnChainIdentifier = initiatorSwapID
 	followerAtomicSwap.InitiatorAddress = sendAddress
-	followerAtomicSwap.Timelock = strconv.FormatInt(config[toChain].Expiry, 10)
+	followerAtomicSwap.Timelock = followerTimelock
 	followerAtomicSwap.MinimumConfirmations = GetMinConfirmations(toChainAmount, toChain)
+	followerAtomicSwap.OnChainIdentifier = followerSwapID
 	order.Taker = filler
 	order.Status = model.Filled
 	if tx := s.db.Save(order); tx.Error != nil {
@@ -413,7 +428,7 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 	orders := []model.Order{}
 	tx := s.db.Table("orders")
 	if orderPair != "" {
-		tx = tx.Where("order_pair = ?", orderPair)
+		tx = tx.Where("order_pair ilike ?", orderPair)
 	}
 	joinAtomicSwaps := false
 	if minAmount != 0 {
@@ -515,7 +530,7 @@ func (s *store) GetActiveOrders() ([]model.Order, error) {
 // get all the swaps that are active
 func (s *store) GetActiveSwaps(chain model.Chain) ([]model.AtomicSwap, error) {
 	swaps := []model.AtomicSwap{}
-	if tx := s.db.Where("status IN ? AND chain = ?", []model.SwapStatus{model.NotStarted, model.Initiated, model.Detected, model.Expired}, chain).Find(&swaps); tx.Error != nil {
+	if tx := s.db.Where("status IN ? AND chain = ? AND on_chain_identifier != '' ", []model.SwapStatus{model.NotStarted, model.Initiated, model.Detected, model.Expired}, chain).Find(&swaps); tx.Error != nil {
 		return nil, tx.Error
 	}
 	return swaps, nil
@@ -523,7 +538,7 @@ func (s *store) GetActiveSwaps(chain model.Chain) ([]model.AtomicSwap, error) {
 
 func (s *store) SwapByOCID(ocID string) (model.AtomicSwap, error) {
 	swap := model.AtomicSwap{}
-	if tx := s.db.Where("on_chain_identifier = ?", ocID).First(&swap); tx.Error != nil {
+	if tx := s.db.Where("on_chain_identifier ilike ?", ocID).First(&swap); tx.Error != nil {
 		return model.AtomicSwap{}, tx.Error
 	}
 	return swap, nil
@@ -582,6 +597,40 @@ func (s *store) Gorm() *gorm.DB {
 	return s.db
 }
 
+func GetSwapId(Chain model.Chain, InitiatorAddress string, RedeemerAddress string, Timelock string, SecretHash string) (string, error) {
+	secHash, err := hex.DecodeString(SecretHash)
+	if err != nil {
+		return "", err
+	}
+	if Chain.IsBTC() {
+		chainConfig := getParams(Chain)
+
+		initiatorAddress, err := btcutil.DecodeAddress(InitiatorAddress, chainConfig)
+		if err != nil {
+			return "", err
+		}
+		redeemerAddress, err := btcutil.DecodeAddress(RedeemerAddress, chainConfig)
+		if err != nil {
+			return "", err
+		}
+		timelock, _ := strconv.ParseInt(Timelock, 10, 64)
+		htlcScript, err := bitcoin.NewHTLCScript(initiatorAddress, redeemerAddress, secHash, timelock)
+		if err != nil {
+			return "", fmt.Errorf("failed to create HTLC script: %w", err)
+		}
+
+		witnessProgram := sha256.Sum256(htlcScript)
+		scriptAddr, err := btcutil.NewAddressWitnessScriptHash(witnessProgram[:], chainConfig)
+		if err != nil {
+			return "", err
+		}
+		return scriptAddr.EncodeAddress(), nil
+	} else if Chain.IsEVM() {
+		orderId := sha256.Sum256(append(secHash, common.HexToAddress(InitiatorAddress).Hash().Bytes()...))
+		return hex.EncodeToString(orderId[:]), nil
+	}
+	return "", nil
+}
 func CheckAddress(chain model.Chain, address string) error {
 	if chain.IsEVM() {
 		if address[:2] == "0x" {
@@ -617,9 +666,9 @@ func CheckHash(hash string) error {
 
 // value is in USD
 func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
-	if chain.IsTestnet() {
-		return 0
-	}
+	// if chain.IsTestnet() {
+	// 	return 0
+	// }
 	if chain.IsBTC() {
 		switch {
 		case value.Cmp(big.NewInt(10000)) < 1:

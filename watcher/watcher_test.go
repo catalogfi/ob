@@ -57,7 +57,7 @@ var _ = Describe("Watcher", func() {
 					Status: model.Redeemed,
 				},
 			}
-			updatedOrder, ctn := ProcessOrder(order, mockStore, model.Network{}, logger)
+			updatedOrder, ctn := ProcessOrder(order, mockStore, logger)
 			Expect(ctn).To(BeTrue())
 			Expect(updatedOrder.Status).To(Equal(model.FailedHard))
 		})
@@ -81,7 +81,7 @@ var _ = Describe("Watcher", func() {
 					Status: model.Refunded,
 				},
 			}
-			updatedOrder, ctn := ProcessOrder(order, mockStore, model.Network{}, logger)
+			updatedOrder, ctn := ProcessOrder(order, mockStore, logger)
 			Expect(ctn).To(BeTrue())
 			Expect(updatedOrder.Status).To(Equal(model.FailedHard))
 		})
@@ -105,7 +105,7 @@ var _ = Describe("Watcher", func() {
 					Status: model.Refunded,
 				},
 			}
-			updatedOrder, ctn := ProcessOrder(order, mockStore, model.Network{}, logger)
+			updatedOrder, ctn := ProcessOrder(order, mockStore, logger)
 			Expect(ctn).To(BeTrue())
 			Expect(updatedOrder.Status).To(Equal(model.FailedSoft))
 		})
@@ -129,7 +129,7 @@ var _ = Describe("Watcher", func() {
 					Status: model.NotStarted,
 				},
 			}
-			updatedOrder, ctn := ProcessOrder(order, mockStore, model.Network{}, logger)
+			updatedOrder, ctn := ProcessOrder(order, mockStore, logger)
 			Expect(ctn).To(BeTrue())
 			Expect(updatedOrder.Status).To(Equal(model.FailedSoft))
 		})
@@ -153,7 +153,7 @@ var _ = Describe("Watcher", func() {
 					Status: model.Redeemed,
 				},
 			}
-			updatedOrder, ctn := ProcessOrder(order, mockStore, model.Network{}, logger)
+			updatedOrder, ctn := ProcessOrder(order, mockStore, logger)
 			Expect(ctn).To(BeTrue())
 			Expect(updatedOrder.Status).To(Equal(model.Executed))
 		})
@@ -180,7 +180,7 @@ var _ = Describe("Watcher", func() {
 					Secret: "secret",
 				},
 			}
-			updatedOrder, ctn := ProcessOrder(order, mockStore, model.Network{}, logger)
+			updatedOrder, ctn := ProcessOrder(order, mockStore, logger)
 			Expect(ctn).To(BeTrue())
 			Expect(updatedOrder.Status).To(Equal(model.Filled))
 			Expect(updatedOrder.Secret).To(Equal(updatedOrder.FollowerAtomicSwap.Secret))
@@ -212,7 +212,7 @@ var _ = Describe("Watcher", func() {
 					Status: model.NotStarted,
 				},
 			}
-			updatedOrder, ctn := ProcessOrder(order, mockStore, model.Network{}, logger)
+			updatedOrder, ctn := ProcessOrder(order, mockStore, logger)
 			Expect(ctn).To(BeTrue())
 			Expect(updatedOrder.Status).To(Equal(model.Cancelled))
 		})
@@ -243,7 +243,7 @@ var _ = Describe("Watcher", func() {
 					Status: model.NotStarted,
 				},
 			}
-			updatedOrder, ctn := ProcessOrder(order, mockStore, model.Network{}, logger)
+			updatedOrder, ctn := ProcessOrder(order, mockStore, logger)
 			Expect(ctn).To(BeTrue())
 			Expect(updatedOrder.Status).To(Equal(model.Cancelled))
 		})
@@ -274,7 +274,7 @@ var _ = Describe("Watcher", func() {
 					Status: model.NotStarted,
 				},
 			}
-			updatedOrder, ctn := ProcessOrder(order, mockStore, model.Network{}, logger)
+			updatedOrder, ctn := ProcessOrder(order, mockStore, logger)
 			Expect(ctn).To(BeTrue())
 			Expect(updatedOrder.Status).To(Equal(model.Cancelled))
 		})
@@ -291,7 +291,7 @@ var _ = Describe("Watcher", func() {
 					Status: model.NotStarted,
 				},
 			}
-			updatedOrder, ctn := ProcessOrder(order, mockStore, model.Network{}, logger)
+			updatedOrder, ctn := ProcessOrder(order, mockStore, logger)
 			Expect(ctn).To(BeFalse())
 			Expect(updatedOrder.Status).To(Equal(model.Created))
 		})
@@ -303,7 +303,7 @@ var _ = Describe("Watcher", func() {
 		var minWorkers = 4
 
 		It("should build a watcher", func() {
-			watcher := NewWatcher(logger, mockStore, model.Network{}, 1)
+			watcher := NewWatcher(logger, mockStore, 1)
 			Expect(watcher).ToNot(BeNil())
 			order := model.Order{
 				Status: model.Filled,
@@ -333,7 +333,7 @@ var _ = Describe("Watcher", func() {
 		})
 
 		It("should build a watcher", func() {
-			watcher := NewWatcher(logger, mockStore, model.Network{}, minWorkers)
+			watcher := NewWatcher(logger, mockStore, minWorkers)
 			Expect(watcher).ToNot(BeNil())
 			order := model.Order{
 				Status: model.Filled,
@@ -355,7 +355,7 @@ var _ = Describe("Watcher", func() {
 		})
 
 		It("should build a watcher", func() {
-			watcher := NewWatcher(logger, mockStore, model.Network{}, minWorkers)
+			watcher := NewWatcher(logger, mockStore, minWorkers)
 			Expect(watcher).ToNot(BeNil())
 			order := model.Order{
 				Status: model.Filled,
@@ -383,7 +383,7 @@ var _ = Describe("Watcher", func() {
 		})
 
 		It("should build a watcher", func() {
-			watcher := NewWatcher(logger, mockStore, model.Network{}, minWorkers)
+			watcher := NewWatcher(logger, mockStore, minWorkers)
 			Expect(watcher).ToNot(BeNil())
 			mockStore.EXPECT().GetActiveOrders().Return(nil, mockError).AnyTimes()
 			ctx, _ := context.WithTimeout(context.Background(), 8*time.Second)
@@ -400,7 +400,7 @@ var _ = Describe("Watcher", func() {
 					Status: model.Redeemed,
 				},
 			}
-			watcher := NewWatcher(logger, mockStore, model.Network{}, 0)
+			watcher := NewWatcher(logger, mockStore, 0)
 			Expect(watcher).ToNot(BeNil())
 			mockStore.EXPECT().GetActiveOrders().Return([]model.Order{order}, nil)
 			ctx, _ := context.WithTimeout(context.Background(), 8*time.Second)

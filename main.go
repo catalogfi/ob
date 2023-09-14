@@ -12,7 +12,8 @@ import (
 	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/catalogfi/wbtc-garden/screener"
 	"github.com/catalogfi/wbtc-garden/store"
-	"github.com/catalogfi/wbtc-garden/watcher"
+	watchers "github.com/catalogfi/wbtc-garden/watcher"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/getsentry/sentry-go"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -77,10 +78,26 @@ func main() {
 		defer logger.Sync()
 	}
 
-	watcher := watcher.NewWatcher(logger, store, envConfig.CONFIG.Network, 4)
+	watcher := watchers.NewWatcher(logger, store, 4)
 	go watcher.Run(context.Background())
 
 	screener := screener.NewScreener(store.Gorm(), envConfig.TRM_KEY)
+	for chain, Network := range envConfig.CONFIG.Network {
+		if chain.IsBTC() {
+			//interval is set to 10 seconds to detect iw tx's quicky
+			btcWatcher := watchers.NewBTCWatcher(store, chain, envConfig.CONFIG, screener, 10*time.Second, logger)
+			go btcWatcher.Watch(context.Background())
+		} else if chain.IsEVM() {
+			for asset, token := range Network.Assets {
+				ethWatcher, err := watchers.NewEthereumWatcher(store, chain, Network, common.HexToAddress(string(asset)), token.StartBlock, screener, logger)
+				if err != nil {
+					panic(err)
+				}
+				go ethWatcher.Watch()
+			}
+		}
+
+	}
 	server := rest.NewServer(store, envConfig.CONFIG, logger, "SECRET", screener)
 	if err := server.Run(context.Background(), fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)

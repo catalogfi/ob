@@ -28,6 +28,7 @@ type EthereumWatcher struct {
 	AtomincSwap    *AtomicSwap.AtomicSwap
 	screener       screener.Screener
 	logger         *zap.Logger
+	ignoreOrders   map[string]bool
 }
 
 type Swap struct {
@@ -55,7 +56,7 @@ func NewEthereumWatchers(store Store, config model.Config, screener screener.Scr
 }
 
 func NewEthereumWatcher(store Store, chain model.Chain, config model.NetworkConfig, address common.Address, startBlock uint64, screener screener.Screener, logger *zap.Logger) (*EthereumWatcher, error) {
-	ethClient, err := ethereum.NewClient(config.RPC["ethrpc"])
+	ethClient, err := ethereum.NewClient(logger, config.RPC["ethrpc"])
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
@@ -73,6 +74,7 @@ func NewEthereumWatcher(store Store, chain model.Chain, config model.NetworkConf
 		screener:       screener,
 		ABI:            atomicSwapAbi,
 		logger:         logger,
+		ignoreOrders:   make(map[string]bool),
 	}, nil
 }
 
@@ -82,6 +84,7 @@ func (w *EthereumWatcher) Watch() {
 		w.ABI.Events["Redeemed"].ID,
 		w.ABI.Events["Refunded"].ID,
 	}}
+	w.logger.Info("asdfg", zap.String("started", "ethereum"))
 
 	for {
 		currentBlock, err := w.client.GetCurrentBlock()
@@ -95,6 +98,7 @@ func (w *EthereumWatcher) Watch() {
 			w.logger.Error("failed to get logs", zap.Error(err))
 			continue
 		}
+		fmt.Println(w.startBlock, currentBlock, len(logs))
 
 		if err := HandleEVMLogs(eventIds, logs, w.store, w.screener, w.AtomincSwap); err != nil {
 			w.logger.Error("failed to handle logs", zap.Error(err))
@@ -118,15 +122,15 @@ func HandleEVMLogs(eventIds [][]common.Hash, logs []types.Log, store Store, scre
 			if err != nil {
 				return err
 			}
-			if err := HandleEVMInitiate(log, store, cSwap, screener); err != nil {
+			if err := HandleEVMInitiate(log, store, cSwap, screener); err != nil && err.Error() != "record not found" {
 				return err
 			}
 		case eventIds[0][1]:
-			if err := HandleEVMRedeem(store, log); err != nil {
+			if err := HandleEVMRedeem(store, log); err != nil && err.Error() != "record not found" {
 				return err
 			}
 		case eventIds[0][2]:
-			if err := HandleEVMRefund(store, log); err != nil {
+			if err := HandleEVMRefund(store, log); err != nil && err.Error() != "record not found" {
 				return err
 			}
 		}
@@ -159,7 +163,7 @@ func UpdateEVMConfirmations(store Store, chain model.Chain, currentBlock uint64)
 }
 
 func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener.Screener) error {
-	swap, err := store.SwapByOCID(log.Topics[1].Hex())
+	swap, err := store.SwapByOCID(log.Topics[1].Hex()[2:])
 	if err != nil {
 		return err
 	}
@@ -192,14 +196,13 @@ func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener
 	}
 	swap.InitiateTxHash = log.TxHash.String()
 	swap.InitiateBlockNumber = log.BlockNumber
-	swap.OnChainIdentifier = log.Topics[1].Hex()
 	swap.Status = model.Detected
 
 	return store.UpdateSwap(&swap)
 }
 
 func HandleEVMRedeem(store Store, log types.Log) error {
-	swap, err := store.SwapByOCID(log.Topics[1].Hex())
+	swap, err := store.SwapByOCID(log.Topics[1].Hex()[2:])
 	if err != nil {
 		return err
 	}
@@ -216,7 +219,7 @@ func HandleEVMRedeem(store Store, log types.Log) error {
 }
 
 func HandleEVMRefund(store Store, log types.Log) error {
-	swap, err := store.SwapByOCID(log.Topics[1].Hex())
+	swap, err := store.SwapByOCID(log.Topics[1].Hex()[2:])
 	if err != nil {
 		return err
 	}

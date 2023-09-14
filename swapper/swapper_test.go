@@ -78,7 +78,7 @@ var _ = Describe("Ethereum to Bitcoin", func() {
 		fmt.Println("ethPkAddr2", ethPkAddr2.Hex())
 
 		logger, _ := zap.NewDevelopment()
-		ethClient, err := ethereum.NewClient("http://localhost:8545")
+		ethClient, err := ethereum.NewClient(logger, "http://localhost:8545")
 		Expect(err).To(BeNil())
 
 		btcClient := bitcoin.NewClient(bitcoin.NewMempool("https://mempool.space/testnet/api"), &chaincfg.RegressionNetParams)

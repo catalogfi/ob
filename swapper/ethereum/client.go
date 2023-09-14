@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"go.uber.org/zap"
 )
 
 var (
@@ -39,22 +40,25 @@ type Client interface {
 
 type client struct {
 	eventWindow int64
+	logger      *zap.Logger
 	url         string
 	provider    *ethclient.Client
 	chainID     *big.Int
 }
 
-func NewClient(url string) (Client, error) {
+func NewClient(logger *zap.Logger, url string) (Client, error) {
 	provider, err := ethclient.Dial(url)
 	if err != nil {
 		return nil, err
 	}
+	childLogger := logger.With(zap.String("service", "ethClient"))
 	chainID, err := provider.ChainID(context.Background())
 	if err != nil {
 		return nil, err
 	}
 
 	return &client{
+		logger:   childLogger,
 		url:      url,
 		provider: provider,
 		chainID:  chainID,
@@ -113,6 +117,11 @@ func (client *client) ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, t
 	if err != nil {
 		return "", err
 	}
+	client.logger.Debug("approve erc20",
+		zap.String("amount", amount.String()),
+		zap.String("token address", tokenAddr.Hex()),
+		zap.String("to address", toAddr.Hex()),
+		zap.String("txHash", tx.Hash().Hex()))
 	receipt, err := bind.WaitMined(context.Background(), client.provider, tx)
 	if err != nil {
 		return "", err
@@ -156,6 +165,7 @@ func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecd
 	if err != nil {
 		return "", err
 	}
+	client.logger.Info("initiate swap", zap.String("txHash", initTx.Hash().Hex()))
 	return receipt.TxHash.Hex(), nil
 }
 

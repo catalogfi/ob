@@ -29,11 +29,12 @@ type RedeemerSwap interface {
 type Watcher interface {
 	Identifier() string
 	Expired() (bool, error)
-	Status(initiateTxHash string) (uint64, uint64, error)
+	Status(initiateTxHash string) (uint64, uint64, bool, error)
 	IsDetected() (bool, string, string, error)
 	IsInitiated() (bool, string, map[string]model.Chain, uint64, error)
 	IsRedeemed() (bool, []byte, string, error)
 	IsRefunded() (bool, string, error)
+	IsInstantWallet(txHash string) (bool, error)
 }
 
 func ExecuteAtomicSwapFirst(initiator InitiatorSwap, redeemer RedeemerSwap, secret []byte) error {

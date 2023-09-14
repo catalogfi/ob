@@ -81,7 +81,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 		It("should fail if no RPCs are provided", func() {
 			_, err := LoadBTCWatcher(model.AtomicSwap{
 				Chain: model.BitcoinTestnet,
-			}, model.NetworkConfig{}, mockBTCStore)
+			}, model.NetworkConfig{})
 			Expect(err).ShouldNot(BeNil())
 		})
 
@@ -93,7 +93,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 				RPC: map[string]string{
 					"blockstream": "https://blockstream.info/testnet/api",
 				},
-			}, mockBTCStore)
+			})
 			Expect(err).ShouldNot(BeNil())
 		})
 
@@ -106,7 +106,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 				RPC: map[string]string{
 					"blockstream": "https://blockstream.info/testnet/api",
 				},
-			}, mockBTCStore)
+			})
 			Expect(err).ShouldNot(BeNil())
 		})
 
@@ -120,7 +120,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 				RPC: map[string]string{
 					"blockstream": "https://blockstream.info/testnet/api",
 				},
-			}, mockBTCStore)
+			})
 			Expect(err).ShouldNot(BeNil())
 		})
 
@@ -135,7 +135,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 				RPC: map[string]string{
 					"blockstream": "https://blockstream.info/testnet/api",
 				},
-			}, mockBTCStore)
+			})
 			Expect(err).ShouldNot(BeNil())
 		})
 
@@ -151,7 +151,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 				RPC: map[string]string{
 					"blockstream": "https://blockstream.info/testnet/api",
 				},
-			}, mockBTCStore)
+			})
 			Expect(err).ShouldNot(BeNil())
 		})
 
@@ -167,14 +167,14 @@ var _ = Describe("Bitcoin Watcher", func() {
 				RPC: map[string]string{
 					"blockstream": "https://blockstream.info/testnet/api",
 				},
-			}, mockBTCStore)
+			})
 			Expect(err).ShouldNot(BeNil())
 		})
 	})
 
 	Describe("can build and run the btc watcher", func() {
 		It("should fail if ProcessSwaps fails", func() {
-			btcWatcher := NewBTCWatcher(mockStore, mockBTCStore, model.BitcoinTestnet, model.Config{}, nil, time.Second, logger)
+			btcWatcher := NewBTCWatcher(mockStore, model.BitcoinTestnet, model.Config{}, nil, time.Second, logger)
 			mockStore.EXPECT().GetActiveSwaps(model.BitcoinTestnet).Return(nil, mockError).MaxTimes(2)
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
@@ -182,14 +182,14 @@ var _ = Describe("Bitcoin Watcher", func() {
 		})
 
 		It("should fail if get active orders fails", func() {
-			btcWatcher := NewBTCWatcher(mockStore, mockBTCStore, model.BitcoinTestnet, model.Config{}, nil, time.Second, logger)
+			btcWatcher := NewBTCWatcher(mockStore, model.BitcoinTestnet, model.Config{}, nil, time.Second, logger)
 			mockStore.EXPECT().GetActiveSwaps(model.BitcoinTestnet).Return(nil, mockError)
 			err := btcWatcher.ProcessBTCSwaps()
 			Expect(err).Should(Not(BeNil()))
 		})
 
 		It("should fail if the rpc url is invalid", func() {
-			btcWatcher := NewBTCWatcher(mockStore, mockBTCStore, model.BitcoinTestnet, model.Config{
+			btcWatcher := NewBTCWatcher(mockStore, model.BitcoinTestnet, model.Config{
 				Network: model.Network{
 					model.BitcoinTestnet: model.NetworkConfig{
 						RPC: map[string]string{
@@ -206,7 +206,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 		})
 
 		It("should fail if the chain is not btc", func() {
-			btcWatcher := NewBTCWatcher(mockStore, mockBTCStore, model.BitcoinTestnet, model.Config{
+			btcWatcher := NewBTCWatcher(mockStore, model.BitcoinTestnet, model.Config{
 				Network: model.Network{
 					model.EthereumSepolia: model.NetworkConfig{
 						RPC: map[string]string{
@@ -223,7 +223,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 		})
 
 		It("should fail if we fail to load the watcher", func() {
-			btcWatcher := NewBTCWatcher(mockStore, mockBTCStore, model.BitcoinTestnet, model.Config{
+			btcWatcher := NewBTCWatcher(mockStore, model.BitcoinTestnet, model.Config{
 				Network: model.Network{
 					model.BitcoinTestnet: model.NetworkConfig{
 						RPC: map[string]string{
@@ -240,7 +240,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 		})
 
 		It("should fail if the update swap fails", func() {
-			btcWatcher := NewBTCWatcher(mockStore, mockBTCStore, model.BitcoinTestnet, model.Config{
+			btcWatcher := NewBTCWatcher(mockStore, model.BitcoinTestnet, model.Config{
 				Network: model.Network{
 					model.BitcoinTestnet: model.NetworkConfig{
 						RPC: map[string]string{
@@ -275,7 +275,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 		})
 
 		It("should fail if the update swap fails", func() {
-			btcWatcher := NewBTCWatcher(mockStore, mockBTCStore, model.BitcoinTestnet, model.Config{
+			btcWatcher := NewBTCWatcher(mockStore, model.BitcoinTestnet, model.Config{
 				Network: model.Network{
 					model.BitcoinTestnet: model.NetworkConfig{
 						RPC: map[string]string{

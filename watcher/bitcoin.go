@@ -2,7 +2,6 @@ package watcher
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"math/big"
@@ -21,7 +20,6 @@ import (
 
 type BTCWatcher struct {
 	store    Store
-	btcStore bitcoin.Store
 	config   model.Config
 	screener screener.Screener
 	interval time.Duration
@@ -29,11 +27,10 @@ type BTCWatcher struct {
 	chain    model.Chain
 }
 
-func NewBTCWatcher(store Store, btcStore bitcoin.Store, chain model.Chain, config model.Config, screener screener.Screener, interval time.Duration, logger *zap.Logger) *BTCWatcher {
+func NewBTCWatcher(store Store, chain model.Chain, config model.Config, screener screener.Screener, interval time.Duration, logger *zap.Logger) *BTCWatcher {
 	return &BTCWatcher{
 		chain:    chain,
 		store:    store,
-		btcStore: btcStore,
 		config:   config,
 		logger:   logger,
 		screener: screener,
@@ -42,6 +39,7 @@ func NewBTCWatcher(store Store, btcStore bitcoin.Store, chain model.Chain, confi
 }
 
 func (w *BTCWatcher) Watch(ctx context.Context) {
+	fmt.Println("started bitcoin watcher")
 	for {
 		select {
 		case <-ctx.Done():
@@ -60,12 +58,13 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch active orders %v", err)
 	}
+	fmt.Println(len(swaps), "btc watcher")
 	for _, swap := range swaps {
-		btcClient, err := LoadBTCClient(swap.Chain, w.config.Network[swap.Chain], w.btcStore)
+		btcClient, err := LoadBTCClient(swap.Chain, w.config.Network[swap.Chain], nil)
 		if err != nil {
 			return fmt.Errorf("failed to load btc client %v", err)
 		}
-		watcher, err := LoadBTCWatcher(swap, w.config.Network[swap.Chain], w.btcStore)
+		watcher, err := LoadBTCWatcher(swap, w.config.Network[swap.Chain])
 		if err != nil {
 			return fmt.Errorf("failed to load watcher %v", err)
 		}
@@ -78,9 +77,6 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 }
 
 func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screener screener.Screener, store Store, swap *model.AtomicSwap) error {
-	if swap.OnChainIdentifier != watcher.Identifier() {
-		swap.OnChainIdentifier = watcher.Identifier()
-	}
 
 	if swap.InitiateTxHash == "" {
 		filledAmount, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
@@ -99,18 +95,29 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			swap.Status = model.Detected
 		}
 	} else if swap.InitiateTxHash != "" && swap.Status == model.Detected {
-		height, confirmations, err := GetBTCConfirmations(btcClient, swap.InitiateTxHash)
+		currentBlock, err := btcClient.GetTipBlockHeight()
+		if err != nil {
+			return err
+		}
+		height, confirmations, isIw, err := watcher.Status(swap.InitiateTxHash)
 		if err != nil {
 			return err
 		}
 
-		if confirmations != swap.CurrentConfirmations {
-			swap.CurrentConfirmations = confirmations
-		}
-		if swap.CurrentConfirmations >= swap.MinimumConfirmations {
-			swap.InitiateBlockNumber = height
+		if isIw {
+			swap.InitiateBlockNumber = currentBlock
 			swap.CurrentConfirmations = swap.MinimumConfirmations
 			swap.Status = model.Initiated
+			swap.IsInstantWallet = true
+		} else {
+			if confirmations != swap.CurrentConfirmations {
+				swap.CurrentConfirmations = confirmations
+			}
+			if swap.CurrentConfirmations >= swap.MinimumConfirmations {
+				swap.InitiateBlockNumber = height
+				swap.CurrentConfirmations = swap.MinimumConfirmations
+				swap.Status = model.Initiated
+			}
 		}
 	} else {
 		currentBlock, err := btcClient.GetTipBlockHeight()
@@ -134,6 +141,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			swap.Status = model.Refunded
 			swap.RefundTxHash = txHash
 		} else {
+			fmt.Println("got here")
 			redeemed, secret, txHash, err := watcher.IsRedeemed()
 			if err != nil {
 				return err
@@ -231,25 +239,10 @@ func LoadBTCClient(chain model.Chain, config model.NetworkConfig, btcStore bitco
 	return client, nil
 }
 
-func LoadBTCWatcher(swap model.AtomicSwap, config model.NetworkConfig, btcStore bitcoin.Store) (swapper.Watcher, error) {
-	client, err := LoadBTCClient(swap.Chain, config, btcStore)
+func LoadBTCWatcher(swap model.AtomicSwap, config model.NetworkConfig) (swapper.Watcher, error) {
+	client, err := LoadBTCClient(swap.Chain, config, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
-	}
-
-	initiatorAddress, err := btcutil.DecodeAddress(swap.InitiatorAddress, swap.Chain.Params())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse the initiator address: %s on chain: %v, %w", swap.InitiatorAddress, swap.Chain, err)
-	}
-
-	redeemerAddress, err := btcutil.DecodeAddress(swap.RedeemerAddress, swap.Chain.Params())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse the redeemer address: %s on chain: %v, %w", swap.RedeemerAddress, swap.Chain, err)
-	}
-
-	secHash, err := hex.DecodeString(swap.SecretHash)
-	if err != nil {
-		return nil, err
 	}
 
 	amt, ok := new(big.Int).SetString(swap.Amount, 10)
@@ -262,15 +255,10 @@ func LoadBTCWatcher(swap model.AtomicSwap, config model.NetworkConfig, btcStore 
 		return nil, fmt.Errorf("invalid timelock: %s", swap.Timelock)
 	}
 
-	htlcScript, err := bitcoin.NewHTLCScript(initiatorAddress, redeemerAddress, secHash, expiry.Int64())
+	scriptAddr, err := btcutil.DecodeAddress(swap.OnChainIdentifier, client.Net())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create HTLC script: %w", err)
+		return nil, err
 	}
-
-	witnessProgram := sha256.Sum256(htlcScript)
-	scriptAddr, err := btcutil.NewAddressWitnessScriptHash(witnessProgram[:], client.Net())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create script address: %w", err)
-	}
-	return bitcoin.NewWatcher(scriptAddr, expiry.Int64(), swap.MinimumConfirmations, amt.Uint64(), client)
+	fmt.Println(scriptAddr, "bitcoin-watcher")
+	return bitcoin.NewWatcher(scriptAddr, expiry.Int64(), swap.MinimumConfirmations, amt.Uint64(), config.IWRPC, client)
 }

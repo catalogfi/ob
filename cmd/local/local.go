@@ -49,7 +49,7 @@ func main() {
 		panic(err)
 	}
 
-	watcher := watcher.NewWatcher(logger, store, config, 4)
+	watcher := watcher.NewWatcher(logger, store, 4)
 	go watcher.Run(context.Background())
 
 	// Screen is not doing sanction check in this case
