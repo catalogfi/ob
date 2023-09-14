@@ -667,28 +667,29 @@ func CheckHash(hash string) error {
 // value is in USD
 func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
 	// if chain.IsTestnet() {
-	// 	return 0
+	// return 0
 	// }
 	if chain.IsBTC() {
-		switch {
-		case value.Cmp(big.NewInt(10000)) < 1:
-			return 1
+		return 0
+		// switch {
+		// case value.Cmp(big.NewInt(10000)) < 1:
+		// 	return 1
 
-		case value.Cmp(big.NewInt(100000)) < 1:
-			return 2
+		// case value.Cmp(big.NewInt(100000)) < 1:
+		// 	return 2
 
-		case value.Cmp(big.NewInt(1000000)) < 1:
-			return 4
+		// case value.Cmp(big.NewInt(1000000)) < 1:
+		// 	return 4
 
-		case value.Cmp(big.NewInt(10000000)) < 1:
-			return 6
+		// case value.Cmp(big.NewInt(10000000)) < 1:
+		// 	return 6
 
-		case value.Cmp(big.NewInt(100000000)) < 1:
-			return 8
+		// case value.Cmp(big.NewInt(100000000)) < 1:
+		// 	return 8
 
-		default:
-			return 12
-		}
+		// default:
+		// 	return 12
+		// }
 	} else if chain.IsEVM() {
 		switch {
 		case value.Cmp(big.NewInt(10000)) < 1:
