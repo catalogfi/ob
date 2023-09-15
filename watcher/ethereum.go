@@ -29,6 +29,7 @@ type EthereumWatcher struct {
 	screener       screener.Screener
 	logger         *zap.Logger
 	ignoreOrders   map[string]bool
+	blockSpan      uint64
 }
 
 type Swap struct {
@@ -45,7 +46,7 @@ func NewEthereumWatchers(store Store, config model.Config, screener screener.Scr
 	for chain, netConfig := range config.Network {
 		for asset, token := range netConfig.Assets {
 			swapAddr := common.HexToAddress(asset.SecondaryID())
-			watcher, err := NewEthereumWatcher(store, chain, netConfig, swapAddr, token.StartBlock, screener, logger)
+			watcher, err := NewEthereumWatcher(store, chain, netConfig, swapAddr, token.StartBlock, uint64(netConfig.EventWindow), screener, logger)
 			if err != nil {
 				return nil, err
 			}
@@ -55,7 +56,7 @@ func NewEthereumWatchers(store Store, config model.Config, screener screener.Scr
 	return watchers, nil
 }
 
-func NewEthereumWatcher(store Store, chain model.Chain, config model.NetworkConfig, address common.Address, startBlock uint64, screener screener.Screener, logger *zap.Logger) (*EthereumWatcher, error) {
+func NewEthereumWatcher(store Store, chain model.Chain, config model.NetworkConfig, address common.Address, startBlock uint64, blockSpan uint64, screener screener.Screener, logger *zap.Logger) (*EthereumWatcher, error) {
 	ethClient, err := ethereum.NewClient(logger, config.RPC["ethrpc"])
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
@@ -75,6 +76,7 @@ func NewEthereumWatcher(store Store, chain model.Chain, config model.NetworkConf
 		ABI:            atomicSwapAbi,
 		logger:         logger,
 		ignoreOrders:   make(map[string]bool),
+		blockSpan:      blockSpan,
 	}, nil
 }
 
@@ -93,7 +95,23 @@ func (w *EthereumWatcher) Watch() {
 			continue
 		}
 
-		logs, err := w.client.GetLogs(w.atomicSwapAddr, w.startBlock, currentBlock, eventIds)
+		var logs []types.Log
+		toBlock := w.startBlock
+		fetchedAll := false
+		for !fetchedAll {
+			fromBlock := toBlock
+			toBlock += w.blockSpan
+			if toBlock > currentBlock {
+				toBlock = currentBlock
+				fetchedAll = true
+			}
+			logsSlice, err := w.client.GetLogs(w.atomicSwapAddr, fromBlock, toBlock, eventIds)
+			if err != nil {
+				w.logger.Error("failed to get logs", zap.Error(err), zap.Any("sd", w.chain), zap.Any("sd", toBlock-fromBlock))
+				continue
+			}
+			logs = append(logs, logsSlice...)
+		}
 		if err != nil {
 			w.logger.Error("failed to get logs", zap.Error(err))
 			continue

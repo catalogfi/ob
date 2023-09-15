@@ -89,7 +89,7 @@ func main() {
 			go btcWatcher.Watch(context.Background())
 		} else if chain.IsEVM() {
 			for asset, token := range Network.Assets {
-				ethWatcher, err := watchers.NewEthereumWatcher(store, chain, Network, common.HexToAddress(string(asset)), token.StartBlock, screener, logger)
+				ethWatcher, err := watchers.NewEthereumWatcher(store, chain, Network, common.HexToAddress(string(asset)), token.StartBlock, uint64(Network.EventWindow), screener, logger)
 				if err != nil {
 					panic(err)
 				}
