@@ -77,15 +77,7 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 }
 
 func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screener screener.Screener, store Store, swap *model.AtomicSwap) error {
-	swapFilledAmount, err := strconv.ParseUint(swap.FilledAmount, 10, 64)
-	if err != nil {
-		return nil
-	}
-	swapAmount, err := strconv.ParseUint(swap.Amount, 10, 64)
-	if err != nil {
-		return nil
-	}
-	if swap.InitiateTxHash == "" || (swap.InitiateTxHash != "" && swapFilledAmount < swapAmount && swap.Chain.IsBTC()) {
+	if swap.InitiateTxHash == "" || (swap.InitiateTxHash != "" && strings.Compare(swap.FilledAmount, swap.Amount) < 0 && swap.Chain.IsBTC()) {
 		filledAmount, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
 		if err != nil {
 			return err
@@ -266,6 +258,6 @@ func LoadBTCWatcher(swap model.AtomicSwap, config model.NetworkConfig) (swapper.
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(scriptAddr, "bitcoin-watcher")
+	fmt.Println("watching :", scriptAddr, " on chain :", swap.Chain)
 	return bitcoin.NewWatcher(scriptAddr, expiry.Int64(), swap.MinimumConfirmations, amt.Uint64(), config.IWRPC, client)
 }
