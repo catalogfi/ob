@@ -54,7 +54,7 @@ func main() {
 
 	// Screen is not doing sanction check in this case
 	screener := screener.NewScreener(nil, "")
-	server := rest.NewServer(store, model.Config{Network: config}, logger, "SECRET", screener)
+	server := rest.NewServer(store, model.Config{Network: config}, logger, "SECRET", nil, screener)
 	if err := server.Run(context.Background(), ":8080"); err != nil {
 		panic(err)
 	}

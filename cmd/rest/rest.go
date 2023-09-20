@@ -53,7 +53,7 @@ func main() {
 	}
 
 	screener := screener.NewScreener(store.Gorm(), envConfig.TRM_KEY)
-	server := rest.NewServer(store, envConfig.CONFIG, logger, envConfig.SERVER_SECRET, screener)
+	server := rest.NewServer(store, envConfig.CONFIG, logger, envConfig.SERVER_SECRET, nil, screener)
 	if err := server.Run(context.Background(), fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}

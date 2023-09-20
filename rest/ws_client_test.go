@@ -36,7 +36,7 @@ var _ = BeforeEach(func() {
 	mockStore = mocks.NewMockServerStore(mockCtrl)
 	mockScreener = mocks.NewMockScreener(mockCtrl)
 	ctx, cancel = context.WithCancel(context.Background())
-	go rest.NewServer(mockStore, config, zap.NewNop(), mockSecret, mockScreener).Run(ctx, ":8080")
+	go rest.NewServer(mockStore, config, zap.NewNop(), mockSecret, nil, mockScreener).Run(ctx, ":8080")
 	client = rest.NewWSClient("ws://localhost:8080", zap.NewNop())
 })
 

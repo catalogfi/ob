@@ -98,7 +98,10 @@ func main() {
 		}
 
 	}
-	server := rest.NewServer(store, envConfig.CONFIG, logger, "SECRET", screener)
+	socketPool := rest.NewSocketPool(make(map[string][]chan rest.UpdatedOrders))
+	listener := rest.NewListner(envConfig.PSQL_DB, socketPool, logger)
+	go listener.Start("updated_orders")
+	server := rest.NewServer(store, envConfig.CONFIG, logger, "SECRET", socketPool, screener)
 	if err := server.Run(context.Background(), fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}

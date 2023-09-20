@@ -35,13 +35,14 @@ var upgrader = websocket.Upgrader{
 }
 
 type Server struct {
-	router   *gin.Engine
-	store    Store
-	auth     Auth
-	config   model.Config
-	logger   *zap.Logger
-	secret   string
-	screener screener.Screener
+	router     *gin.Engine
+	store      Store
+	auth       Auth
+	config     model.Config
+	logger     *zap.Logger
+	secret     string
+	socketPool SocketPool
+	screener   screener.Screener
 }
 
 type Store interface {
@@ -61,16 +62,17 @@ type Store interface {
 	FilterOrders(maker, taker, orderPair, secretHash, sort string, status model.Status, minPrice, maxPrice float64, minAmount, maxAmount float64, page, perPage int, verbose bool) ([]model.Order, error)
 }
 
-func NewServer(store Store, config model.Config, logger *zap.Logger, secret string, screener screener.Screener) *Server {
+func NewServer(store Store, config model.Config, logger *zap.Logger, secret string, socketPool SocketPool, screener screener.Screener) *Server {
 	childLogger := logger.With(zap.String("service", "rest"))
 	return &Server{
-		router:   gin.Default(),
-		store:    store,
-		secret:   secret,
-		logger:   childLogger,
-		auth:     NewAuth(config.Network),
-		config:   config,
-		screener: screener,
+		router:     gin.Default(),
+		store:      store,
+		secret:     secret,
+		logger:     childLogger,
+		auth:       NewAuth(config.Network),
+		config:     config,
+		socketPool: socketPool,
+		screener:   screener,
 	}
 }
 
