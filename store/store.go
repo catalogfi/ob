@@ -202,12 +202,12 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	}
 	_, ok = config.Network[receiveChain]
 	if !ok {
-		return 0, fmt.Errorf("unsupported recieve chain")
+		return 0, fmt.Errorf("unsupported receive chain")
 	}
 
 	// check if send address and receive address are proper addresses for respective chains
 	if err := CheckAddress(receiveChain, receiveAddress); err != nil {
-		return 0, fmt.Errorf("invalid recieve address: %v", err)
+		return 0, fmt.Errorf("invalid receive address: %v", err)
 	}
 	if err := CheckAddress(sendChain, sendAddress); err != nil {
 		return 0, fmt.Errorf("invalid send address: %v", err)
@@ -352,7 +352,7 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 		return fmt.Errorf("constraint violation: corrupted order pair: %v", err)
 	}
 	if err := CheckAddress(fromChain, receiveAddress); err != nil {
-		return fmt.Errorf("invalid recieve address: %v", err)
+		return fmt.Errorf("invalid receive address: %v", err)
 	}
 	if err := CheckAddress(toChain, sendAddress); err != nil {
 		return fmt.Errorf("invalid send address: %v", err)
@@ -666,47 +666,47 @@ func CheckHash(hash string) error {
 
 // value is in USD
 func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
-	if chain.IsBTC() {
-		switch {
-		case value.Cmp(big.NewInt(10000)) < 1:
-			return 1
+	// if chain.IsBTC() {
+	// 	switch {
+	// 	case value.Cmp(big.NewInt(10000)) < 1:
+	// 		return 1
 
-		case value.Cmp(big.NewInt(100000)) < 1:
-			return 2
+	// 	case value.Cmp(big.NewInt(100000)) < 1:
+	// 		return 2
 
-		case value.Cmp(big.NewInt(1000000)) < 1:
-			return 4
+	// 	case value.Cmp(big.NewInt(1000000)) < 1:
+	// 		return 4
 
-		case value.Cmp(big.NewInt(10000000)) < 1:
-			return 6
+	// 	case value.Cmp(big.NewInt(10000000)) < 1:
+	// 		return 6
 
-		case value.Cmp(big.NewInt(100000000)) < 1:
-			return 8
+	// 	case value.Cmp(big.NewInt(100000000)) < 1:
+	// 		return 8
 
-		default:
-			return 12
-		}
-	} else if chain.IsEVM() {
-		switch {
-		case value.Cmp(big.NewInt(10000)) < 1:
-			return 6
+	// 	default:
+	// 		return 12
+	// 	}
+	// } else if chain.IsEVM() {
+	// 	switch {
+	// 	case value.Cmp(big.NewInt(10000)) < 1:
+	// 		return 6
 
-		case value.Cmp(big.NewInt(100000)) < 1:
-			return 12
+	// 	case value.Cmp(big.NewInt(100000)) < 1:
+	// 		return 12
 
-		case value.Cmp(big.NewInt(1000000)) < 1:
-			return 18
+	// 	case value.Cmp(big.NewInt(1000000)) < 1:
+	// 		return 18
 
-		case value.Cmp(big.NewInt(10000000)) < 1:
-			return 24
+	// 	case value.Cmp(big.NewInt(10000000)) < 1:
+	// 		return 24
 
-		case value.Cmp(big.NewInt(100000000)) < 1:
-			return 30
+	// 	case value.Cmp(big.NewInt(100000000)) < 1:
+	// 		return 30
 
-		default:
-			return 100
-		}
-	}
+	// 	default:
+	// 		return 100
+	// 	}
+	// }
 	return 0
 }
 

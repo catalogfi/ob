@@ -255,7 +255,7 @@ var _ = Describe("Store", func() {
 		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
 	})
 
-	It("Error, giving wrong recieve address", func() {
+	It("Error, giving wrong receive address", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F8", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
@@ -279,7 +279,7 @@ var _ = Describe("Store", func() {
 		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
 	})
 
-	It("Error, giving wrong recieve amount", func() {
+	It("Error, giving wrong receive amount", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "1,00000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
@@ -642,7 +642,7 @@ var _ = Describe("Store", func() {
 		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
 	})
 
-	It("Error, failed to get recieve price", func() {
+	It("Error, failed to get receive price", func() {
 		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		var tconfig = model.Config{

@@ -140,7 +140,6 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			swap.Status = model.Refunded
 			swap.RefundTxHash = txHash
 		} else {
-			fmt.Println("got here")
 			redeemed, secret, txHash, err := watcher.IsRedeemed()
 			if err != nil {
 				return err
