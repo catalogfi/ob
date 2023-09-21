@@ -79,14 +79,14 @@ var _ = Describe("Bitcoin Watcher", func() {
 
 	Describe("can load btc watcher", func() {
 		It("should fail if no RPCs are provided", func() {
-			_, err := LoadBTCWatcher(model.AtomicSwap{
+			_, err := LoadBTCWatcher(mockBTCClient, model.AtomicSwap{
 				Chain: model.BitcoinTestnet,
 			}, model.NetworkConfig{})
 			Expect(err).ShouldNot(BeNil())
 		})
 
 		It("should fail if an invalid btc address is provided for the initiator", func() {
-			_, err := LoadBTCWatcher(model.AtomicSwap{
+			_, err := LoadBTCWatcher(mockBTCClient, model.AtomicSwap{
 				Chain:            model.BitcoinTestnet,
 				InitiatorAddress: "invalid address",
 			}, model.NetworkConfig{
@@ -98,7 +98,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 		})
 
 		It("should fail if an invalid btc address is provided for the redeemer", func() {
-			_, err := LoadBTCWatcher(model.AtomicSwap{
+			_, err := LoadBTCWatcher(mockBTCClient, model.AtomicSwap{
 				Chain:            model.BitcoinTestnet,
 				InitiatorAddress: "n2psi3r4BpvzjPPXdaz3de1k1MgNi4Wyzd",
 				RedeemerAddress:  "invalid address",
@@ -111,7 +111,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 		})
 
 		It("should fail if an invalid amount is provided", func() {
-			_, err := LoadBTCWatcher(model.AtomicSwap{
+			_, err := LoadBTCWatcher(mockBTCClient, model.AtomicSwap{
 				Chain:            model.BitcoinTestnet,
 				InitiatorAddress: "n2psi3r4BpvzjPPXdaz3de1k1MgNi4Wyzd",
 				RedeemerAddress:  "n1g3aBR4dhZnhwzT4PhfoaVB2doYJ5JvpX",
@@ -125,7 +125,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 		})
 
 		It("should fail if an invalid secret hash is provided", func() {
-			_, err := LoadBTCWatcher(model.AtomicSwap{
+			_, err := LoadBTCWatcher(mockBTCClient, model.AtomicSwap{
 				Chain:            model.BitcoinTestnet,
 				InitiatorAddress: "n2psi3r4BpvzjPPXdaz3de1k1MgNi4Wyzd",
 				RedeemerAddress:  "n1g3aBR4dhZnhwzT4PhfoaVB2doYJ5JvpX",
@@ -140,7 +140,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 		})
 
 		It("should fail if an invalid timelock is provided", func() {
-			_, err := LoadBTCWatcher(model.AtomicSwap{
+			_, err := LoadBTCWatcher(mockBTCClient, model.AtomicSwap{
 				Chain:            model.BitcoinTestnet,
 				InitiatorAddress: "n2psi3r4BpvzjPPXdaz3de1k1MgNi4Wyzd",
 				RedeemerAddress:  "n1g3aBR4dhZnhwzT4PhfoaVB2doYJ5JvpX",
@@ -156,7 +156,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 		})
 
 		It("should fail if an invalid timelock is provided", func() {
-			_, err := LoadBTCWatcher(model.AtomicSwap{
+			_, err := LoadBTCWatcher(mockBTCClient, model.AtomicSwap{
 				Chain:            model.BitcoinTestnet,
 				InitiatorAddress: "n2psi3r4BpvzjPPXdaz3de1k1MgNi4Wyzd",
 				RedeemerAddress:  "n1g3aBR4dhZnhwzT4PhfoaVB2doYJ5JvpX",

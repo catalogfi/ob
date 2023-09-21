@@ -62,15 +62,18 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 	for _, swap := range swaps {
 		btcClient, err := LoadBTCClient(swap.Chain, w.config.Network[swap.Chain], nil)
 		if err != nil {
-			return fmt.Errorf("failed to load btc client %v", err)
+			w.logger.Error("failed to load client", zap.Error(err))
+			continue
 		}
-		watcher, err := LoadBTCWatcher(swap, w.config.Network[swap.Chain])
+		watcher, err := LoadBTCWatcher(btcClient, swap, w.config.Network[swap.Chain])
 		if err != nil {
-			return fmt.Errorf("failed to load watcher %v", err)
+			w.logger.Error("failed to load watcher", zap.Error(err))
+			continue
 		}
 
 		if err := UpdateSwapStatus(watcher, btcClient, w.screener, w.store, &swap); err != nil {
-			return fmt.Errorf("failed to check swap %v", err)
+			w.logger.Error("failed to update swap status", zap.Error(err))
+			continue
 		}
 	}
 	return nil
@@ -93,6 +96,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 		if filledAmount >= amount {
 			swap.Status = model.Detected
 		}
+
 	} else if swap.InitiateTxHash != "" && swap.Status == model.Detected {
 		currentBlock, err := btcClient.GetTipBlockHeight()
 		if err != nil {
@@ -237,11 +241,7 @@ func LoadBTCClient(chain model.Chain, config model.NetworkConfig, btcStore bitco
 	return client, nil
 }
 
-func LoadBTCWatcher(swap model.AtomicSwap, config model.NetworkConfig) (swapper.Watcher, error) {
-	client, err := LoadBTCClient(swap.Chain, config, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load client: %v", err)
-	}
+func LoadBTCWatcher(client bitcoin.Client, swap model.AtomicSwap, config model.NetworkConfig) (swapper.Watcher, error) {
 
 	amt, ok := new(big.Int).SetString(swap.Amount, 10)
 	if !ok {
