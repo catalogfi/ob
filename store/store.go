@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,11 +36,27 @@ type Store interface {
 	Gorm() *gorm.DB
 }
 
-func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
+func New(dialector gorm.Dialector, setupPath string, opts ...gorm.Option) (Store, error) {
 	db, err := gorm.Open(dialector, opts...)
 	if err != nil {
 		return nil, err
 	}
+
+	c, ioErr := os.ReadFile(setupPath)
+	if ioErr != nil {
+		return nil, fmt.Errorf("error reading file from path : %s,error : %v", setupPath, err)
+	}
+	sql := string(c)
+	db.Exec(sql)
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("error getting DB instance: %v", err)
+	}
+	maxConnections := 50 // Adjust this value as needed
+	sqlDB.SetMaxIdleConns(50)
+	sqlDB.SetMaxOpenConns(maxConnections)
+	sqlDB.SetConnMaxIdleTime(10 * time.Minute)
+
 	if err := db.AutoMigrate(&model.Order{}, &model.AtomicSwap{}, &model.Blacklist{}); err != nil {
 		return nil, err
 	}

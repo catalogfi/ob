@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/TheZeroSlave/zapsentry"
+	"github.com/catalogfi/wbtc-garden/internal/path"
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/catalogfi/wbtc-garden/screener"
@@ -47,9 +48,8 @@ func LoadConfiguration(file string) Config {
 
 func main() {
 	// psql db
-	envConfig := LoadConfiguration("./config.json")
-	// fmt.Println(envConfig.PSQL_DB)
-	store, err := store.New(postgres.Open(envConfig.PSQL_DB), &gorm.Config{
+	envConfig := LoadConfiguration(path.ConfigPath)
+	store, err := store.New(postgres.Open(envConfig.PSQL_DB), path.SQLSetupPath, &gorm.Config{
 		NowFunc: func() time.Time { return time.Now().UTC() },
 		Logger:  logger.Default.LogMode(logger.Silent),
 	})
@@ -98,10 +98,11 @@ func main() {
 		}
 
 	}
-	socketPool := rest.NewSocketPool(make(map[string][]chan rest.UpdatedOrders))
+	socketPool := rest.NewSocketPool(make(map[string][]chan rest.UpdatedOrders), store)
 	listener := rest.NewListner(envConfig.PSQL_DB, socketPool, logger)
-	go listener.Start("updated_orders")
-	server := rest.NewServer(store, envConfig.CONFIG, logger, "SECRET", socketPool, screener)
+	go listener.Start("updates_to_orders", "updates_to_atomic_swaps")
+
+	server := rest.NewServer(store, envConfig.CONFIG, logger, envConfig.SERVER_SECRET, socketPool, screener)
 	if err := server.Run(context.Background(), fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}

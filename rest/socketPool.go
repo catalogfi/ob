@@ -6,27 +6,40 @@ import (
 	"github.com/catalogfi/wbtc-garden/model"
 )
 
+type socketPool struct {
+	mu    *sync.RWMutex
+	pool  map[string][]chan UpdatedOrders
+	store Store
+}
+
 type SocketPool interface {
-	FilterAndBufferOrder(order model.Order)
+	FilterAndBufferOrder(orderId uint64) error
 	AddSocketChannel(creator string, channel chan UpdatedOrders)
 	RemoveSocketchannel(creator string, channel chan UpdatedOrders)
 }
 
-func NewSocketPool(pool map[string][]chan UpdatedOrders) SocketPool {
+func NewSocketPool(pool map[string][]chan UpdatedOrders, store Store) SocketPool {
 	return &socketPool{
-		mu:   new(sync.RWMutex),
-		pool: pool,
+		mu:    new(sync.RWMutex),
+		pool:  pool,
+		store: store,
 	}
 }
 
-func (s *socketPool) FilterAndBufferOrder(order model.Order) {
+func (s *socketPool) FilterAndBufferOrder(orderId uint64) error {
+
+	order, err := s.store.GetOrder(uint(orderId))
+	if err != nil {
+		return err
+	}
 	creator := order.Maker
 	var orders []model.Order
 	for _, chans := range (s.pool)[creator] {
 		chans <- UpdatedOrders{
-			Orders: append(orders, order),
+			Orders: append(orders, *order),
 		}
 	}
+	return nil
 }
 func (s *socketPool) AddSocketChannel(creator string, channel chan UpdatedOrders) {
 	s.mu.Lock()

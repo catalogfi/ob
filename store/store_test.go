@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"os"
 
+	"github.com/catalogfi/wbtc-garden/internal/path"
 	"github.com/catalogfi/wbtc-garden/model"
 	. "github.com/catalogfi/wbtc-garden/store"
 	. "github.com/onsi/ginkgo/v2"
@@ -54,7 +55,7 @@ var _ = BeforeEach(func() {
 
 var _ = Describe("Store", func() {
 	It("should be able to get locked amount", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", "17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2daE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
@@ -86,7 +87,7 @@ var _ = Describe("Store", func() {
 		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
 	})
 	It("Error, when using invalid AtomicSwap address", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eD", "100000000", "100000000", "17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2daE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
@@ -94,7 +95,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("should be able to fill an order", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -114,7 +115,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("should be able to cancel an order", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		cid, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -129,7 +130,7 @@ var _ = Describe("Store", func() {
 	})
 
 	// It("shouldn't be able to cancel a filled order", func() {
-	// 	store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+	// 	store, err := New(sqlite.Open("test.db"),path.SQLSetupPath, &gorm.Config{})
 	// 	Expect(err).NotTo(HaveOccurred())
 	// 	cid, err := store.CreateOrder("creator", "sendAddress", "receiveAddress", "ETH:ETH-BTC:BTC", "100", "200", "secretHash", "receivebtcAddress", config)
 	// 	Expect(err).NotTo(HaveOccurred())
@@ -144,7 +145,7 @@ var _ = Describe("Store", func() {
 	// })
 
 	It("should be able to get all open orders", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		cid1, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -186,7 +187,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, shoudl happen cause it crosses daily amount value", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -199,7 +200,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, creating order with amount less than MinTxlimit", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "1000", "1000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).Should(HaveOccurred())
@@ -207,7 +208,7 @@ var _ = Describe("Store", func() {
 
 	})
 	It("Error, creating order with amount less than MaxTxlimit", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "10000000000000000000000", "10000000000000000000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).Should(HaveOccurred())
@@ -216,7 +217,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, giving wrong creator address", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58a5B8f9872E0", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).Should(HaveOccurred())
@@ -224,7 +225,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, giving wrong unsupported chain format", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "shinto/ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).Should(HaveOccurred())
@@ -232,7 +233,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, giving wrong send send chain", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoi_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).Should(HaveOccurred())
@@ -240,7 +241,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, giving wrong recive chain", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereu_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).Should(HaveOccurred())
@@ -248,7 +249,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, giving wrong send address", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJa", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).Should(HaveOccurred())
@@ -256,7 +257,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, giving wrong receive address", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F8", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).Should(HaveOccurred())
@@ -264,7 +265,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, giving wrong recive chain", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", "17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2daE6B5ca5B8f9Ec6F", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).Should(HaveOccurred())
@@ -272,7 +273,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, giving wrong send amount", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "1,00000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).Should(HaveOccurred())
@@ -280,7 +281,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, giving wrong receive amount", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "1,00000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).Should(HaveOccurred())
@@ -288,7 +289,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, manually changing the daily limit to a wrong value", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		var tconfig = model.Config{
 			Network: model.Network{
@@ -326,7 +327,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, manually changing the Min limit to a wrong value", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		var tconfig = model.Config{
 			Network: model.Network{
@@ -363,7 +364,7 @@ var _ = Describe("Store", func() {
 		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
 	})
 	It("Error, manually changing the Max limit to a wrong value", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		var tconfig = model.Config{
 			Network: model.Network{
@@ -401,7 +402,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, fill order sender addreses wrong", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -412,7 +413,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, fill order reciever address wrong", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -423,7 +424,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, changing the order after creation", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -440,7 +441,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, trying to fill an non-existent order", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		err = store.FillOrder(5, "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config.Network)
 		Expect(err).Should(HaveOccurred())
@@ -448,7 +449,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, trying to fill an order with wrong config file for sendChain", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		var tconfig = model.Config{
 			Network: model.Network{
@@ -493,7 +494,7 @@ var _ = Describe("Store", func() {
 
 	})
 	It("Error, trying to fill an order with wrong config file for recieverChain", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		var tconfig = model.Config{
 			Network: model.Network{
@@ -539,7 +540,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, trying to cancel order by another creator", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -549,7 +550,7 @@ var _ = Describe("Store", func() {
 
 	})
 	It("Error, trying to cancel order which doesnt exist", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -560,7 +561,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, trying to cancel a filled order", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -576,7 +577,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Trying to filter order with all the details", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -604,7 +605,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, failed to get send price", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		var tconfig = model.Config{
 			Network: model.Network{
@@ -643,7 +644,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, failed to get receive price", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		var tconfig = model.Config{
 			Network: model.Network{
@@ -681,7 +682,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, if Amount is corrupted", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF-bitcoin_testnet", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -700,7 +701,7 @@ var _ = Describe("Store", func() {
 		Expect(os.Remove("test.db")).NotTo(HaveOccurred())
 	})
 	It("Error, creating order with wrong config file", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF-bitcoin_testnet", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", model.Config{})
 		Expect(err).Should(HaveOccurred())
@@ -709,7 +710,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Creating filling and then creating with same address", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id1, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -722,7 +723,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, deleting database after creating and then trying to fill", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id1, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -734,7 +735,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, creating order in a deleted database", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -745,7 +746,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, updating order in a deleted database", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -759,7 +760,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, attempting to cancel order when Db is deleted", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -770,7 +771,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Getting order by the specifying address", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -782,7 +783,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Getting active swaps", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -794,7 +795,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Updating a swap", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -811,7 +812,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Getting the database", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		_, err = store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -821,7 +822,7 @@ var _ = Describe("Store", func() {
 	})
 
 	It("Error, Updating a swap in a deleted database", func() {
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
@@ -837,7 +838,7 @@ var _ = Describe("Store", func() {
 
 	It("Getting swap usng onchain indentifiers", func() {
 
-		store, err := New(sqlite.Open("test.db"), &gorm.Config{})
+		store, err := New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{})
 		Expect(err).NotTo(HaveOccurred())
 		id, err := store.CreateOrder("0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", "0x17100301bB2FF58aE6B5ca5B8f9Ec6F872E0F2da", "bitcoin_testnet-ethereum_sepolia:0x130Ff59B75a415d0bcCc2e996acAf27ce70fD5eF", "100000000", "100000000", secretHash, "mg54DDo5jfNkx5tF4d7Ag6G6VrJaSjr7ES", config)
 		Expect(err).NotTo(HaveOccurred())
