@@ -85,7 +85,7 @@ func main() {
 	for chain, Network := range envConfig.CONFIG.Network {
 		if chain.IsBTC() {
 			//interval is set to 10 seconds to detect iw tx's quicky
-			btcWatcher := watchers.NewBTCWatcher(store, chain, envConfig.CONFIG, screener, 10*time.Second, logger)
+			btcWatcher := watchers.NewBTCWatcher(store, chain, envConfig.CONFIG, screener, 5*time.Second, logger)
 			go btcWatcher.Watch(context.Background())
 		} else if chain.IsEVM() {
 			for asset, token := range Network.Assets {
