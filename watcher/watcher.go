@@ -95,7 +95,6 @@ func ProcessOrder(order model.Order, store Store, logger *zap.Logger) (model.Ord
 	// copy secret from follower atomic swap
 	if order.Secret != order.FollowerAtomicSwap.Secret {
 		order.Secret = order.FollowerAtomicSwap.Secret
-		return order, true
 	}
 
 	// Special cases regardless of order status
