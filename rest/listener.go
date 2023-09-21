@@ -47,9 +47,7 @@ func (listner *Listner) Start(ordersUpdatechan string, swapsUpdatechan string) {
 
 	listner.logger.Info("Started listening to postgres events...")
 
-	for {
-		listner.waitForEvent(ordersListener, swapsListener)
-	}
+	listner.waitForEvent(ordersListener, swapsListener)
 
 }
 
@@ -67,20 +65,17 @@ func (listner *Listner) waitForEvent(ol *pq.Listener, sl *pq.Listener) {
 			oid, err := strconv.ParseUint(on.Extra, 10, 64)
 			if err != nil {
 				listner.logger.Error(fmt.Sprintf("Error processing id: %v", err))
-				return
 			}
 			listner.logger.Info("received order:", zap.Uint64("order id:", oid))
 			err = listner.socketPool.FilterAndBufferOrder(oid)
 			if err != nil {
 				listner.logger.Error("Failed to write order to channel", zap.Uint64("order id:", oid))
 			}
-			return
 		case sn := <-sl.Notify:
 			listner.logger.Info(fmt.Sprint("Received data from channel [", sn.Channel, "] :"))
 			sid, err := strconv.ParseUint(sn.Extra, 10, 64)
 			if err != nil {
 				listner.logger.Error(fmt.Sprintf("Error processing id: %v", err))
-				return
 			}
 			if sid&1 == 1 {
 				sid += 1
@@ -91,14 +86,12 @@ func (listner *Listner) waitForEvent(ol *pq.Listener, sl *pq.Listener) {
 			if err != nil {
 				listner.logger.Error("Failed to write order to channel", zap.Uint64("order id:", oid))
 			}
-			return
 		case <-time.After(90 * time.Second):
 			listner.logger.Info("Received no events for 90 seconds, checking connection")
 			go func() {
 				ol.Ping()
 				sl.Ping()
 			}()
-			return
 		}
 	}
 }
