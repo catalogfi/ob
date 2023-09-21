@@ -410,13 +410,13 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	followerAtomicSwap.OnChainIdentifier = followerSwapID
 	order.Taker = filler
 	order.Status = model.Filled
-	if tx := s.db.Save(order); tx.Error != nil {
-		return tx.Error
-	}
 	if tx := s.db.Save(initiateAtomicSwap); tx.Error != nil {
 		return tx.Error
 	}
 	if tx := s.db.Save(followerAtomicSwap); tx.Error != nil {
+		return tx.Error
+	}
+	if tx := s.db.Save(order); tx.Error != nil {
 		return tx.Error
 	}
 	return nil
