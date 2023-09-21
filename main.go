@@ -99,7 +99,7 @@ func main() {
 
 	}
 	socketPool := rest.NewSocketPool(make(map[string][]chan rest.UpdatedOrders), store)
-	listener := rest.NewListner(envConfig.PSQL_DB, socketPool, logger)
+	listener := rest.NewDBListener(envConfig.PSQL_DB, socketPool, logger)
 	go listener.Start("updates_to_orders", "updates_to_atomic_swaps")
 
 	server := rest.NewServer(store, envConfig.CONFIG, logger, envConfig.SERVER_SECRET, socketPool, screener)
