@@ -32,14 +32,25 @@ func (s *socketPool) FilterAndBufferOrder(orderId uint64) error {
 	if err != nil {
 		return err
 	}
-	creator := order.Maker
+	var users []string
+	users = append(users, order.Maker)
+	if order.Taker != "" {
+		users = append(users, order.Taker)
+	}
 	var orders []model.Order
-	for _, chans := range (s.pool)[creator] {
-		chans <- UpdatedOrders{
-			Orders: append(orders, *order),
+	orders = append(orders, *order)
+
+	s.bufferOrders(users, orders)
+	return nil
+}
+func (s *socketPool) bufferOrders(users []string, orders []model.Order) {
+	for _, user := range users {
+		for _, chann := range (s.pool)[user] {
+			chann <- UpdatedOrders{
+				Orders: orders,
+			}
 		}
 	}
-	return nil
 }
 func (s *socketPool) AddSocketChannel(creator string, channel chan UpdatedOrders) {
 	s.mu.Lock()
