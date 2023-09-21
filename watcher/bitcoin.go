@@ -94,34 +94,40 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 		swap.FilledAmount = strconv.FormatUint(filledAmount, 10)
 		swap.InitiateTxHash = txHash
 		if filledAmount >= amount {
-			swap.Status = model.Detected
+			_, _, isIw, err := watcher.Status(swap.InitiateTxHash)
+			if err != nil {
+				return err
+			}
+
+			if isIw {
+				currentBlock, err := btcClient.GetTipBlockHeight()
+				if err != nil {
+					return err
+				}
+				swap.InitiateBlockNumber = currentBlock
+				swap.CurrentConfirmations = swap.MinimumConfirmations
+				swap.Status = model.Initiated
+				swap.IsInstantWallet = true
+			} else {
+				swap.Status = model.Detected
+			}
 		}
 
 	} else if swap.InitiateTxHash != "" && swap.Status == model.Detected {
-		currentBlock, err := btcClient.GetTipBlockHeight()
-		if err != nil {
-			return err
-		}
-		height, confirmations, isIw, err := watcher.Status(swap.InitiateTxHash)
+		height, confirmations, _, err := watcher.Status(swap.InitiateTxHash)
 		if err != nil {
 			return err
 		}
 
-		if isIw {
-			swap.InitiateBlockNumber = currentBlock
+		if confirmations != swap.CurrentConfirmations {
+			swap.CurrentConfirmations = confirmations
+		}
+		if swap.CurrentConfirmations >= swap.MinimumConfirmations {
+			swap.InitiateBlockNumber = height
 			swap.CurrentConfirmations = swap.MinimumConfirmations
 			swap.Status = model.Initiated
-			swap.IsInstantWallet = true
-		} else {
-			if confirmations != swap.CurrentConfirmations {
-				swap.CurrentConfirmations = confirmations
-			}
-			if swap.CurrentConfirmations >= swap.MinimumConfirmations {
-				swap.InitiateBlockNumber = height
-				swap.CurrentConfirmations = swap.MinimumConfirmations
-				swap.Status = model.Initiated
-			}
 		}
+
 	} else {
 		currentBlock, err := btcClient.GetTipBlockHeight()
 		if err != nil {
