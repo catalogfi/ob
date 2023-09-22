@@ -15,7 +15,7 @@ type socketPool struct {
 type SocketPool interface {
 	FilterAndBufferOrder(orderId uint64) error
 	AddSocketChannel(creator string, channel chan UpdatedOrders)
-	RemoveSocketchannel(creator string, channel chan UpdatedOrders)
+	RemoveSocketChannel(creator string, channel chan UpdatedOrders)
 }
 
 func NewSocketPool(pool map[string][]chan UpdatedOrders, store Store) SocketPool {
@@ -44,6 +44,8 @@ func (s *socketPool) FilterAndBufferOrder(orderId uint64) error {
 	return nil
 }
 func (s *socketPool) bufferOrders(users []string, orders []model.Order) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for _, user := range users {
 		for _, chann := range (s.pool)[user] {
 			chann <- UpdatedOrders{
@@ -54,15 +56,16 @@ func (s *socketPool) bufferOrders(users []string, orders []model.Order) {
 }
 func (s *socketPool) AddSocketChannel(creator string, channel chan UpdatedOrders) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	(s.pool)[creator] = append((s.pool)[creator], channel)
-	s.mu.Unlock()
 }
-func (s *socketPool) RemoveSocketchannel(creator string, channel chan UpdatedOrders) {
+func (s *socketPool) RemoveSocketChannel(creator string, channel chan UpdatedOrders) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	for m, n := range (s.pool)[creator] {
 		if n == channel {
 			(s.pool)[creator] = append((s.pool)[creator][0:m], (s.pool)[creator][m+1:len((s.pool)[creator])]...)
+			return
 		}
 	}
-	s.mu.Unlock()
 }

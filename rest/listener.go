@@ -61,6 +61,9 @@ func (listener *DBListener) waitForEvent(ol *pq.Listener, sl *pq.Listener) {
 	for {
 		select {
 		case on := <-ol.Notify:
+			if on == nil {
+				continue
+			}
 			listener.logger.Info(fmt.Sprint("Received data from channel [", on.Channel, "] :"))
 			oid, err := strconv.ParseUint(on.Extra, 10, 64)
 			if err != nil {
@@ -73,6 +76,9 @@ func (listener *DBListener) waitForEvent(ol *pq.Listener, sl *pq.Listener) {
 				listener.logger.Error("Failed to write order to channel", zap.Uint64("order id:", oid))
 			}
 		case sn := <-sl.Notify:
+			if sn == nil {
+				continue
+			}
 			listener.logger.Info(fmt.Sprint("Received data from channel [", sn.Channel, "] :"))
 			sid, err := strconv.ParseUint(sn.Extra, 10, 64)
 			if err != nil {
