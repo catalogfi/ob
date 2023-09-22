@@ -160,7 +160,7 @@ func (w *watcher) Status(initateTxHash string) (uint64, uint64, bool, error) {
 				conf = nextConf
 			}
 			if isIW {
-				isIW, err = w.IsInstantWallet(txHashes[0])
+				isIW, err = w.IsInstantWallet(txHash)
 				if err != nil {
 					return 0, 0, false, fmt.Errorf("failed to check for instant wallet txs: %w", err)
 				}
