@@ -192,7 +192,6 @@ func (s *Server) subscribeToUpdatedOrders(creator string, ctx context.Context) <
 				return
 			}
 
-			// hasUpdated will always be true
 			newOrders := UpdatedOrders{
 				Orders: orders,
 			}
