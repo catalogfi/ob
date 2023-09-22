@@ -179,8 +179,8 @@ func (s *Server) subscribeToUpdatedOrders(creator string, ctx context.Context) <
 
 	go func() {
 		defer func() {
-			close(responses)
 			s.socketPool.RemoveSocketchannel(creator, responses)
+			close(responses)
 		}()
 
 		for {
