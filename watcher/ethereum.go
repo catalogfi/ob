@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/catalogfi/wbtc-garden/model"
@@ -161,6 +162,10 @@ func UpdateEVMConfirmations(store Store, chain model.Chain, currentBlock uint64)
 		return err
 	}
 	for _, swap := range swaps {
+		timelock, err := strconv.ParseUint(swap.Timelock, 10, 64)
+		if err != nil {
+			return fmt.Errorf("failed to ParseUint timelock: %s", err)
+		}
 		if swap.Status == model.Detected && currentBlock > swap.InitiateBlockNumber {
 			confirmations := currentBlock - swap.InitiateBlockNumber
 			if confirmations != swap.CurrentConfirmations {
@@ -172,6 +177,12 @@ func UpdateEVMConfirmations(store Store, chain model.Chain, currentBlock uint64)
 				if err := store.UpdateSwap(&swap); err != nil {
 					return err
 				}
+			}
+		}
+		if swap.Status == model.Initiated && currentBlock > swap.InitiateBlockNumber+uint64(timelock) {
+			swap.Status = model.Expired
+			if err := store.UpdateSwap(&swap); err != nil {
+				return err
 			}
 		}
 	}

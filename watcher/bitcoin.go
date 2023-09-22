@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -14,7 +15,6 @@ import (
 	"github.com/catalogfi/wbtc-garden/screener"
 	"github.com/catalogfi/wbtc-garden/swapper"
 	"github.com/catalogfi/wbtc-garden/swapper/bitcoin"
-	"github.com/ethereum/go-ethereum/common/math"
 	"go.uber.org/zap"
 )
 
@@ -80,10 +80,14 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 }
 
 func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screener screener.Screener, store Store, swap *model.AtomicSwap) error {
+
 	if swap.InitiateTxHash == "" || (swap.InitiateTxHash != "" && strings.Compare(swap.FilledAmount, swap.Amount) < 0 && swap.Chain.IsBTC()) {
 		filledAmount, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
 		if err != nil {
 			return err
+		}
+		if filledAmount == 0 {
+			return nil
 		}
 
 		amount, err := strconv.ParseUint(swap.Amount, 10, 64)
@@ -98,14 +102,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			if err != nil {
 				return err
 			}
-
 			if isIw {
-				currentBlock, err := btcClient.GetTipBlockHeight()
-				if err != nil {
-					return err
-				}
-				swap.InitiateBlockNumber = currentBlock
-				swap.CurrentConfirmations = swap.MinimumConfirmations
 				swap.Status = model.Initiated
 				swap.IsInstantWallet = true
 			} else {
@@ -118,17 +115,32 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 		if err != nil {
 			return err
 		}
+		if confirmations > 0 && swap.InitiateBlockNumber == 0 {
+			swap.InitiateBlockNumber = height
+		}
 
 		if confirmations != swap.CurrentConfirmations {
 			swap.CurrentConfirmations = confirmations
 		}
 		if swap.CurrentConfirmations >= swap.MinimumConfirmations {
-			swap.InitiateBlockNumber = height
 			swap.CurrentConfirmations = swap.MinimumConfirmations
 			swap.Status = model.Initiated
 		}
 
-	} else {
+	} else if swap.IsInstantWallet && swap.InitiateBlockNumber == 0 && swap.Status == model.Initiated {
+		//when we detect iw, we set status to inited, but we would not
+		//know the block number, so we do that here
+		blockHeight, confs, _, err := watcher.Status(swap.InitiateTxHash)
+		if err != nil {
+			return err
+		}
+		swap.InitiateBlockNumber = blockHeight
+		if confs >= swap.MinimumConfirmations {
+			swap.CurrentConfirmations = swap.MinimumConfirmations
+		} else {
+			swap.CurrentConfirmations = confs
+		}
+	} else if swap.Status != model.Redeemed && swap.Status != model.Refunded {
 		currentBlock, err := btcClient.GetTipBlockHeight()
 		if err != nil {
 			return err
@@ -144,11 +156,13 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			if err != nil {
 				return err
 			}
-			if !refunded {
-				return nil
+			if !refunded && swap.Status != model.Expired {
+				swap.Status = model.Expired
+			} else {
+				swap.Status = model.Refunded
+				swap.RefundTxHash = txHash
 			}
-			swap.Status = model.Refunded
-			swap.RefundTxHash = txHash
+
 		} else {
 			redeemed, secret, txHash, err := watcher.IsRedeemed()
 			if err != nil {
@@ -172,7 +186,7 @@ func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, cha
 	}
 
 	utxos, bal, err := btcClient.GetUTXOs(addr, 0)
-	if err != nil {
+	if err != nil || bal == 0 {
 		return 0, "", err
 	}
 
