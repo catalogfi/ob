@@ -134,10 +134,16 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 		if err != nil {
 			return err
 		}
-		swap.InitiateBlockNumber = blockHeight
+		if confs == 0 {
+			return nil
+		}
+		// we have atleast 1 confirmation at this point
+		if swap.InitiateBlockNumber == 0 {
+			swap.InitiateBlockNumber = blockHeight
+		}
 		if confs >= swap.MinimumConfirmations {
 			swap.CurrentConfirmations = swap.MinimumConfirmations
-		} else {
+		} else if confs != swap.CurrentConfirmations {
 			swap.CurrentConfirmations = confs
 		}
 	} else if swap.Status != model.Redeemed && swap.Status != model.Refunded {
