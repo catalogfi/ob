@@ -156,7 +156,10 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			if err != nil {
 				return err
 			}
-			if !refunded && swap.Status != model.Expired {
+			if !refunded {
+				if swap.Status == model.Expired {
+					return nil
+				}
 				swap.Status = model.Expired
 			} else {
 				swap.Status = model.Refunded
