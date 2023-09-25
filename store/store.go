@@ -42,12 +42,10 @@ func New(dialector gorm.Dialector, setupPath string, opts ...gorm.Option) (Store
 		return nil, err
 	}
 
-	c, ioErr := os.ReadFile(setupPath)
-	if ioErr != nil {
-		return nil, fmt.Errorf("error reading file from path : %s,error : %v", setupPath, err)
+	err = setupTriggers(db, setupPath)
+	if err != nil {
+		return nil, err
 	}
-	sql := string(c)
-	db.Exec(sql)
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, fmt.Errorf("error getting DB instance: %v", err)
@@ -61,6 +59,16 @@ func New(dialector gorm.Dialector, setupPath string, opts ...gorm.Option) (Store
 		return nil, err
 	}
 	return &store{mu: new(sync.RWMutex), cache: make(map[string]Price), db: db}, nil
+}
+
+func setupTriggers(db *gorm.DB, setupPath string) error {
+	c, ioErr := os.ReadFile(setupPath)
+	if ioErr != nil {
+		return fmt.Errorf("error reading file from path : %s,error : %v", setupPath, ioErr)
+	}
+	sql := string(c)
+	tx := db.Exec(sql)
+	return tx.Error
 }
 
 func (s *store) totalVolume(from, to time.Time, config model.Network) (*big.Int, error) {

@@ -92,7 +92,7 @@ func (listener *DBListener) waitForEvent(ol *pq.Listener, sl *pq.Listener) {
 			listener.logger.Info("received order:", zap.Uint64("order id:", oid), zap.Uint64("swap id:", sid))
 			err = listener.socketPool.FilterAndBufferOrder(oid)
 			if err != nil {
-				listener.logger.Error("Failed to write order to channel", zap.Uint64("order id:", oid))
+				listener.logger.Error("Failed to write order to channel", zap.String("error", err.Error()), zap.Uint64("order id:", oid))
 			}
 		case <-time.After(90 * time.Second):
 			listener.logger.Info("Received no events for 90 seconds, checking connection")
