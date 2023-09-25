@@ -7,38 +7,32 @@ import (
 )
 
 type socketPool struct {
-	mu    *sync.RWMutex
-	pool  map[string][]chan UpdatedOrders
-	store Store
+	mu   *sync.RWMutex
+	pool map[string][]chan UpdatedOrders
 }
 
 type SocketPool interface {
-	FilterAndBufferOrder(orderId uint64) error
+	FilterAndBufferOrder(order model.Order) error
 	AddSocketChannel(creator string, channel chan UpdatedOrders)
 	RemoveSocketChannel(creator string, channel chan UpdatedOrders)
 }
 
-func NewSocketPool(pool map[string][]chan UpdatedOrders, store Store) SocketPool {
+func NewSocketPool(pool map[string][]chan UpdatedOrders) SocketPool {
 	return &socketPool{
-		mu:    new(sync.RWMutex),
-		pool:  pool,
-		store: store,
+		mu:   new(sync.RWMutex),
+		pool: pool,
 	}
 }
 
-func (s *socketPool) FilterAndBufferOrder(orderId uint64) error {
+func (s *socketPool) FilterAndBufferOrder(order model.Order) error {
 
-	order, err := s.store.GetOrder(uint(orderId))
-	if err != nil {
-		return err
-	}
 	var users []string
 	users = append(users, order.Maker)
 	if order.Taker != "" {
 		users = append(users, order.Taker)
 	}
 	var orders []model.Order
-	orders = append(orders, *order)
+	orders = append(orders, order)
 
 	s.bufferOrders(users, orders)
 	return nil

@@ -13,15 +13,17 @@ type DBListener struct {
 	dsn        string
 	socketPool SocketPool
 	logger     *zap.Logger
+	store      Store
 }
 
 func NewDBListener(dsn string,
 	socketPool SocketPool,
-	logger *zap.Logger) DBListener {
+	logger *zap.Logger, store Store) DBListener {
 	return DBListener{
 		dsn:        dsn,
 		socketPool: socketPool,
 		logger:     logger,
+		store:      store,
 	}
 
 }
@@ -71,7 +73,11 @@ func (listener *DBListener) waitForEvent(ol *pq.Listener, sl *pq.Listener) {
 				continue
 			}
 			listener.logger.Info("received order:", zap.Uint64("order id:", oid))
-			err = listener.socketPool.FilterAndBufferOrder(oid)
+			order, err := listener.store.GetOrder(uint(oid))
+			if err != nil {
+				listener.logger.Error("Failed to get order", zap.String("error", err.Error()), zap.Uint64("order id:", oid))
+			}
+			err = listener.socketPool.FilterAndBufferOrder(*order)
 			if err != nil {
 				listener.logger.Error("Failed to write order to channel", zap.Uint64("order id:", oid))
 			}
@@ -85,14 +91,14 @@ func (listener *DBListener) waitForEvent(ol *pq.Listener, sl *pq.Listener) {
 				listener.logger.Error(fmt.Sprintf("Error processing id: %v", err))
 				continue
 			}
-			if sid&1 == 1 {
-				sid += 1
-			}
-			oid := sid >> 1
-			listener.logger.Info("received order:", zap.Uint64("order id:", oid), zap.Uint64("swap id:", sid))
-			err = listener.socketPool.FilterAndBufferOrder(oid)
+			order, err := listener.store.GetOrderBySwapID(uint(sid))
 			if err != nil {
-				listener.logger.Error("Failed to write order to channel", zap.String("error", err.Error()), zap.Uint64("order id:", oid))
+				listener.logger.Error("Failed to get order by swap id", zap.String("error", err.Error()), zap.Uint64("swap id:", sid))
+			}
+			listener.logger.Info("received order:", zap.Uint64("order id:", uint64(order.ID)), zap.Uint64("swap id:", sid))
+			err = listener.socketPool.FilterAndBufferOrder(*order)
+			if err != nil {
+				listener.logger.Error("Failed to write order to channel", zap.String("error", err.Error()), zap.Uint64("order id:", uint64(order.ID)))
 			}
 		case <-time.After(90 * time.Second):
 			listener.logger.Info("Received no events for 90 seconds, checking connection")

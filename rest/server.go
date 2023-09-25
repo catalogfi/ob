@@ -54,6 +54,8 @@ type Store interface {
 	FillOrder(orderID uint, filler, sendAddress, receiveAddress string, config model.Network) error
 	// get order by id
 	GetOrder(orderID uint) (*model.Order, error)
+	// get order by atomic swap id
+	GetOrderBySwapID(swapID uint) (*model.Order, error)
 	// get orders by address
 	GetOrdersByAddress(address string) ([]model.Order, error)
 	// cancel order by id

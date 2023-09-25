@@ -41,10 +41,12 @@ func New(dialector gorm.Dialector, setupPath string, opts ...gorm.Option) (Store
 	if err != nil {
 		return nil, err
 	}
+	if setupPath != "" {
 
-	err = setupTriggers(db, setupPath)
-	if err != nil {
-		return nil, err
+		err = setupTriggers(db, setupPath)
+		if err != nil {
+			return nil, err
+		}
 	}
 	sqlDB, err := db.DB()
 	if err != nil {
@@ -585,6 +587,16 @@ func (s *store) GetOrder(orderID uint) (*model.Order, error) {
 		FollowerAtomicSwap:  &model.AtomicSwap{},
 	}
 	if tx := s.db.First(order, orderID); tx.Error != nil {
+		return nil, tx.Error
+	}
+	return order, s.fillSwapDetails(order)
+}
+func (s *store) GetOrderBySwapID(swapID uint) (*model.Order, error) {
+	order := &model.Order{
+		InitiatorAtomicSwap: &model.AtomicSwap{},
+		FollowerAtomicSwap:  &model.AtomicSwap{},
+	}
+	if tx := s.db.Where("initiator_atomic_swap_id = ? or follower_atomic_swap_id = ?", swapID, swapID).First(order); tx.Error != nil {
 		return nil, tx.Error
 	}
 	return order, s.fillSwapDetails(order)

@@ -98,8 +98,8 @@ func main() {
 		}
 
 	}
-	socketPool := rest.NewSocketPool(make(map[string][]chan rest.UpdatedOrders), store)
-	listener := rest.NewDBListener(envConfig.PSQL_DB, socketPool, logger)
+	socketPool := rest.NewSocketPool(make(map[string][]chan rest.UpdatedOrders))
+	listener := rest.NewDBListener(envConfig.PSQL_DB, socketPool, logger, store)
 	go listener.Start("updates_to_orders", "updates_to_atomic_swaps")
 
 	server := rest.NewServer(store, envConfig.CONFIG, logger, envConfig.SERVER_SECRET, socketPool, screener)
@@ -107,51 +107,3 @@ func main() {
 		panic(err)
 	}
 }
-
-// func TestnetConfig() executor.Config {
-// 	return executor.Config{
-// 		Name:            "testnet",
-// 		Params:          &chaincfg.TestNet3Params,
-// 		PrivateKey:      os.Getenv("PRIVATE_KEY"),
-// 		WBTCAddress:     os.Getenv("SEPOLIA_WBTC"),
-// 		BitcoinURL:      os.Getenv("BTC_TESTNET_RPC"),
-// 		EthereumURL:     os.Getenv("SEPOLIA_RPC"),
-// 		DeployerAddress: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
-// 	}
-// }
-
-// func EthereumConfig() executor.Config {
-// 	return executor.Config{
-// 		Name:            "ethereum",
-// 		Params:          &chaincfg.MainNetParams,
-// 		PrivateKey:      os.Getenv("PRIVATE_KEY"),
-// 		WBTCAddress:     os.Getenv("ETHEREUM_WBTC"),
-// 		BitcoinURL:      os.Getenv("BTC_RPC"),
-// 		EthereumURL:     os.Getenv("ETHEREUM_RPC"),
-// 		DeployerAddress: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
-// 	}
-// }
-
-// func OptimismConfig() executor.Config {
-// 	return executor.Config{
-// 		Name:            "optimism",
-// 		Params:          &chaincfg.MainNetParams,
-// 		PrivateKey:      os.Getenv("PRIVATE_KEY"),
-// 		WBTCAddress:     os.Getenv("OPTIMISM_WBTC"),
-// 		BitcoinURL:      os.Getenv("BTC_RPC"),
-// 		EthereumURL:     os.Getenv("OPTIMISM_RPC"),
-// 		DeployerAddress: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
-// 	}
-// }
-
-// func ArbitrumConfig() executor.Config {
-// 	return executor.Config{
-// 		Name:            "arbitrum",
-// 		Params:          &chaincfg.MainNetParams,
-// 		PrivateKey:      os.Getenv("PRIVATE_KEY"),
-// 		WBTCAddress:     os.Getenv("ARBITRUM_WBTC"),
-// 		BitcoinURL:      os.Getenv("BTC_RPC"),
-// 		EthereumURL:     os.Getenv("ARBITRUM_RPC"),
-// 		DeployerAddress: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
-// 	}
-// }

@@ -51,7 +51,6 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
-	github.com/lib/pq v1.10.9 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
@@ -87,6 +86,7 @@ require (
 	github.com/fatih/color v1.7.0
 	github.com/getsentry/sentry-go v0.18.0
 	github.com/gorilla/websocket v1.4.2
+	github.com/lib/pq v1.10.9
 	github.com/spruceid/siwe-go v0.2.0
 	go.uber.org/mock v0.2.0
 	go.uber.org/zap v1.25.0
