@@ -105,7 +105,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			if err != nil {
 				return err
 			}
-			if conf > 0 {
+			if conf > 2 {
 				order, err := store.GetOrderBySwapID(swap.ID)
 				if err != nil {
 					return fmt.Errorf("failed to get order of a non valid tx:%v", err)
