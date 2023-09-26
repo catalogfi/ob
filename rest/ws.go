@@ -178,10 +178,13 @@ func (s *Server) subscribeToUpdatedOrders(creator string, ctx context.Context) <
 	responses := make(chan UpdatedOrders)
 
 	go func() {
-		defer close(responses)
-		orderMap := map[uint]model.Order{}
+		defer func() {
+			s.socketPool.RemoveSocketChannel(creator, responses)
+			close(responses)
+		}()
 
 		for {
+			s.socketPool.AddSocketChannel(creator, responses)
 			orders, err := s.store.GetOrdersByAddress(creator)
 			if err != nil {
 				responses <- UpdatedOrders{Error: fmt.Sprintf("failed to get orders for %s: %v", creator, err)}
@@ -189,8 +192,9 @@ func (s *Server) subscribeToUpdatedOrders(creator string, ctx context.Context) <
 				return
 			}
 
-			// hasUpdated will always be true
-			newOrders, _ := updatedOrders(orderMap, orders)
+			newOrders := UpdatedOrders{
+				Orders: orders,
+			}
 			responses <- newOrders
 
 			for {
@@ -198,20 +202,6 @@ func (s *Server) subscribeToUpdatedOrders(creator string, ctx context.Context) <
 				case <-ctx.Done():
 					return
 				default:
-					newOrdersByAddr, err := s.store.GetOrdersByAddress(creator)
-					if err != nil {
-						responses <- UpdatedOrders{Error: fmt.Sprintf("failed to get orders for %s: %v", creator, err)}
-						s.logger.Error("failed to get order", zap.Error(err))
-						return
-					}
-
-					newOrders, hasUpdated := updatedOrders(orderMap, newOrdersByAddr)
-					if !hasUpdated {
-						time.Sleep(time.Second * 2)
-						continue
-					}
-
-					responses <- newOrders
 				}
 			}
 		}

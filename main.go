@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/TheZeroSlave/zapsentry"
+	"github.com/catalogfi/wbtc-garden/internal/path"
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/catalogfi/wbtc-garden/screener"
@@ -47,9 +48,8 @@ func LoadConfiguration(file string) Config {
 
 func main() {
 	// psql db
-	envConfig := LoadConfiguration("./config.json")
-	// fmt.Println(envConfig.PSQL_DB)
-	store, err := store.New(postgres.Open(envConfig.PSQL_DB), &gorm.Config{
+	envConfig := LoadConfiguration(path.ConfigPath)
+	store, err := store.New(postgres.Open(envConfig.PSQL_DB), path.SQLSetupPath, &gorm.Config{
 		NowFunc: func() time.Time { return time.Now().UTC() },
 		Logger:  logger.Default.LogMode(logger.Silent),
 	})
@@ -85,7 +85,7 @@ func main() {
 	for chain, Network := range envConfig.CONFIG.Network {
 		if chain.IsBTC() {
 			//interval is set to 10 seconds to detect iw tx's quicky
-			btcWatcher := watchers.NewBTCWatcher(store, chain, envConfig.CONFIG, screener, 10*time.Second, logger)
+			btcWatcher := watchers.NewBTCWatcher(store, chain, envConfig.CONFIG, screener, 5*time.Second, logger)
 			go btcWatcher.Watch(context.Background())
 		} else if chain.IsEVM() {
 			for asset, token := range Network.Assets {
@@ -98,56 +98,12 @@ func main() {
 		}
 
 	}
-	server := rest.NewServer(store, envConfig.CONFIG, logger, "SECRET", screener)
+	socketPool := rest.NewSocketPool(make(map[string][]chan rest.UpdatedOrders))
+	listener := rest.NewDBListener(envConfig.PSQL_DB, socketPool, logger, store)
+	go listener.Start("updates_to_orders", "updates_to_atomic_swaps")
+
+	server := rest.NewServer(store, envConfig.CONFIG, logger, envConfig.SERVER_SECRET, socketPool, screener)
 	if err := server.Run(context.Background(), fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}
 }
-
-// func TestnetConfig() executor.Config {
-// 	return executor.Config{
-// 		Name:            "testnet",
-// 		Params:          &chaincfg.TestNet3Params,
-// 		PrivateKey:      os.Getenv("PRIVATE_KEY"),
-// 		WBTCAddress:     os.Getenv("SEPOLIA_WBTC"),
-// 		BitcoinURL:      os.Getenv("BTC_TESTNET_RPC"),
-// 		EthereumURL:     os.Getenv("SEPOLIA_RPC"),
-// 		DeployerAddress: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
-// 	}
-// }
-
-// func EthereumConfig() executor.Config {
-// 	return executor.Config{
-// 		Name:            "ethereum",
-// 		Params:          &chaincfg.MainNetParams,
-// 		PrivateKey:      os.Getenv("PRIVATE_KEY"),
-// 		WBTCAddress:     os.Getenv("ETHEREUM_WBTC"),
-// 		BitcoinURL:      os.Getenv("BTC_RPC"),
-// 		EthereumURL:     os.Getenv("ETHEREUM_RPC"),
-// 		DeployerAddress: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
-// 	}
-// }
-
-// func OptimismConfig() executor.Config {
-// 	return executor.Config{
-// 		Name:            "optimism",
-// 		Params:          &chaincfg.MainNetParams,
-// 		PrivateKey:      os.Getenv("PRIVATE_KEY"),
-// 		WBTCAddress:     os.Getenv("OPTIMISM_WBTC"),
-// 		BitcoinURL:      os.Getenv("BTC_RPC"),
-// 		EthereumURL:     os.Getenv("OPTIMISM_RPC"),
-// 		DeployerAddress: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
-// 	}
-// }
-
-// func ArbitrumConfig() executor.Config {
-// 	return executor.Config{
-// 		Name:            "arbitrum",
-// 		Params:          &chaincfg.MainNetParams,
-// 		PrivateKey:      os.Getenv("PRIVATE_KEY"),
-// 		WBTCAddress:     os.Getenv("ARBITRUM_WBTC"),
-// 		BitcoinURL:      os.Getenv("BTC_RPC"),
-// 		EthereumURL:     os.Getenv("ARBITRUM_RPC"),
-// 		DeployerAddress: "0xf8fC386f964a380007a54D04Ce74E13A2033f26B",
-// 	}
-// }

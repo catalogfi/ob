@@ -170,6 +170,8 @@ type Order struct {
 	Status               Status  `json:"status"`
 	SecretNonce          uint64  `json:"secretNonce"`
 	UserBtcWalletAddress string  `json:"userBtcWalletAddress"`
+	RandomMultiplier     uint64
+	RandomScore          uint64
 
 	Fee uint `json:"fee"`
 }

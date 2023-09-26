@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/catalogfi/wbtc-garden/internal/path"
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/catalogfi/wbtc-garden/screener"
@@ -16,7 +17,7 @@ import (
 
 func main() {
 	// sqlite db
-	store, err := store.New(sqlite.Open("test.db"), &gorm.Config{
+	store, err := store.New(sqlite.Open("test.db"), path.SQLSetupPath, &gorm.Config{
 		NowFunc: func() time.Time { return time.Now().UTC() },
 	})
 	if err != nil {
@@ -54,7 +55,7 @@ func main() {
 
 	// Screen is not doing sanction check in this case
 	screener := screener.NewScreener(nil, "")
-	server := rest.NewServer(store, model.Config{Network: config}, logger, "SECRET", screener)
+	server := rest.NewServer(store, model.Config{Network: config}, logger, "SECRET", nil, screener)
 	if err := server.Run(context.Background(), ":8080"); err != nil {
 		panic(err)
 	}

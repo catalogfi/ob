@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/catalogfi/wbtc-garden/internal/path"
 	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/catalogfi/wbtc-garden/rest"
 	"github.com/catalogfi/wbtc-garden/screener"
@@ -38,9 +39,8 @@ func LoadConfiguration(file string) Config {
 
 func main() {
 	// psql db
-	envConfig := LoadConfiguration("./config.json")
-	// fmt.Println(envConfig.PSQL_DB)
-	store, err := store.New(postgres.Open(envConfig.PSQL_DB), &gorm.Config{
+	envConfig := LoadConfiguration(path.ConfigPath)
+	store, err := store.New(postgres.Open(envConfig.PSQL_DB), path.SQLSetupPath, &gorm.Config{
 		NowFunc: func() time.Time { return time.Now().UTC() },
 	})
 	if err != nil {
@@ -53,7 +53,7 @@ func main() {
 	}
 
 	screener := screener.NewScreener(store.Gorm(), envConfig.TRM_KEY)
-	server := rest.NewServer(store, envConfig.CONFIG, logger, envConfig.SERVER_SECRET, screener)
+	server := rest.NewServer(store, envConfig.CONFIG, logger, envConfig.SERVER_SECRET, nil, screener)
 	if err := server.Run(context.Background(), fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}

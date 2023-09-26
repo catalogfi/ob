@@ -17,6 +17,9 @@ type Store interface {
 	// GetActiveOrders fetches all orders which are active.
 	GetActiveOrders() ([]model.Order, error)
 
+	// get order by atomic swap id
+	GetOrderBySwapID(swapID uint) (*model.Order, error)
+
 	UpdateSwap(swap *model.AtomicSwap) error
 	GetActiveSwaps(chain model.Chain) ([]model.AtomicSwap, error)
 	SwapByOCID(ocID string) (model.AtomicSwap, error)
@@ -95,7 +98,6 @@ func ProcessOrder(order model.Order, store Store, logger *zap.Logger) (model.Ord
 	// copy secret from follower atomic swap
 	if order.Secret != order.FollowerAtomicSwap.Secret {
 		order.Secret = order.FollowerAtomicSwap.Secret
-		return order, true
 	}
 
 	// Special cases regardless of order status

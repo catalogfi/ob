@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,15 +36,41 @@ type Store interface {
 	Gorm() *gorm.DB
 }
 
-func New(dialector gorm.Dialector, opts ...gorm.Option) (Store, error) {
+func New(dialector gorm.Dialector, setupPath string, opts ...gorm.Option) (Store, error) {
 	db, err := gorm.Open(dialector, opts...)
 	if err != nil {
 		return nil, err
 	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("error getting DB instance: %v", err)
+	}
+	maxConnections := 50 // Adjust this value as needed
+	sqlDB.SetMaxIdleConns(50)
+	sqlDB.SetMaxOpenConns(maxConnections)
+	sqlDB.SetConnMaxIdleTime(10 * time.Minute)
+
 	if err := db.AutoMigrate(&model.Order{}, &model.AtomicSwap{}, &model.Blacklist{}); err != nil {
 		return nil, err
 	}
+	if setupPath != "" {
+		err = setupTriggers(db, setupPath)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &store{mu: new(sync.RWMutex), cache: make(map[string]Price), db: db}, nil
+}
+
+func setupTriggers(db *gorm.DB, setupPath string) error {
+	c, ioErr := os.ReadFile(setupPath)
+	if ioErr != nil {
+		return fmt.Errorf("error reading file from path : %s,error : %v", setupPath, ioErr)
+	}
+	sql := string(c)
+	tx := db.Exec(sql)
+	return tx.Error
 }
 
 func (s *store) totalVolume(from, to time.Time, config model.Network) (*big.Int, error) {
@@ -393,13 +420,13 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	followerAtomicSwap.OnChainIdentifier = followerSwapID
 	order.Taker = filler
 	order.Status = model.Filled
-	if tx := s.db.Save(order); tx.Error != nil {
-		return tx.Error
-	}
 	if tx := s.db.Save(initiateAtomicSwap); tx.Error != nil {
 		return tx.Error
 	}
 	if tx := s.db.Save(followerAtomicSwap); tx.Error != nil {
+		return tx.Error
+	}
+	if tx := s.db.Save(order); tx.Error != nil {
 		return tx.Error
 	}
 	return nil
@@ -564,6 +591,16 @@ func (s *store) GetOrder(orderID uint) (*model.Order, error) {
 	}
 	return order, s.fillSwapDetails(order)
 }
+func (s *store) GetOrderBySwapID(swapID uint) (*model.Order, error) {
+	order := &model.Order{
+		InitiatorAtomicSwap: &model.AtomicSwap{},
+		FollowerAtomicSwap:  &model.AtomicSwap{},
+	}
+	if tx := s.db.Where("initiator_atomic_swap_id = ? or follower_atomic_swap_id = ?", swapID, swapID).First(order); tx.Error != nil {
+		return nil, tx.Error
+	}
+	return order, s.fillSwapDetails(order)
+}
 
 // update the given order and the internal atomic swap objects on the db
 // @dev should only be used internally and cannot be called by an end user
@@ -666,47 +703,50 @@ func CheckHash(hash string) error {
 
 // value is in USD
 func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
-	// if chain.IsBTC() {
-	// 	switch {
-	// 	case value.Cmp(big.NewInt(10000)) < 1:
-	// 		return 1
+	if !chain.IsTestnet() {
+		return 0
+	}
+	if chain.IsBTC() {
+		switch {
+		case value.Cmp(big.NewInt(10000)) < 1:
+			return 1
 
-	// 	case value.Cmp(big.NewInt(100000)) < 1:
-	// 		return 2
+		case value.Cmp(big.NewInt(100000)) < 1:
+			return 2
 
-	// 	case value.Cmp(big.NewInt(1000000)) < 1:
-	// 		return 4
+		case value.Cmp(big.NewInt(1000000)) < 1:
+			return 4
 
-	// 	case value.Cmp(big.NewInt(10000000)) < 1:
-	// 		return 6
+		case value.Cmp(big.NewInt(10000000)) < 1:
+			return 6
 
-	// 	case value.Cmp(big.NewInt(100000000)) < 1:
-	// 		return 8
+		case value.Cmp(big.NewInt(100000000)) < 1:
+			return 8
 
-	// 	default:
-	// 		return 12
-	// 	}
-	// } else if chain.IsEVM() {
-	// 	switch {
-	// 	case value.Cmp(big.NewInt(10000)) < 1:
-	// 		return 6
+		default:
+			return 12
+		}
+	} else if chain.IsEVM() {
+		switch {
+		case value.Cmp(big.NewInt(10000)) < 1:
+			return 6
 
-	// 	case value.Cmp(big.NewInt(100000)) < 1:
-	// 		return 12
+		case value.Cmp(big.NewInt(100000)) < 1:
+			return 12
 
-	// 	case value.Cmp(big.NewInt(1000000)) < 1:
-	// 		return 18
+		case value.Cmp(big.NewInt(1000000)) < 1:
+			return 18
 
-	// 	case value.Cmp(big.NewInt(10000000)) < 1:
-	// 		return 24
+		case value.Cmp(big.NewInt(10000000)) < 1:
+			return 24
 
-	// 	case value.Cmp(big.NewInt(100000000)) < 1:
-	// 		return 30
+		case value.Cmp(big.NewInt(100000000)) < 1:
+			return 30
 
-	// 	default:
-	// 		return 100
-	// 	}
-	// }
+		default:
+			return 100
+		}
+	}
 	return 0
 }
 

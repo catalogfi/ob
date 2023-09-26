@@ -86,6 +86,7 @@ require (
 	github.com/fatih/color v1.7.0
 	github.com/getsentry/sentry-go v0.18.0
 	github.com/gorilla/websocket v1.4.2
+	github.com/lib/pq v1.10.9
 	github.com/spruceid/siwe-go v0.2.0
 	go.uber.org/mock v0.2.0
 	go.uber.org/zap v1.25.0

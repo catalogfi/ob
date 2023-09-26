@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/catalogfi/wbtc-garden/model"
@@ -66,7 +68,7 @@ func NewEthereumWatcher(store Store, chain model.Chain, config model.NetworkConf
 	return &EthereumWatcher{
 		chain:          chain,
 		netConfig:      config,
-		interval:       10 * time.Second,
+		interval:       5 * time.Second,
 		store:          store,
 		atomicSwapAddr: address,
 		client:         ethClient,
@@ -86,7 +88,6 @@ func (w *EthereumWatcher) Watch() {
 		w.ABI.Events["Redeemed"].ID,
 		w.ABI.Events["Refunded"].ID,
 	}}
-	w.logger.Info("asdfg", zap.String("started", "ethereum"))
 
 	for {
 		currentBlock, err := w.client.GetCurrentBlock()
@@ -108,52 +109,51 @@ func (w *EthereumWatcher) Watch() {
 			logsSlice, err := w.client.GetLogs(w.atomicSwapAddr, fromBlock, toBlock, eventIds)
 			if err != nil {
 				w.logger.Error("failed to get logs", zap.Error(err), zap.Any("sd", w.chain), zap.Any("sd", toBlock-fromBlock))
+				fetchedAll = false
+				toBlock = fromBlock
 				continue
 			}
 			logs = append(logs, logsSlice...)
 		}
-		if err != nil {
-			w.logger.Error("failed to get logs", zap.Error(err))
-			continue
-		}
+
 		fmt.Println(w.startBlock, currentBlock, len(logs))
-
-		if err := HandleEVMLogs(eventIds, logs, w.store, w.screener, w.AtomincSwap); err != nil {
-			w.logger.Error("failed to handle logs", zap.Error(err))
-			continue
+		HandleEVMLogs(eventIds, logs, w.store, w.screener, w.AtomincSwap, w.logger)
+		err = UpdateEVMConfirmations(w.store, w.chain, currentBlock)
+		if err != nil {
+			w.logger.Error("failed to update confirmations", zap.Error(err))
 		}
 
-		if err := UpdateEVMConfirmations(w.store, w.chain, currentBlock); err != nil {
-			w.logger.Error("failed to update swap confirmations", zap.Error(err))
-			continue
-		}
 		w.startBlock = currentBlock
 		time.Sleep(w.interval)
 	}
 }
 
-func HandleEVMLogs(eventIds [][]common.Hash, logs []types.Log, store Store, screener screener.Screener, contract *AtomicSwap.AtomicSwap) error {
+func HandleEVMLogs(eventIds [][]common.Hash, logs []types.Log, store Store, screener screener.Screener, contract *AtomicSwap.AtomicSwap, logger *zap.Logger) {
 	for _, log := range logs {
 		switch log.Topics[0] {
 		case eventIds[0][0]:
 			cSwap, err := contract.AtomicSwapOrders(nil, log.Topics[1])
 			if err != nil {
-				return err
+				logger.Error("failed to get swap order while handling evm logs", zap.Error(err))
+				//ignore the error and move on to the next log
+				continue
 			}
 			if err := HandleEVMInitiate(log, store, cSwap, screener); err != nil && err.Error() != "record not found" {
-				return err
+				logger.Error("failed to handle evm initiate", zap.Error(err))
+				continue
 			}
 		case eventIds[0][1]:
 			if err := HandleEVMRedeem(store, log); err != nil && err.Error() != "record not found" {
-				return err
+				logger.Error("failed to handle evm redeem", zap.Error(err))
+				continue
 			}
 		case eventIds[0][2]:
 			if err := HandleEVMRefund(store, log); err != nil && err.Error() != "record not found" {
-				return err
+				logger.Error("failed to handle evm refund", zap.Error(err))
+				continue
 			}
 		}
 	}
-	return nil
 }
 
 // update confirmation status of unconfirmed initiates
@@ -163,6 +163,10 @@ func UpdateEVMConfirmations(store Store, chain model.Chain, currentBlock uint64)
 		return err
 	}
 	for _, swap := range swaps {
+		timelock, err := strconv.ParseUint(swap.Timelock, 10, 64)
+		if err != nil {
+			return fmt.Errorf("failed to ParseUint timelock: %s", err)
+		}
 		if swap.Status == model.Detected && currentBlock > swap.InitiateBlockNumber {
 			confirmations := currentBlock - swap.InitiateBlockNumber
 			if confirmations != swap.CurrentConfirmations {
@@ -174,6 +178,12 @@ func UpdateEVMConfirmations(store Store, chain model.Chain, currentBlock uint64)
 				if err := store.UpdateSwap(&swap); err != nil {
 					return err
 				}
+			}
+		}
+		if swap.Status == model.Initiated && currentBlock > swap.InitiateBlockNumber+uint64(timelock) {
+			swap.Status = model.Expired
+			if err := store.UpdateSwap(&swap); err != nil {
+				return err
 			}
 		}
 	}
@@ -212,6 +222,11 @@ func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener
 	if cSwap.Expiry.Cmp(expiry) != 0 {
 		return fmt.Errorf("incorrect expiry: %s", swap.Amount)
 	}
+
+	if strings.ToLower(cSwap.Redeemer.String()) != strings.ToLower(swap.RedeemerAddress) {
+		return fmt.Errorf("incorrect redeemer: %s", swap.RedeemerAddress)
+	}
+
 	swap.InitiateTxHash = log.TxHash.String()
 	swap.InitiateBlockNumber = log.BlockNumber
 	swap.Status = model.Detected
