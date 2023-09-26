@@ -81,7 +81,15 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 
 func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screener screener.Screener, store Store, swap *model.AtomicSwap) error {
 
-	if swap.InitiateTxHash == "" || (swap.InitiateTxHash != "" && strings.Compare(swap.FilledAmount, swap.Amount) < 0 && swap.Chain.IsBTC()) {
+	filledAmt, err := strconv.ParseUint(swap.FilledAmount, 10, 64)
+	if err != nil {
+		return err
+	}
+	amount, err := strconv.ParseUint(swap.Amount, 10, 64)
+	if err != nil {
+		return err
+	}
+	if swap.InitiateTxHash == "" || (swap.InitiateTxHash != "" && filledAmt < amount && swap.Chain.IsBTC()) && swap.Status == model.NotStarted {
 		filledAmount, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
 		if err != nil {
 			return err
@@ -90,17 +98,24 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			return nil
 		}
 
-		amount, err := strconv.ParseUint(swap.Amount, 10, 64)
-		if err != nil {
-			return err
-		}
-
 		swap.FilledAmount = strconv.FormatUint(filledAmount, 10)
 		swap.InitiateTxHash = txHash
 		if filledAmount >= amount {
-			_, _, isIw, err := watcher.Status(swap.InitiateTxHash)
+			_, conf, isIw, err := watcher.Status(swap.InitiateTxHash)
 			if err != nil {
 				return err
+			}
+			if conf > 0 {
+				order, err := store.GetOrderBySwapID(swap.ID)
+				if err != nil {
+					return fmt.Errorf("failed to get order of a non valid tx:%v", err)
+				}
+				order.Status = model.Cancelled
+				if err = store.UpdateOrder(order); err != nil {
+					return fmt.Errorf("failed to update a non valid order:%v", err)
+				}
+				return nil
+				// TODO: blacklist this maker
 			}
 			if isIw {
 				swap.Status = model.Initiated

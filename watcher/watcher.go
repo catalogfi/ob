@@ -17,6 +17,9 @@ type Store interface {
 	// GetActiveOrders fetches all orders which are active.
 	GetActiveOrders() ([]model.Order, error)
 
+	// get order by atomic swap id
+	GetOrderBySwapID(swapID uint) (*model.Order, error)
+
 	UpdateSwap(swap *model.AtomicSwap) error
 	GetActiveSwaps(chain model.Chain) ([]model.AtomicSwap, error)
 	SwapByOCID(ocID string) (model.AtomicSwap, error)
