@@ -41,13 +41,7 @@ func New(dialector gorm.Dialector, setupPath string, opts ...gorm.Option) (Store
 	if err != nil {
 		return nil, err
 	}
-	if setupPath != "" {
 
-		err = setupTriggers(db, setupPath)
-		if err != nil {
-			return nil, err
-		}
-	}
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, fmt.Errorf("error getting DB instance: %v", err)
@@ -59,6 +53,12 @@ func New(dialector gorm.Dialector, setupPath string, opts ...gorm.Option) (Store
 
 	if err := db.AutoMigrate(&model.Order{}, &model.AtomicSwap{}, &model.Blacklist{}); err != nil {
 		return nil, err
+	}
+	if setupPath != "" {
+		err = setupTriggers(db, setupPath)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &store{mu: new(sync.RWMutex), cache: make(map[string]Price), db: db}, nil
 }
