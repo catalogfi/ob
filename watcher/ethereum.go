@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/catalogfi/wbtc-garden/model"
@@ -221,6 +222,11 @@ func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener
 	if cSwap.Expiry.Cmp(expiry) != 0 {
 		return fmt.Errorf("incorrect expiry: %s", swap.Amount)
 	}
+
+	if strings.ToLower(cSwap.Redeemer.String()) != strings.ToLower(swap.RedeemerAddress) {
+		return fmt.Errorf("incorrect redeemer: %s", swap.RedeemerAddress)
+	}
+
 	swap.InitiateTxHash = log.TxHash.String()
 	swap.InitiateBlockNumber = log.BlockNumber
 	swap.Status = model.Detected
