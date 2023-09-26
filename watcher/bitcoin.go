@@ -81,9 +81,14 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 
 func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screener screener.Screener, store Store, swap *model.AtomicSwap) error {
 
-	filledAmt, err := strconv.ParseUint(swap.FilledAmount, 10, 64)
-	if err != nil {
-		return err
+	var filledAmt uint64
+	var err error
+	filledAmt = 0
+	if swap.FilledAmount != "" {
+		filledAmt, err = strconv.ParseUint(swap.FilledAmount, 10, 64)
+		if err != nil {
+			return err
+		}
 	}
 	amount, err := strconv.ParseUint(swap.Amount, 10, 64)
 	if err != nil {
