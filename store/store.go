@@ -703,9 +703,6 @@ func CheckHash(hash string) error {
 
 // value is in USD
 func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
-	if !chain.IsTestnet() {
-		return 0
-	}
 	if chain.IsBTC() {
 		switch {
 		case value.Cmp(big.NewInt(10000)) < 1:
