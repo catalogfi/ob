@@ -335,10 +335,12 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		PriceByOracle:   followerSwapPrice.Price,
 	}
 
-	if tx := s.db.Create(&initiatorAtomicSwap); tx.Error != nil {
+	trx := s.db.Begin()
+
+	if tx := trx.Create(&initiatorAtomicSwap); tx.Error != nil {
 		return 0, tx.Error
 	}
-	if tx := s.db.Create(&followerAtomicSwap); tx.Error != nil {
+	if tx := trx.Create(&followerAtomicSwap); tx.Error != nil {
 		return 0, tx.Error
 	}
 
@@ -355,8 +357,12 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		SecretNonce:           uint64(len(orders)) + 1,
 		UserBtcWalletAddress:  userBtcWalletAddress,
 	}
-	if tx := s.db.Create(&order); tx.Error != nil {
+	if tx := trx.Create(&order); tx.Error != nil {
 		return 0, tx.Error
+	}
+
+	if err := trx.Commit().Error; err != nil {
+		return 0, err
 	}
 
 	return order.ID, nil
@@ -443,6 +449,10 @@ func (s *store) CancelOrder(creator string, orderID uint) error {
 	}
 	if order.Status != model.Created {
 		return fmt.Errorf("order can be cancelled only if it is not filled, current status: %v", order.Status)
+	}
+	order.Status = model.Cancelled
+	if tx := s.db.Save(order); tx.Error != nil {
+		return fmt.Errorf("failed to update status:%v", tx.Error)
 	}
 	if tx := s.db.Delete(order); tx.Error != nil {
 		return tx.Error
