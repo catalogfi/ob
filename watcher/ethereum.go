@@ -168,7 +168,7 @@ func UpdateEVMConfirmations(store Store, chain model.Chain, currentBlock uint64)
 			return fmt.Errorf("failed to ParseUint timelock: %s", err)
 		}
 		if swap.Status == model.Detected && currentBlock > swap.InitiateBlockNumber {
-			confirmations := currentBlock - swap.InitiateBlockNumber
+			confirmations := currentBlock - swap.InitiateBlockNumber + 1
 			if confirmations != swap.CurrentConfirmations {
 				swap.CurrentConfirmations = confirmations
 				if confirmations >= swap.MinimumConfirmations {
