@@ -177,7 +177,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			return err
 		}
 
-		if currentBlock > swap.InitiateBlockNumber+expiry {
+		if currentBlock >= swap.InitiateBlockNumber+expiry {
 			refunded, txHash, err := watcher.IsRefunded()
 			if err != nil {
 				return err
