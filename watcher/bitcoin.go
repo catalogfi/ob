@@ -39,7 +39,7 @@ func NewBTCWatcher(store Store, chain model.Chain, config model.Config, screener
 }
 
 func (w *BTCWatcher) Watch(ctx context.Context) {
-	fmt.Println("started bitcoin watcher")
+	w.logger.Info("started bitcoin watcher", zap.String("chain :", string(w.chain)))
 	for {
 		select {
 		case <-ctx.Done():
@@ -58,7 +58,7 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch active orders %v", err)
 	}
-	fmt.Println(len(swaps), "btc watcher")
+
 	for _, swap := range swaps {
 		btcClient, err := LoadBTCClient(swap.Chain, w.config.Network[swap.Chain], nil)
 		if err != nil {
@@ -306,6 +306,6 @@ func LoadBTCWatcher(client bitcoin.Client, swap model.AtomicSwap, config model.N
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("watching :", scriptAddr, " on chain :", swap.Chain)
+
 	return bitcoin.NewWatcher(scriptAddr, expiry.Int64(), swap.MinimumConfirmations, amt.Uint64(), config.IWRPC, client)
 }

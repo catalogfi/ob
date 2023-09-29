@@ -102,13 +102,13 @@ func (w *EthereumWatcher) Watch() {
 		for !fetchedAll {
 			fromBlock := toBlock
 			toBlock += w.blockSpan
-			if toBlock > currentBlock {
+			if toBlock >= currentBlock {
 				toBlock = currentBlock
 				fetchedAll = true
 			}
 			logsSlice, err := w.client.GetLogs(w.atomicSwapAddr, fromBlock, toBlock, eventIds)
 			if err != nil {
-				w.logger.Error("failed to get logs", zap.Error(err), zap.Any("sd", w.chain), zap.Any("sd", toBlock-fromBlock))
+				w.logger.Error("failed to get logs", zap.Error(err), zap.Any("chain", w.chain), zap.Any("toBlock", toBlock), zap.Any("fromBlock", fromBlock))
 				fetchedAll = false
 				toBlock = fromBlock
 				continue
@@ -116,7 +116,6 @@ func (w *EthereumWatcher) Watch() {
 			logs = append(logs, logsSlice...)
 		}
 
-		fmt.Println(w.startBlock, currentBlock, len(logs))
 		HandleEVMLogs(eventIds, logs, w.store, w.screener, w.AtomincSwap, w.logger)
 		err = UpdateEVMConfirmations(w.store, w.chain, currentBlock)
 		if err != nil {

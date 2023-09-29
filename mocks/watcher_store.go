@@ -63,6 +63,14 @@ func (mr *MockStoreMockRecorder) GetActiveSwaps(chain interface{}) *gomock.Call 
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveSwaps", reflect.TypeOf((*MockStore)(nil).GetActiveSwaps), chain)
 }
+// GetOrderBySwapID mocks base method.
+func (m *MockStore) GetOrderBySwapID(swapID uint) (*model.Order, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOrderBySwapID", swapID)
+	ret0, _ := ret[0].(*model.Order)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
 
 // SwapByOCID mocks base method.
 func (m *MockStore) SwapByOCID(ocID string) (model.AtomicSwap, error) {
