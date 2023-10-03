@@ -304,7 +304,7 @@ func (client *client) ChainID() *big.Int {
 
 func (client *client) GetLogs(contract common.Address, fromBlock, toBlock uint64, eventIds [][]common.Hash) ([]types.Log, error) {
 	intermediateToBlock := toBlock
-	if client.eventWindow < int64(fromBlock)-int64(toBlock) {
+	if client.eventWindow < int64(toBlock)-int64(fromBlock) {
 		intermediateToBlock = fromBlock + uint64(client.eventWindow)
 	}
 	eventlogs := []types.Log{}
