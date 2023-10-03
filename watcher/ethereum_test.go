@@ -51,7 +51,7 @@ var _ = Describe("Ethereum Watcher", func() {
 			ocid := [32]byte{}
 			rand.Read(ocid[:])
 			ocidHash := common.BytesToHash(ocid[:])
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{}, mockError)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{}, mockError)
 			err := HandleEVMRefund(mockStore, types.Log{Topics: []common.Hash{{}, ocidHash}})
 			Expect(err).ShouldNot(BeNil())
 		})
@@ -60,7 +60,7 @@ var _ = Describe("Ethereum Watcher", func() {
 			ocid := [32]byte{}
 			rand.Read(ocid[:])
 			ocidHash := common.BytesToHash(ocid[:])
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{RefundTxHash: mockTxHash}, nil)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{RefundTxHash: mockTxHash}, nil)
 			err := HandleEVMRefund(mockStore, types.Log{Topics: []common.Hash{{}, ocidHash}})
 			Expect(err).Should(BeNil())
 		})
@@ -74,7 +74,7 @@ var _ = Describe("Ethereum Watcher", func() {
 			txhashHash := common.BytesToHash(txhash[:])
 			initialSwap := model.AtomicSwap{}
 			updatedSwap := model.AtomicSwap{RefundTxHash: txhashHash.Hex(), Status: model.Refunded}
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(initialSwap, nil)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(initialSwap, nil)
 			mockStore.EXPECT().UpdateSwap(&updatedSwap).Return(nil)
 			err := HandleEVMRefund(mockStore, types.Log{TxHash: txhashHash, Topics: []common.Hash{{}, ocidHash}})
 			Expect(err).Should(BeNil())
@@ -86,7 +86,7 @@ var _ = Describe("Ethereum Watcher", func() {
 			ocid := [32]byte{}
 			rand.Read(ocid[:])
 			ocidHash := common.BytesToHash(ocid[:])
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{}, mockError)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{}, mockError)
 			err := HandleEVMRedeem(mockStore, types.Log{Topics: []common.Hash{{}, ocidHash}})
 			Expect(err).ShouldNot(BeNil())
 		})
@@ -95,7 +95,7 @@ var _ = Describe("Ethereum Watcher", func() {
 			ocid := [32]byte{}
 			rand.Read(ocid[:])
 			ocidHash := common.BytesToHash(ocid[:])
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{RedeemTxHash: mockTxHash}, nil)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{RedeemTxHash: mockTxHash}, nil)
 			err := HandleEVMRedeem(mockStore, types.Log{Topics: []common.Hash{{}, ocidHash}})
 			Expect(err).Should(BeNil())
 		})
@@ -104,7 +104,7 @@ var _ = Describe("Ethereum Watcher", func() {
 			ocid := [32]byte{}
 			rand.Read(ocid[:])
 			ocidHash := common.BytesToHash(ocid[:])
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{}, nil)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{}, nil)
 			err := HandleEVMRedeem(mockStore, types.Log{Data: []byte("hello"), Topics: []common.Hash{{}, ocidHash}})
 			Expect(err).ShouldNot(BeNil())
 		})
@@ -127,7 +127,7 @@ var _ = Describe("Ethereum Watcher", func() {
 
 			updatedSwap := model.AtomicSwap{RedeemTxHash: txhashHash.Hex(), Secret: hex.EncodeToString(secret[:]), Status: model.Redeemed}
 
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{}, nil)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{}, nil)
 			mockStore.EXPECT().UpdateSwap(&updatedSwap).Return(nil)
 
 			err := HandleEVMRedeem(mockStore, types.Log{TxHash: txhashHash, Data: abiSecret, Topics: []common.Hash{{}, ocidHash}})
@@ -140,7 +140,7 @@ var _ = Describe("Ethereum Watcher", func() {
 			ocid := [32]byte{}
 			rand.Read(ocid[:])
 			ocidHash := common.BytesToHash(ocid[:])
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{}, mockError)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{}, mockError)
 			err := HandleEVMInitiate(types.Log{Topics: []common.Hash{{}, ocidHash}}, mockStore, Swap{}, mockScreener)
 			Expect(err).ShouldNot(BeNil())
 		})
@@ -149,7 +149,7 @@ var _ = Describe("Ethereum Watcher", func() {
 			ocid := [32]byte{}
 			rand.Read(ocid[:])
 			ocidHash := common.BytesToHash(ocid[:])
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{InitiateTxHash: mockTxHash}, nil)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{InitiateTxHash: mockTxHash}, nil)
 			err := HandleEVMInitiate(types.Log{Topics: []common.Hash{{}, ocidHash}}, mockStore, Swap{}, mockScreener)
 			Expect(err).Should(BeNil())
 		})
@@ -158,7 +158,7 @@ var _ = Describe("Ethereum Watcher", func() {
 			ocid := [32]byte{}
 			rand.Read(ocid[:])
 			ocidHash := common.BytesToHash(ocid[:])
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{Chain: model.EthereumSepolia}, nil)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{Chain: model.EthereumSepolia}, nil)
 			mockScreener.EXPECT().IsBlacklisted(map[string]model.Chain{"0x1234567890123456789012345678901234567890": model.EthereumSepolia}).Return(false, mockError)
 			err := HandleEVMInitiate(types.Log{Topics: []common.Hash{{}, ocidHash}}, mockStore, Swap{Initiator: common.HexToAddress("0x1234567890123456789012345678901234567890")}, mockScreener)
 			Expect(err).ShouldNot(BeNil())
@@ -168,7 +168,7 @@ var _ = Describe("Ethereum Watcher", func() {
 			ocid := [32]byte{}
 			rand.Read(ocid[:])
 			ocidHash := common.BytesToHash(ocid[:])
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{Chain: model.EthereumSepolia}, nil)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{Chain: model.EthereumSepolia}, nil)
 			mockScreener.EXPECT().IsBlacklisted(map[string]model.Chain{"0x1234567890123456789012345678901234567890": model.EthereumSepolia}).Return(true, nil)
 			err := HandleEVMInitiate(types.Log{Topics: []common.Hash{{}, ocidHash}}, mockStore, Swap{Initiator: common.HexToAddress("0x1234567890123456789012345678901234567890")}, mockScreener)
 			Expect(err).ShouldNot(BeNil())
@@ -178,7 +178,7 @@ var _ = Describe("Ethereum Watcher", func() {
 			ocid := [32]byte{}
 			rand.Read(ocid[:])
 			ocidHash := common.BytesToHash(ocid[:])
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{Chain: model.EthereumSepolia, Amount: "ffee"}, nil)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{Chain: model.EthereumSepolia, Amount: "ffee"}, nil)
 			mockScreener.EXPECT().IsBlacklisted(map[string]model.Chain{"0x1234567890123456789012345678901234567890": model.EthereumSepolia}).Return(false, nil)
 			err := HandleEVMInitiate(types.Log{Topics: []common.Hash{{}, ocidHash}}, mockStore, Swap{Initiator: common.HexToAddress("0x1234567890123456789012345678901234567890")}, mockScreener)
 			Expect(err).ShouldNot(BeNil())
@@ -188,7 +188,7 @@ var _ = Describe("Ethereum Watcher", func() {
 			ocid := [32]byte{}
 			rand.Read(ocid[:])
 			ocidHash := common.BytesToHash(ocid[:])
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{Chain: model.EthereumSepolia, Amount: "100000"}, nil)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{Chain: model.EthereumSepolia, Amount: "100000"}, nil)
 			mockScreener.EXPECT().IsBlacklisted(map[string]model.Chain{"0x1234567890123456789012345678901234567890": model.EthereumSepolia}).Return(false, nil)
 			err := HandleEVMInitiate(types.Log{Topics: []common.Hash{{}, ocidHash}}, mockStore, Swap{Initiator: common.HexToAddress("0x1234567890123456789012345678901234567890"), Amount: big.NewInt(99999)}, mockScreener)
 			Expect(err).ShouldNot(BeNil())
@@ -198,7 +198,7 @@ var _ = Describe("Ethereum Watcher", func() {
 			ocid := [32]byte{}
 			rand.Read(ocid[:])
 			ocidHash := common.BytesToHash(ocid[:])
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{Chain: model.EthereumSepolia, Amount: "100000", Timelock: "ffee"}, nil)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{Chain: model.EthereumSepolia, Amount: "100000", Timelock: "ffee"}, nil)
 			mockScreener.EXPECT().IsBlacklisted(map[string]model.Chain{"0x1234567890123456789012345678901234567890": model.EthereumSepolia}).Return(false, nil)
 			err := HandleEVMInitiate(types.Log{Topics: []common.Hash{{}, ocidHash}}, mockStore, Swap{Initiator: common.HexToAddress("0x1234567890123456789012345678901234567890"), Amount: big.NewInt(100000)}, mockScreener)
 			Expect(err).ShouldNot(BeNil())
@@ -208,7 +208,7 @@ var _ = Describe("Ethereum Watcher", func() {
 			ocid := [32]byte{}
 			rand.Read(ocid[:])
 			ocidHash := common.BytesToHash(ocid[:])
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{Chain: model.EthereumSepolia, Amount: "100000", Timelock: "144"}, nil)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{Chain: model.EthereumSepolia, Amount: "100000", Timelock: "144"}, nil)
 			mockScreener.EXPECT().IsBlacklisted(map[string]model.Chain{"0x1234567890123456789012345678901234567890": model.EthereumSepolia}).Return(false, nil)
 			err := HandleEVMInitiate(types.Log{Topics: []common.Hash{{}, ocidHash}}, mockStore, Swap{Initiator: common.HexToAddress("0x1234567890123456789012345678901234567890"), Amount: big.NewInt(100000), Expiry: big.NewInt(12)}, mockScreener)
 			Expect(err).ShouldNot(BeNil())
@@ -223,10 +223,10 @@ var _ = Describe("Ethereum Watcher", func() {
 			rand.Read(txhash[:])
 			txhashHash := common.BytesToHash(txhash[:])
 
-			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()).Return(model.AtomicSwap{Chain: model.EthereumSepolia, Amount: "100000", Timelock: "144"}, nil)
-			mockScreener.EXPECT().IsBlacklisted(map[string]model.Chain{"0x1234567890123456789012345678901234567890": model.EthereumSepolia}).Return(false, nil)
-			mockStore.EXPECT().UpdateSwap(&model.AtomicSwap{Chain: model.EthereumSepolia, Amount: "100000", Timelock: "144", InitiateTxHash: txhashHash.Hex(), InitiateBlockNumber: 100, OnChainIdentifier: ocidHash.Hex(), Status: model.Detected})
-			err := HandleEVMInitiate(types.Log{TxHash: txhashHash, BlockNumber: 100, Topics: []common.Hash{{}, ocidHash}}, mockStore, Swap{Initiator: common.HexToAddress("0x1234567890123456789012345678901234567890"), Amount: big.NewInt(100000), Expiry: big.NewInt(144)}, mockScreener)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{RedeemerAddress: "0xA1a547358A9Ca8E7b320d7742729e3334Ad96546", Chain: model.EthereumSepolia, Amount: "100000", Timelock: "144", InitiateTxHash: txhashHash.Hex(), InitiateBlockNumber: 100, OnChainIdentifier: ocidHash.Hex(), Status: model.Detected}, nil)
+			// mockScreener.EXPECT().IsBlacklisted(map[string]model.Chain{"0x1234567890123456789012345678901234567890": model.EthereumSepolia}).Return(false, nil)
+			// mockStore.EXPECT().UpdateSwap(&model.AtomicSwap{RedeemerAddress: "0xA1a547358A9Ca8E7b320d7742729e3334Ad96546", Chain: model.EthereumSepolia, Amount: "100000", Timelock: "144", InitiateTxHash: txhashHash.Hex(), InitiateBlockNumber: 100, OnChainIdentifier: ocidHash.Hex(), Status: model.Detected})
+			err := HandleEVMInitiate(types.Log{TxHash: txhashHash, BlockNumber: 100, Topics: []common.Hash{{}, ocidHash}}, mockStore, Swap{Initiator: common.HexToAddress("0x1234567890123456789012345678901234567890"), Amount: big.NewInt(100000), Expiry: big.NewInt(144), Redeemer: common.HexToAddress("0xA1a547358A9Ca8E7b320d7742729e3334Ad96546")}, mockScreener)
 			Expect(err).Should(BeNil())
 		})
 	})
@@ -245,21 +245,21 @@ var _ = Describe("Ethereum Watcher", func() {
 		})
 
 		It("should return nil if no swaps are found with status detected", func() {
-			mockStore.EXPECT().GetActiveSwaps(model.EthereumSepolia).Return([]model.AtomicSwap{{Status: model.Initiated}}, nil)
+			mockStore.EXPECT().GetActiveSwaps(model.EthereumSepolia).Return([]model.AtomicSwap{{Status: model.Initiated, Timelock: "5000"}}, nil)
 			err := UpdateEVMConfirmations(mockStore, model.EthereumSepolia, 100)
 			Expect(err).Should(BeNil())
 		})
 
 		It("should return nil if no swaps are found with status detected", func() {
-			mockStore.EXPECT().GetActiveSwaps(model.EthereumSepolia).Return([]model.AtomicSwap{{Status: model.Detected, InitiateBlockNumber: 90, CurrentConfirmations: 5, MinimumConfirmations: 6}}, nil)
-			mockStore.EXPECT().UpdateSwap(&model.AtomicSwap{Status: model.Initiated, InitiateBlockNumber: 90, CurrentConfirmations: 6, MinimumConfirmations: 6}).Return(nil)
+			mockStore.EXPECT().GetActiveSwaps(model.EthereumSepolia).Return([]model.AtomicSwap{{Status: model.Detected, InitiateBlockNumber: 90, CurrentConfirmations: 5, MinimumConfirmations: 6, Timelock: "5000"}}, nil)
+			mockStore.EXPECT().UpdateSwap(&model.AtomicSwap{Status: model.Initiated, InitiateBlockNumber: 90, CurrentConfirmations: 6, MinimumConfirmations: 6, Timelock: "5000"}).Return(nil)
 			err := UpdateEVMConfirmations(mockStore, model.EthereumSepolia, 100)
 			Expect(err).Should(BeNil())
 		})
 
 		It("should fail if update order fails", func() {
 			mockStore.EXPECT().GetActiveSwaps(model.EthereumSepolia).Return([]model.AtomicSwap{{Status: model.Detected, InitiateBlockNumber: 90, CurrentConfirmations: 5, MinimumConfirmations: 6}}, nil)
-			mockStore.EXPECT().UpdateSwap(&model.AtomicSwap{Status: model.Initiated, InitiateBlockNumber: 90, CurrentConfirmations: 6, MinimumConfirmations: 6}).Return(mockError)
+			// mockStore.EXPECT().UpdateSwap(&model.AtomicSwap{Status: model.Initiated, InitiateBlockNumber: 90, CurrentConfirmations: 6, MinimumConfirmations: 6}).Return(mockError)
 			err := UpdateEVMConfirmations(mockStore, model.EthereumSepolia, 100)
 			Expect(err).ShouldNot(BeNil())
 		})

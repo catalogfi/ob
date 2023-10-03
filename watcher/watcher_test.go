@@ -162,7 +162,7 @@ var _ = Describe("Watcher", func() {
 			order := model.Order{
 				Status: model.Filled,
 				InitiatorAtomicSwap: &model.AtomicSwap{
-					Status: model.Initiated,
+					Status: model.Redeemed,
 				},
 				FollowerAtomicSwap: &model.AtomicSwap{
 					Status: model.Redeemed,
@@ -170,10 +170,10 @@ var _ = Describe("Watcher", func() {
 				},
 			}
 			updatedOrder := model.Order{
-				Status: model.Filled,
+				Status: model.Executed,
 				Secret: "secret",
 				InitiatorAtomicSwap: &model.AtomicSwap{
-					Status: model.Initiated,
+					Status: model.Redeemed,
 				},
 				FollowerAtomicSwap: &model.AtomicSwap{
 					Status: model.Redeemed,
@@ -182,9 +182,9 @@ var _ = Describe("Watcher", func() {
 			}
 			updatedOrder, ctn := ProcessOrder(order, mockStore, logger)
 			Expect(ctn).To(BeTrue())
-			Expect(updatedOrder.Status).To(Equal(model.Filled))
+			Expect(updatedOrder.Status).To(Equal(model.Executed))
 			Expect(updatedOrder.Secret).To(Equal(updatedOrder.FollowerAtomicSwap.Secret))
-		})
+		})git ch
 
 		It("should cancel an order if OrderTimeout passes", func() {
 			createdAt := time.Now().Add(-OrderTimeout - time.Minute)
