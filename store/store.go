@@ -696,13 +696,14 @@ func GetSwapId(Chain model.Chain, InitiatorAddress string, RedeemerAddress strin
 func CheckAddress(chain model.Chain, address string) error {
 	if chain.IsEVM() {
 		if address[:2] == "0x" {
-			if len(address) != 42 {
-				return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
-			}
-		} else {
-			if len(address) == 40 {
-				return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
-			}
+			address = address[2:]
+		}
+		if len(address) != 40 {
+			return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
+		}
+		_, err := hex.DecodeString(address)
+		if err != nil {
+			return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
 		}
 	} else if chain.IsBTC() {
 		_, err := btcutil.DecodeAddress(address, getParams(chain))
