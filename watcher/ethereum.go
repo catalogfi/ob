@@ -27,7 +27,7 @@ type EthereumWatcher struct {
 	atomicSwapAddr common.Address
 	client         ethereum.Client
 	ABI            *abi.ABI
-	AtomincSwap    *AtomicSwap.AtomicSwap
+	AtomicSwap     *AtomicSwap.AtomicSwap
 	screener       screener.Screener
 	logger         *zap.Logger
 	ignoreOrders   map[string]bool
@@ -42,6 +42,8 @@ type Swap struct {
 	Amount      *big.Int
 	IsFulfilled bool
 }
+
+var retryCount = 5
 
 func NewEthereumWatchers(store Store, config model.Config, screener screener.Screener, logger *zap.Logger) ([]*EthereumWatcher, error) {
 	var watchers []*EthereumWatcher
@@ -73,7 +75,7 @@ func NewEthereumWatcher(store Store, chain model.Chain, config model.NetworkConf
 		atomicSwapAddr: address,
 		client:         ethClient,
 		startBlock:     startBlock,
-		AtomincSwap:    atomicSwap,
+		AtomicSwap:     atomicSwap,
 		screener:       screener,
 		ABI:            atomicSwapAbi,
 		logger:         logger,
@@ -88,7 +90,6 @@ func (w *EthereumWatcher) Watch() {
 		w.ABI.Events["Redeemed"].ID,
 		w.ABI.Events["Refunded"].ID,
 	}}
-
 	for {
 		currentBlock, err := w.client.GetCurrentBlock()
 		if err != nil {
@@ -116,7 +117,14 @@ func (w *EthereumWatcher) Watch() {
 			logs = append(logs, logsSlice...)
 		}
 
-		HandleEVMLogs(eventIds, logs, w.store, w.screener, w.AtomincSwap, w.logger)
+		werr := HandleEVMLogs(eventIds, logs, w.store, w.screener, w.AtomicSwap, w.logger)
+		if werr != nil {
+			if werr.isUnrecoverable() {
+				w.logger.Error("an unrecoverable error occurred while handling evm logs, shutting down", zap.Error(werr.Err), zap.Any("chain", w.chain))
+				return
+			}
+			w.logger.Error("failed to handle evm logs", zap.Error(werr.Err))
+		}
 		err = UpdateEVMConfirmations(w.store, w.chain, currentBlock)
 		if err != nil {
 			w.logger.Error("failed to update confirmations", zap.Error(err))
@@ -127,32 +135,42 @@ func (w *EthereumWatcher) Watch() {
 	}
 }
 
-func HandleEVMLogs(eventIds [][]common.Hash, logs []types.Log, store Store, screener screener.Screener, contract *AtomicSwap.AtomicSwap, logger *zap.Logger) {
+func HandleEVMLogs(eventIds [][]common.Hash, logs []types.Log, store Store, screener screener.Screener, contract *AtomicSwap.AtomicSwap, logger *zap.Logger) *WatcherError {
 	for _, log := range logs {
 		switch log.Topics[0] {
 		case eventIds[0][0]:
-			cSwap, err := contract.AtomicSwapOrders(nil, log.Topics[1])
+			cSwap, err := RetryWithReturnValue(func() (Swap, error) {
+				return contract.AtomicSwapOrders(nil, log.Topics[1])
+			}, retryCount)
 			if err != nil {
-				logger.Error("failed to get swap order while handling evm logs", zap.Error(err))
-				//ignore the error and move on to the next log
-				continue
+				return NewWatcherError(fmt.Errorf("failed to get swap order: %s", err))
 			}
-			if err := HandleEVMInitiate(log, store, cSwap, screener); err != nil && err.Error() != "record not found" {
-				logger.Error("failed to handle evm initiate", zap.Error(err))
-				continue
+			handler := func() *WatcherError {
+				return HandleEVMInitiate(log, store, cSwap, screener)
+			}
+			wErr := RetryOnWatcherError(handler, retryCount)
+			if wErr != nil && wErr.isUnrecoverable() {
+				return wErr
 			}
 		case eventIds[0][1]:
-			if err := HandleEVMRedeem(store, log); err != nil && err.Error() != "record not found" {
-				logger.Error("failed to handle evm redeem", zap.Error(err))
-				continue
+			handler := func() *WatcherError {
+				return HandleEVMRedeem(store, log)
+			}
+			err := RetryOnWatcherError(handler, retryCount)
+			if err != nil && err.isUnrecoverable() {
+				return err
 			}
 		case eventIds[0][2]:
-			if err := HandleEVMRefund(store, log); err != nil && err.Error() != "record not found" {
-				logger.Error("failed to handle evm refund", zap.Error(err))
-				continue
+			handler := func() *WatcherError {
+				return HandleEVMRefund(store, log)
+			}
+			err := RetryOnWatcherError(handler, retryCount)
+			if err != nil && err.isUnrecoverable() {
+				return err
 			}
 		}
 	}
+	return nil
 }
 
 // update confirmation status of unconfirmed initiates
@@ -189,10 +207,17 @@ func UpdateEVMConfirmations(store Store, chain model.Chain, currentBlock uint64)
 	return nil
 }
 
-func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener.Screener) error {
+func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener.Screener) *WatcherError {
 	swap, err := store.SwapByOCID(log.Topics[1].Hex()[2:])
 	if err != nil {
-		return err
+		if err.Error() != "record not found" {
+			// we just ignore the error and move on to the next log
+			return nil
+		}
+		return NewWatcherError(
+			fmt.Errorf("failed to get swap by ocid: %s", err),
+			WithRecoverable,
+		)
 	}
 	if swap.InitiateTxHash != "" {
 		return nil
@@ -200,65 +225,131 @@ func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener
 
 	isBlacklisted, err := screener.IsBlacklisted(map[string]model.Chain{cSwap.Initiator.Hex(): swap.Chain})
 	if err != nil {
-		return err
+		return NewWatcherError(fmt.Errorf("failed to check if address is blacklisted, %s", cSwap.Initiator.Hex()), WithRecoverable)
 	}
 	if isBlacklisted {
-		return fmt.Errorf("blacklisted deposits detected")
+		return NewWatcherError(fmt.Errorf("address is blacklisted, %s", cSwap.Initiator.Hex()), WithIgnore)
 	}
 
 	amount, ok := new(big.Int).SetString(swap.Amount, 10)
 	if !ok {
-		return fmt.Errorf("invalid amount: %s", swap.Amount)
+		return NewWatcherError(fmt.Errorf("invalid amount: %s", swap.Amount), WithIgnore)
 	}
 	if cSwap.Amount.Cmp(amount) < 0 {
-		return fmt.Errorf("insufficient amount: %s", swap.Amount)
+		return NewWatcherError(fmt.Errorf("insufficient amount: %s", swap.Amount), WithIgnore)
 	}
 	expiry, ok := new(big.Int).SetString(swap.Timelock, 10)
 	if !ok {
-		return fmt.Errorf("failed to decode timelock: %s", err)
+		return NewWatcherError(fmt.Errorf("failed to decode timelock: %s", err), WithIgnore)
 	}
 
 	if cSwap.Expiry.Cmp(expiry) != 0 {
-		return fmt.Errorf("incorrect expiry: %s", swap.Amount)
+		return NewWatcherError(fmt.Errorf("incorrect expiry: %s", swap.Amount), WithIgnore)
 	}
 
 	if strings.ToLower(cSwap.Redeemer.String()) != strings.ToLower(swap.RedeemerAddress) {
-		return fmt.Errorf("incorrect redeemer: %s", swap.RedeemerAddress)
+		return NewWatcherError(fmt.Errorf("incorrect redeemer: %s", swap.RedeemerAddress), WithIgnore)
 	}
 
 	swap.InitiateTxHash = log.TxHash.String()
 	swap.InitiateBlockNumber = log.BlockNumber
 	swap.Status = model.Detected
 
-	return store.UpdateSwap(&swap)
+	err = store.UpdateSwap(&swap)
+	if err != nil {
+		return NewWatcherError(fmt.Errorf("failed to update swap: %s", err), WithRecoverable)
+	}
+	return nil
 }
 
-func HandleEVMRedeem(store Store, log types.Log) error {
+func HandleEVMRedeem(store Store, log types.Log) *WatcherError {
 	swap, err := store.SwapByOCID(log.Topics[1].Hex()[2:])
+
 	if err != nil {
-		return err
+		if err.Error() != "record not found" {
+			// we just ignore the error and move on to the next log
+			return nil
+		}
+		return NewWatcherError(
+			fmt.Errorf("failed to get swap by ocid: %s", err),
+			WithRecoverable,
+		)
 	}
+
 	if swap.RedeemTxHash != "" {
 		return nil
 	}
 	if len(log.Data) < 64 {
-		return fmt.Errorf("invalid log data: %x", log.Data)
+		return NewWatcherError(
+			fmt.Errorf("invalid log data: %x", log.Data),
+			WithIgnore,
+		)
 	}
 	swap.Secret = hex.EncodeToString(log.Data[64:])
 	swap.RedeemTxHash = log.TxHash.Hex()
 	swap.Status = model.Redeemed
-	return store.UpdateSwap(&swap)
+	err = store.UpdateSwap(&swap)
+	if err != nil {
+		return NewWatcherError(
+			fmt.Errorf("failed to update swap: %s", err),
+			WithRecoverable,
+		)
+	}
+	return nil
 }
 
-func HandleEVMRefund(store Store, log types.Log) error {
+func HandleEVMRefund(store Store, log types.Log) *WatcherError {
 	swap, err := store.SwapByOCID(log.Topics[1].Hex()[2:])
 	if err != nil {
-		return err
+		if err.Error() != "record not found" {
+			// we just ignore the error and move on to the next log
+			return nil
+		}
+		return NewWatcherError(
+			fmt.Errorf("failed to get swap by ocid: %s", err),
+			WithRecoverable,
+		)
 	}
 	if swap.RefundTxHash != "" {
 		return nil
 	}
 	swap.RefundTxHash = log.TxHash.String()
 	swap.Status = model.Refunded
-	return store.UpdateSwap(&swap)
+	err = store.UpdateSwap(&swap)
+	if err != nil {
+		return NewWatcherError(
+			fmt.Errorf("failed to update swap: %s", err),
+			WithRecoverable,
+		)
+	}
+	return nil
+}
+
+func RetryOnWatcherError(f func() *WatcherError, retries int) *WatcherError {
+	var err *WatcherError
+	for i := 0; i < retries; i++ {
+		err = f()
+		if err == nil {
+			return nil
+		}
+		if err.ignore || !err.Recoverable {
+			return err
+		}
+		time.Sleep(time.Duration(retries) * 1000 * time.Millisecond)
+	}
+	err.Recoverable = false
+	return err
+}
+
+func RetryWithReturnValue[T any](f func() (T, error), retries int) (T, error) {
+	var err error
+	var nilData T
+	for i := 0; i < retries; i++ {
+		data, err := f()
+		if err == nil {
+			return data, nil
+		}
+		time.Sleep(time.Duration(retries) * 1000 * time.Millisecond)
+	}
+	return nilData, err
 }
