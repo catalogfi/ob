@@ -2,6 +2,7 @@ package watcher
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type EthereumWatcher struct {
@@ -90,40 +92,37 @@ func (w *EthereumWatcher) Watch() {
 		w.ABI.Events["Redeemed"].ID,
 		w.ABI.Events["Refunded"].ID,
 	}}
+
 	for {
 		currentBlock, err := w.client.GetCurrentBlock()
 		if err != nil {
 			w.logger.Error("failed to get current block number", zap.Error(err))
 			continue
 		}
-
-		var logs []types.Log
-		toBlock := w.startBlock
-		fetchedAll := false
-		for !fetchedAll {
-			fromBlock := toBlock
-			toBlock += w.blockSpan
-			if toBlock >= currentBlock {
-				toBlock = currentBlock
-				fetchedAll = true
-			}
-			logsSlice, err := w.client.GetLogs(w.atomicSwapAddr, fromBlock, toBlock, eventIds)
-			if err != nil {
-				w.logger.Error("failed to get logs", zap.Error(err), zap.Any("chain", w.chain), zap.Any("toBlock", toBlock), zap.Any("fromBlock", fromBlock))
-				fetchedAll = false
-				toBlock = fromBlock
-				continue
-			}
-			logs = append(logs, logsSlice...)
+		if w.startBlock == currentBlock {
+			time.Sleep(1 * time.Second)
+			continue
+		} else if w.startBlock > currentBlock {
+			//this might happen because of a reorg or rpc is giving incorrect block number
+			//So when this happens, just process it again.
+			w.logger.Error("start block is greater than current block", zap.Uint64("startBlock", w.startBlock), zap.Uint64("currentBlock", currentBlock))
+			w.startBlock = currentBlock
 		}
-
-		werr := HandleEVMLogs(eventIds, logs, w.store, w.screener, w.AtomicSwap, w.logger)
+		fromBlock := w.startBlock
+		toBlock := currentBlock
+		logsSlice, err := w.client.GetLogs(w.atomicSwapAddr, fromBlock, toBlock, eventIds, w.blockSpan)
+		if err != nil {
+			w.logger.Error("failed to get logs", zap.Error(err))
+			continue
+		}
+		werr := HandleEVMLogs(eventIds, logsSlice, w.store, w.screener, w.AtomicSwap, w.logger)
 		if werr != nil {
-			if werr.isUnrecoverable() {
-				w.logger.Error("an unrecoverable error occurred while handling evm logs, shutting down", zap.Error(werr.Err), zap.Any("chain", w.chain))
+			var nonrecoverable *NonRecoverableError
+			if errors.As(werr, &nonrecoverable) {
+				w.logger.Error("an unrecoverable error occurred while handling evm logs, shutting down", zap.Error(werr), zap.Any("chain", w.chain))
 				return
 			}
-			w.logger.Error("failed to handle evm logs", zap.Error(werr.Err))
+			w.logger.Error("failed to handle evm logs", zap.Error(werr))
 		}
 		err = UpdateEVMConfirmations(w.store, w.chain, currentBlock)
 		if err != nil {
@@ -135,7 +134,7 @@ func (w *EthereumWatcher) Watch() {
 	}
 }
 
-func HandleEVMLogs(eventIds [][]common.Hash, logs []types.Log, store Store, screener screener.Screener, contract *AtomicSwap.AtomicSwap, logger *zap.Logger) *WatcherError {
+func HandleEVMLogs(eventIds [][]common.Hash, logs []types.Log, store Store, screener screener.Screener, contract *AtomicSwap.AtomicSwap, logger *zap.Logger) error {
 	for _, log := range logs {
 		switch log.Topics[0] {
 		case eventIds[0][0]:
@@ -143,29 +142,32 @@ func HandleEVMLogs(eventIds [][]common.Hash, logs []types.Log, store Store, scre
 				return contract.AtomicSwapOrders(nil, log.Topics[1])
 			}, retryCount)
 			if err != nil {
-				return NewWatcherError(fmt.Errorf("failed to get swap order: %s", err))
+				return NewNonRecoverableError(fmt.Errorf("failed to get swap order: %s", err))
 			}
-			handler := func() *WatcherError {
+			handler := func() error {
 				return HandleEVMInitiate(log, store, cSwap, screener)
 			}
 			wErr := RetryOnWatcherError(handler, retryCount)
-			if wErr != nil && wErr.isUnrecoverable() {
+			var nonrecoverable *NonRecoverableError
+			if wErr != nil && errors.As(wErr, &nonrecoverable) {
 				return wErr
 			}
 		case eventIds[0][1]:
-			handler := func() *WatcherError {
+			handler := func() error {
 				return HandleEVMRedeem(store, log)
 			}
 			err := RetryOnWatcherError(handler, retryCount)
-			if err != nil && err.isUnrecoverable() {
+			var nonrecoverable *NonRecoverableError
+			if err != nil && errors.As(err, &nonrecoverable) {
 				return err
 			}
 		case eventIds[0][2]:
-			handler := func() *WatcherError {
+			handler := func() error {
 				return HandleEVMRefund(store, log)
 			}
 			err := RetryOnWatcherError(handler, retryCount)
-			if err != nil && err.isUnrecoverable() {
+			var nonrecoverable *NonRecoverableError
+			if err != nil && errors.As(err, &nonrecoverable) {
 				return err
 			}
 		}
@@ -207,17 +209,13 @@ func UpdateEVMConfirmations(store Store, chain model.Chain, currentBlock uint64)
 	return nil
 }
 
-func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener.Screener) *WatcherError {
+func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener.Screener) error {
 	swap, err := store.SwapByOCID(log.Topics[1].Hex()[2:])
 	if err != nil {
-		if err.Error() != "record not found" {
-			// we just ignore the error and move on to the next log
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
 		}
-		return NewWatcherError(
-			fmt.Errorf("failed to get swap by ocid: %s", err),
-			WithRecoverable,
-		)
+		return NewRecoverableError(fmt.Errorf("failed to get swap by ocid: %s", err))
 	}
 	if swap.InitiateTxHash != "" {
 		return nil
@@ -225,30 +223,30 @@ func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener
 
 	isBlacklisted, err := screener.IsBlacklisted(map[string]model.Chain{cSwap.Initiator.Hex(): swap.Chain})
 	if err != nil {
-		return NewWatcherError(fmt.Errorf("failed to check if address is blacklisted, %s", cSwap.Initiator.Hex()), WithRecoverable)
+		return NewRecoverableError(fmt.Errorf("failed to check if address is blacklisted, %s", cSwap.Initiator.Hex()))
 	}
 	if isBlacklisted {
-		return NewWatcherError(fmt.Errorf("address is blacklisted, %s", cSwap.Initiator.Hex()), WithIgnore)
+		return NewIgnorableError(fmt.Errorf("address is blacklisted, %s", cSwap.Initiator.Hex()))
 	}
 
 	amount, ok := new(big.Int).SetString(swap.Amount, 10)
 	if !ok {
-		return NewWatcherError(fmt.Errorf("invalid amount: %s", swap.Amount), WithIgnore)
+		return NewIgnorableError(fmt.Errorf("invalid amount: %s", swap.Amount))
 	}
 	if cSwap.Amount.Cmp(amount) < 0 {
-		return NewWatcherError(fmt.Errorf("insufficient amount: %s", swap.Amount), WithIgnore)
+		return NewIgnorableError(fmt.Errorf("insufficient amount: %s", swap.Amount))
 	}
 	expiry, ok := new(big.Int).SetString(swap.Timelock, 10)
 	if !ok {
-		return NewWatcherError(fmt.Errorf("failed to decode timelock: %s", err), WithIgnore)
+		return NewIgnorableError(fmt.Errorf("failed to decode timelock: %s", err))
 	}
 
 	if cSwap.Expiry.Cmp(expiry) != 0 {
-		return NewWatcherError(fmt.Errorf("incorrect expiry: %s", swap.Amount), WithIgnore)
+		return NewIgnorableError(fmt.Errorf("incorrect expiry: %s", swap.Amount))
 	}
 
 	if strings.ToLower(cSwap.Redeemer.String()) != strings.ToLower(swap.RedeemerAddress) {
-		return NewWatcherError(fmt.Errorf("incorrect redeemer: %s", swap.RedeemerAddress), WithIgnore)
+		return NewIgnorableError(fmt.Errorf("incorrect redeemer: %s", swap.RedeemerAddress))
 	}
 
 	swap.InitiateTxHash = log.TxHash.String()
@@ -257,22 +255,20 @@ func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener
 
 	err = store.UpdateSwap(&swap)
 	if err != nil {
-		return NewWatcherError(fmt.Errorf("failed to update swap: %s", err), WithRecoverable)
+		return NewRecoverableError(fmt.Errorf("failed to update swap: %s", err))
 	}
 	return nil
 }
 
-func HandleEVMRedeem(store Store, log types.Log) *WatcherError {
+func HandleEVMRedeem(store Store, log types.Log) error {
 	swap, err := store.SwapByOCID(log.Topics[1].Hex()[2:])
 
 	if err != nil {
-		if err.Error() != "record not found" {
-			// we just ignore the error and move on to the next log
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
 		}
-		return NewWatcherError(
+		return NewRecoverableError(
 			fmt.Errorf("failed to get swap by ocid: %s", err),
-			WithRecoverable,
 		)
 	}
 
@@ -280,9 +276,8 @@ func HandleEVMRedeem(store Store, log types.Log) *WatcherError {
 		return nil
 	}
 	if len(log.Data) < 64 {
-		return NewWatcherError(
+		return NewIgnorableError(
 			fmt.Errorf("invalid log data: %x", log.Data),
-			WithIgnore,
 		)
 	}
 	swap.Secret = hex.EncodeToString(log.Data[64:])
@@ -290,24 +285,21 @@ func HandleEVMRedeem(store Store, log types.Log) *WatcherError {
 	swap.Status = model.Redeemed
 	err = store.UpdateSwap(&swap)
 	if err != nil {
-		return NewWatcherError(
+		return NewRecoverableError(
 			fmt.Errorf("failed to update swap: %s", err),
-			WithRecoverable,
 		)
 	}
 	return nil
 }
 
-func HandleEVMRefund(store Store, log types.Log) *WatcherError {
+func HandleEVMRefund(store Store, log types.Log) error {
 	swap, err := store.SwapByOCID(log.Topics[1].Hex()[2:])
 	if err != nil {
-		if err.Error() != "record not found" {
-			// we just ignore the error and move on to the next log
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
 		}
-		return NewWatcherError(
+		return NewRecoverableError(
 			fmt.Errorf("failed to get swap by ocid: %s", err),
-			WithRecoverable,
 		)
 	}
 	if swap.RefundTxHash != "" {
@@ -317,28 +309,32 @@ func HandleEVMRefund(store Store, log types.Log) *WatcherError {
 	swap.Status = model.Refunded
 	err = store.UpdateSwap(&swap)
 	if err != nil {
-		return NewWatcherError(
+		return NewRecoverableError(
 			fmt.Errorf("failed to update swap: %s", err),
-			WithRecoverable,
 		)
 	}
 	return nil
 }
 
-func RetryOnWatcherError(f func() *WatcherError, retries int) *WatcherError {
-	var err *WatcherError
+func RetryOnWatcherError(f func() error, retries int) error {
+	var err error
 	for i := 0; i < retries; i++ {
 		err = f()
 		if err == nil {
 			return nil
 		}
-		if err.ignore || !err.Recoverable {
+		var nonRecoverable *NonRecoverableError
+		var ignorable *IgnorableError
+		if errors.As(err, &nonRecoverable) || errors.As(err, &ignorable) {
 			return err
+		}
+		if i == retries-1 {
+			//do not sleep on last retry
+			break
 		}
 		time.Sleep(time.Duration(retries) * 1000 * time.Millisecond)
 	}
-	err.Recoverable = false
-	return err
+	return NewNonRecoverableError(err)
 }
 
 func RetryWithReturnValue[T any](f func() (T, error), retries int) (T, error) {

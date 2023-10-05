@@ -1,37 +1,37 @@
 package watcher
 
-type WatcherError struct {
-	Err         error
-	Recoverable bool
-	ignore      bool
+type NonRecoverableError struct {
+	Err error
 }
 
-func (e *WatcherError) Error() string {
+func NewNonRecoverableError(err error) *NonRecoverableError {
+	return &NonRecoverableError{Err: err}
+}
+
+func (e *NonRecoverableError) Error() string {
 	return e.Err.Error()
 }
 
-func (e *WatcherError) isUnrecoverable() bool {
-	return e.Recoverable && !e.ignore
+type RecoverableError struct {
+	Err error
 }
 
-func NewWatcherError(err error, opts ...WatcherErrorOpts) *WatcherError {
-	watcherError := &WatcherError{
-		Err:         err,
-		Recoverable: false,
-		ignore:      false,
-	}
-	for _, opt := range opts {
-		opt(watcherError)
-	}
-	return watcherError
+func NewRecoverableError(err error) *RecoverableError {
+	return &RecoverableError{Err: err}
 }
 
-type WatcherErrorOpts func(*WatcherError)
-
-func WithRecoverable(err *WatcherError) {
-	err.Recoverable = true
+func (e *RecoverableError) Error() string {
+	return e.Err.Error()
 }
 
-func WithIgnore(err *WatcherError) {
-	err.ignore = true
+type IgnorableError struct {
+	Err error
+}
+
+func NewIgnorableError(err error) *IgnorableError {
+	return &IgnorableError{Err: err}
+}
+
+func (e *IgnorableError) Error() string {
+	return e.Err.Error()
 }
