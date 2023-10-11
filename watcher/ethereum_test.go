@@ -16,12 +16,13 @@ import (
 	. "github.com/onsi/gomega"
 
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 )
 
 var _ = Describe("Ethereum Watcher", func() {
 	defer GinkgoRecover()
 
-	// logger := zap.NewNop()
+	logger := zap.NewNop()
 	var (
 		mockCtrl *gomock.Controller
 		// mockWatcher   *mocks.MockWatcher
@@ -145,6 +146,27 @@ var _ = Describe("Ethereum Watcher", func() {
 			Expect(err).ShouldNot(BeNil())
 		})
 
+		It("should fail if reedemer is incorrect", func() {
+			ocid := [32]byte{}
+			rand.Read(ocid[:])
+			ocidHash := common.BytesToHash(ocid[:])
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{RedeemerAddress: "0xA1a547358A9Ca8E7b320d7742729e3334Ad96546", Chain: model.EthereumSepolia, Amount: "100000", Timelock: "144"}, nil)
+			mockScreener.EXPECT().IsBlacklisted(map[string]model.Chain{"0x1234567890123456789012345678901234567890": model.EthereumSepolia}).Return(false, nil)
+			err := HandleEVMInitiate(types.Log{Topics: []common.Hash{{}, ocidHash}}, mockStore, Swap{Redeemer: common.HexToAddress("0xA1a547368A9Ca8E7b320d7742729e3334Ad96546"), Initiator: common.HexToAddress("0x1234567890123456789012345678901234567890"), Amount: big.NewInt(100000), Expiry: big.NewInt(144)}, mockScreener)
+			Expect(err).ShouldNot(BeNil())
+		})
+
+		It("should properly handle evm intiate", func() {
+			ocid := [32]byte{}
+			rand.Read(ocid[:])
+			ocidHash := common.BytesToHash(ocid[:])
+			mockStore.EXPECT().UpdateSwap(&model.AtomicSwap{Status: model.Detected, RedeemerAddress: "0xA1a547358A9Ca8E7b320d7742729e3334Ad96546", Chain: model.EthereumSepolia, Amount: "100000", Timelock: "144", InitiateTxHash: "0x0000000000000000000000000000000000000000000000000000000000000000"}).Return(nil)
+			mockStore.EXPECT().SwapByOCID(ocidHash.Hex()[2:]).Return(model.AtomicSwap{RedeemerAddress: "0xA1a547358A9Ca8E7b320d7742729e3334Ad96546", Chain: model.EthereumSepolia, Amount: "100000", Timelock: "144"}, nil)
+			mockScreener.EXPECT().IsBlacklisted(map[string]model.Chain{"0x1234567890123456789012345678901234567890": model.EthereumSepolia}).Return(false, nil)
+			err := HandleEVMInitiate(types.Log{Topics: []common.Hash{{}, ocidHash}}, mockStore, Swap{Redeemer: common.HexToAddress("0xA1a547358A9Ca8E7b320d7742729e3334Ad96546"), Initiator: common.HexToAddress("0x1234567890123456789012345678901234567890"), Amount: big.NewInt(100000), Expiry: big.NewInt(144)}, mockScreener)
+			Expect(err).Should(BeNil())
+		})
+
 		It("should not update store if it is already updated", func() {
 			ocid := [32]byte{}
 			rand.Read(ocid[:])
@@ -257,6 +279,26 @@ var _ = Describe("Ethereum Watcher", func() {
 			Expect(err).Should(BeNil())
 		})
 
+		It("should return nil if no swaps are found with status detected and update swap is an err", func() {
+			mockStore.EXPECT().GetActiveSwaps(model.EthereumSepolia).Return([]model.AtomicSwap{{Status: model.Detected, InitiateBlockNumber: 90, CurrentConfirmations: 5, MinimumConfirmations: 6, Timelock: "5000"}}, nil)
+			mockStore.EXPECT().UpdateSwap(&model.AtomicSwap{Status: model.Initiated, InitiateBlockNumber: 90, CurrentConfirmations: 6, MinimumConfirmations: 6, Timelock: "5000"}).Return(mockError)
+			err := UpdateEVMConfirmations(mockStore, model.EthereumSepolia, 100)
+			Expect(err).Should(Not(BeNil()))
+		})
+
+		It("should return nil if order is expired and status is intitiated", func() {
+			mockStore.EXPECT().GetActiveSwaps(model.EthereumSepolia).Return([]model.AtomicSwap{{Status: model.Initiated, InitiateBlockNumber: 90, CurrentConfirmations: 5, MinimumConfirmations: 6, Timelock: "5000"}}, nil)
+			mockStore.EXPECT().UpdateSwap(&model.AtomicSwap{Status: model.Expired, InitiateBlockNumber: 90, CurrentConfirmations: 5, MinimumConfirmations: 6, Timelock: "5000"}).Return(nil)
+			err := UpdateEVMConfirmations(mockStore, model.EthereumSepolia, 6000)
+			Expect(err).Should(BeNil())
+		})
+		It("should return err if order is expired and status is intitiated and update swap fails", func() {
+			mockStore.EXPECT().GetActiveSwaps(model.EthereumSepolia).Return([]model.AtomicSwap{{Status: model.Initiated, InitiateBlockNumber: 90, CurrentConfirmations: 5, MinimumConfirmations: 6, Timelock: "5000"}}, nil)
+			mockStore.EXPECT().UpdateSwap(&model.AtomicSwap{Status: model.Expired, InitiateBlockNumber: 90, CurrentConfirmations: 5, MinimumConfirmations: 6, Timelock: "5000"}).Return(mockError)
+			err := UpdateEVMConfirmations(mockStore, model.EthereumSepolia, 6000)
+			Expect(err).Should(Not(BeNil()))
+		})
+
 		It("should fail if update order fails", func() {
 			mockStore.EXPECT().GetActiveSwaps(model.EthereumSepolia).Return([]model.AtomicSwap{{Status: model.Detected, InitiateBlockNumber: 90, CurrentConfirmations: 5, MinimumConfirmations: 6}}, nil)
 			// mockStore.EXPECT().UpdateSwap(&model.AtomicSwap{Status: model.Initiated, InitiateBlockNumber: 90, CurrentConfirmations: 6, MinimumConfirmations: 6}).Return(mockError)
@@ -264,4 +306,84 @@ var _ = Describe("Ethereum Watcher", func() {
 			Expect(err).ShouldNot(BeNil())
 		})
 	})
+
+	Describe("creating new ethereum watcher", func() {
+		It("Should succesfully new a ethereum watcher", func() {
+			_, err := NewEthereumWatchers(mockStore, model.Config{
+				Network: model.Network{
+					model.EthereumSepolia: model.NetworkConfig{
+						EventWindow: 1000,
+						RPC: map[string]string{
+							"ethrpc": "https://sepolia.infura.io/v3/68fc281b537345f2b9af8dfe4a72c75b",
+						},
+						Assets: map[model.Asset]model.Token{
+							"0xA5E38d098b54C00F10e32E51647086232a9A0afD": {
+								Oracle:       "https://api.coincap.io/v2/assets/bitcoin",
+								TokenAddress: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+								StartBlock:   18139000,
+								Decimals:     8,
+							},
+						},
+						Expiry: 7200,
+					},
+				},
+			}, nil, logger)
+			Expect(err).Should(BeNil())
+
+		})
+
+		It("Should fail if Asset is wrong", func() {
+			_, err := NewEthereumWatchers(mockStore, model.Config{
+				Network: model.Network{
+					model.EthereumSepolia: model.NetworkConfig{
+						EventWindow: 1000,
+						RPC: map[string]string{
+							"ethrp": "https://sepolia.infura.io/v3/68fc281b537345f2b9af8dfe4a72c75b",
+						},
+						Assets: map[model.Asset]model.Token{
+							"0xA5E38d098b54C00F10e32E51647086232a9A0afD": {
+								Oracle:       "https://api.coincap.io/v2/assets/bitcoin",
+								TokenAddress: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+								StartBlock:   18139000,
+								Decimals:     8,
+							},
+						},
+						Expiry: 7200,
+					},
+				},
+			}, nil, logger)
+			Expect(err).ShouldNot(BeNil())
+
+		})
+	})
+
+	// Describe("Ethereum watch function", func(){
+	// 	It("yi", func(){
+	// 		ethWatcher, err := NewEthereumWatchers(mockStore, model.Config{
+	// 			Network: model.Network{
+	// 				model.EthereumSepolia: model.NetworkConfig{
+	// 					EventWindow: 1000,
+	// 					RPC: map[string]string{
+	// 						"ethrpc": "https://sepolia.infura.io/v3/68fc281b537345f2b9af8dfe4a72c75b",
+	// 					},
+	// 					Assets: map[model.Asset]model.Token{
+	// 						"0xA5E38d098b54C00F10e32E51647086232a9A0afD": {
+	// 							Oracle:       "https://api.coincap.io/v2/assets/bitcoin",
+	// 							TokenAddress: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+	// 							StartBlock:   18139000,
+	// 							Decimals:     8,
+	// 						},
+	// 					},
+	// 					Expiry: 7200,
+	// 				},
+	// 			},
+	// 		}, nil, logger)
+	// 		Expect(err).Should(BeNil())
+	// 		mockStore.EXPECT().GetActiveSwaps(model.EthereumSepolia).Return([]model.AtomicSwap{{Status: model.Initiated}}, nil).AnyTimes()
+	// 		updatedSwap := model.AtomicSwap{RefundTxHash: "", Status: model.Initiated}
+	// 		mockStore.EXPECT().UpdateSwap(&updatedSwap).Return(nil)
+
+	// 		ethWatcher[0].Watch()
+	// 	})
+	// })
 })

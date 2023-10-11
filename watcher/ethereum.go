@@ -219,7 +219,7 @@ func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener
 	}
 
 	if cSwap.Expiry.Cmp(expiry) != 0 {
-		return fmt.Errorf("incorrect expiry: %s", swap.Amount)
+		return fmt.Errorf("incorrect expiry: %s", expiry)
 	}
 
 	if strings.ToLower(cSwap.Redeemer.String()) != strings.ToLower(swap.RedeemerAddress) {

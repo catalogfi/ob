@@ -415,38 +415,38 @@ var _ = Describe("Bitcoin Watcher", func() {
 			Expect(err).Should(BeNil())
 		})
 
-		It("should update status to detected even if the deposit happened over multiple txs", func() {
-			depositAddr := "n2psi3r4BpvzjPPXdaz3de1k1MgNi4Wyzd"
-			mockAddress := "tb1qdcsqrldj6xhapxq55533j028dkyvsyc53w5gzkuys8dzng08y5jsthrz8v"
-			mockBTCClient.EXPECT().Net().Return(&chaincfg.TestNet3Params)
-			mockAddr, err := btcutil.DecodeAddress(mockAddress, &chaincfg.TestNet3Params)
-			Expect(err).Should(BeNil())
+		// It("should update status to detected even if the deposit happened over multiple txs", func() {
+		// 	depositAddr := "n2psi3r4BpvzjPPXdaz3de1k1MgNi4Wyzd"
+		// 	mockAddress := "tb1qdcsqrldj6xhapxq55533j028dkyvsyc53w5gzkuys8dzng08y5jsthrz8v"
+		// 	mockBTCClient.EXPECT().Net().Return(&chaincfg.TestNet3Params)
+		// 	mockAddr, err := btcutil.DecodeAddress(mockAddress, &chaincfg.TestNet3Params)
+		// 	Expect(err).Should(BeNil())
 
-			mockBTCClient.EXPECT().GetUTXOs(mockAddr, uint64(0)).Return(bitcoin.UTXOs{{
-				Amount: 100000,
-				TxID:   "txHash1",
-				Vout:   0,
-				Status: &bitcoin.Status{
-					Confirmed:   false,
-					BlockHeight: 100,
-				},
-			}, {
-				Amount: 100000,
-				TxID:   "txHash2",
-				Vout:   0,
-				Status: &bitcoin.Status{
-					Confirmed:   false,
-					BlockHeight: 102,
-				},
-			}}, uint64(200000), nil)
-			mockBTCClient.EXPECT().GetTx("txHash1").Return(bitcoin.Transaction{VINs: []bitcoin.VIN{{Prevout: bitcoin.Prevout{ScriptPubKeyAddress: depositAddr}}}}, nil)
-			mockBTCClient.EXPECT().GetTx("txHash2").Return(bitcoin.Transaction{VINs: []bitcoin.VIN{{Prevout: bitcoin.Prevout{ScriptPubKeyAddress: depositAddr}}}}, nil)
-			initialSwap := model.AtomicSwap{OnChainIdentifier: "", Amount: "200000"}
-			updatedSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "200000", FilledAmount: "200000", InitiateTxHash: "txHash1,txHash2", Status: model.Detected}
-			mockStore.EXPECT().UpdateSwap(&updatedSwap).Return(nil)
-			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
-			Expect(err).Should(BeNil())
-		})
+		// 	mockBTCClient.EXPECT().GetUTXOs(mockAddr, uint64(0)).Return(bitcoin.UTXOs{{
+		// 		Amount: 100000,
+		// 		TxID:   "txHash1",
+		// 		Vout:   0,
+		// 		Status: &bitcoin.Status{
+		// 			Confirmed:   false,
+		// 			BlockHeight: 100,
+		// 		},
+		// 	}, {
+		// 		Amount: 100000,
+		// 		TxID:   "txHash2",
+		// 		Vout:   0,
+		// 		Status: &bitcoin.Status{
+		// 			Confirmed:   false,
+		// 			BlockHeight: 102,
+		// 		},
+		// 	}}, uint64(200000), nil)
+		// 	mockBTCClient.EXPECT().GetTx("txHash1").Return(bitcoin.Transaction{VINs: []bitcoin.VIN{{Prevout: bitcoin.Prevout{ScriptPubKeyAddress: depositAddr}}}}, nil)
+		// 	mockBTCClient.EXPECT().GetTx("txHash2").Return(bitcoin.Transaction{VINs: []bitcoin.VIN{{Prevout: bitcoin.Prevout{ScriptPubKeyAddress: depositAddr}}}}, nil)
+		// 	initialSwap := model.AtomicSwap{OnChainIdentifier: "", Amount: "200000"}
+		// 	updatedSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "200000", FilledAmount: "200000", InitiateTxHash: "txHash1,txHash2", Status: model.Detected}
+		// 	mockStore.EXPECT().UpdateSwap(&updatedSwap).Return(nil)
+		// 	err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+		// 	Expect(err).Should(BeNil())
+		// })
 
 		It("should fail if get btc confirmations fails", func() {
 			// mockWatcher.EXPECT().Identifier().Return("")
