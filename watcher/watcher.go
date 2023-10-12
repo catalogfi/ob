@@ -99,7 +99,6 @@ func ProcessOrder(order model.Order, store Store, logger *zap.Logger) (model.Ord
 	if order.Secret != order.FollowerAtomicSwap.Secret {
 		order.Secret = order.FollowerAtomicSwap.Secret
 	}
-
 	// Special cases regardless of order status
 	switch {
 	case order.Status == model.Created && time.Since(order.CreatedAt) > OrderTimeout:
@@ -114,6 +113,10 @@ func ProcessOrder(order model.Order, store Store, logger *zap.Logger) (model.Ord
 		order.Status = model.FailedSoft
 	// Follower has not filled the swap before the order timeout
 	case (order.Status == model.Created && time.Since(order.CreatedAt) > OrderTimeout) || order.Status == model.Filled && time.Since(order.CreatedAt) > SwapInitiationTimeout && order.InitiatorAtomicSwap.Status == model.NotStarted:
+		//check if the user partially filled the order
+		if order.InitiatorAtomicSwap.FilledAmount != "" {
+			break
+		}
 		logger.Info("atomic swap cancelled due to fill timeout")
 		order.Status = model.Cancelled
 	case (order.InitiatorAtomicSwap.Status == model.Redeemed && order.FollowerAtomicSwap.Status == model.Redeemed):

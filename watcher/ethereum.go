@@ -179,7 +179,7 @@ func UpdateEVMConfirmations(store Store, chain model.Chain, currentBlock uint64)
 				}
 			}
 		}
-		if swap.Status == model.Initiated && currentBlock > swap.InitiateBlockNumber+uint64(timelock) {
+		if ((swap.FilledAmount != "" && swap.Status == model.NotStarted) || swap.Status == model.Initiated) && currentBlock > swap.InitiateBlockNumber+uint64(timelock) {
 			swap.Status = model.Expired
 			if err := store.UpdateSwap(&swap); err != nil {
 				return err
