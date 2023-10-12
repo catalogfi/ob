@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"net/http"
 	"os"
@@ -256,6 +257,13 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		return 0, fmt.Errorf("invalid receive amount: %s", receiveAmount)
 	}
 
+	if sendAmt.Cmp(new(big.Int).SetInt64(0)) <= 0 {
+		return 0, fmt.Errorf("invalid send amount")
+	}
+	if receiveAmt.Cmp(new(big.Int).SetInt64(0)) <= 0 {
+		return 0, fmt.Errorf("invalid receive amount")
+	}
+
 	if config.DailyLimit != "" {
 		// get the total amount traded by the user in the last 24 hrs for limit checks
 		tradedValue, err := s.ValueTradedByUserYesterday(creator, config.Network)
@@ -290,6 +298,13 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 
 	// ignoring accuracy
 	price, _ := new(big.Float).Quo(new(big.Float).SetInt(sendAmt), new(big.Float).SetInt(receiveAmt)).Float64()
+
+	if math.IsInf(price, 0) {
+		return 0, fmt.Errorf("invalid amount in price")
+	}
+	if math.IsNaN(price) {
+		return 0, fmt.Errorf("invalid amount in price")
+	}
 
 	initiatorAtomicSwap := model.AtomicSwap{
 		InitiatorAddress: sendAddress,
@@ -681,13 +696,14 @@ func GetSwapId(Chain model.Chain, InitiatorAddress string, RedeemerAddress strin
 func CheckAddress(chain model.Chain, address string) error {
 	if chain.IsEVM() {
 		if address[:2] == "0x" {
-			if len(address) != 42 {
-				return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
-			}
-		} else {
-			if len(address) == 40 {
-				return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
-			}
+			address = address[2:]
+		}
+		if len(address) != 40 {
+			return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
+		}
+		_, err := hex.DecodeString(address)
+		if err != nil {
+			return fmt.Errorf("invalid evm (%v) address: %v", chain, address)
 		}
 	} else if chain.IsBTC() {
 		_, err := btcutil.DecodeAddress(address, getParams(chain))
