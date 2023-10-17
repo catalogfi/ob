@@ -29,7 +29,7 @@ type Client interface {
 	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
 	GetDecimals(tokenAddr common.Address) (uint8, error)
 	GetConfirmations(txHash string) (uint64, uint64, error)
-	GetLogs(contract common.Address, fromBlock, toBlock uint64, eventIds [][]common.Hash) ([]types.Log, error)
+	GetLogs(contract common.Address, fromBlock, toBlock uint64, eventIds [][]common.Hash, eventWindow uint64) ([]types.Log, error)
 	ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
 	InitiateAtomicSwap(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error)
 	RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte, secret []byte) (string, error)
@@ -39,11 +39,10 @@ type Client interface {
 }
 
 type client struct {
-	eventWindow int64
-	logger      *zap.Logger
-	url         string
-	provider    *ethclient.Client
-	chainID     *big.Int
+	logger   *zap.Logger
+	url      string
+	provider *ethclient.Client
+	chainID  *big.Int
 }
 
 func NewClient(logger *zap.Logger, url string) (Client, error) {
@@ -302,10 +301,10 @@ func (client *client) ChainID() *big.Int {
 	return client.chainID
 }
 
-func (client *client) GetLogs(contract common.Address, fromBlock, toBlock uint64, eventIds [][]common.Hash) ([]types.Log, error) {
+func (client *client) GetLogs(contract common.Address, fromBlock, toBlock uint64, eventIds [][]common.Hash, eventWindow uint64) ([]types.Log, error) {
 	intermediateToBlock := toBlock
-	if client.eventWindow < int64(toBlock)-int64(fromBlock) {
-		intermediateToBlock = fromBlock + uint64(client.eventWindow)
+	if eventWindow < toBlock-fromBlock {
+		intermediateToBlock = fromBlock + eventWindow
 	}
 	eventlogs := []types.Log{}
 	for {
@@ -318,9 +317,6 @@ func (client *client) GetLogs(contract common.Address, fromBlock, toBlock uint64
 			Topics: eventIds,
 		}
 		logs, err := client.GetProvider().FilterLogs(context.Background(), query)
-		if len(logs) > 0 {
-			return logs, nil
-		}
 		if err != nil {
 			return nil, err
 		}
@@ -329,7 +325,7 @@ func (client *client) GetLogs(contract common.Address, fromBlock, toBlock uint64
 			break
 		}
 		fromBlock = intermediateToBlock + 1
-		intermediateToBlock = fromBlock + uint64(client.eventWindow)
+		intermediateToBlock = fromBlock + eventWindow
 		if intermediateToBlock > toBlock {
 			intermediateToBlock = toBlock
 		}
