@@ -244,7 +244,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	// TODO: can we make this more generic userBtcWalletAddress
 
 	// validate secretHash
-	if err := CheckHash(secretHash); err != nil {
+	if secretHash, err = CheckHash(secretHash); err != nil {
 		return 0, err
 	}
 	sendAmt, ok := new(big.Int).SetString(sendAmount, 10)
@@ -716,15 +716,15 @@ func CheckAddress(chain model.Chain, address string) error {
 	return nil
 }
 
-func CheckHash(hash string) error {
+func CheckHash(hash string) (string, error) {
 	if len(hash) >= 2 && hash[0] == '0' && (hash[1] == 'x' || hash[1] == 'X') {
 		hash = hash[2:]
 	}
 	_, err := hex.DecodeString(hash)
 	if err != nil {
-		return fmt.Errorf("not a valid hash %s", hash)
+		return "", fmt.Errorf("not a valid hash %s", hash)
 	}
-	return nil
+	return hash, nil
 }
 
 // value is in USD
