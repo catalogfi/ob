@@ -542,12 +542,12 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 	}
 
 	if verbose {
-		for i := range orders {
-			if err := s.fillSwapDetails(&orders[i]); err != nil {
-				return nil, err
-			}
+		db := s.db.Preload("InitiatorAtomicSwap").Preload("FollowerAtomicSwap")
+		if err := db.Order("id ASC").Find(&orders).Error; err != nil {
+			return nil, err
 		}
 	}
+
 	return orders, nil
 }
 
