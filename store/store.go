@@ -557,10 +557,9 @@ func (s *store) GetOrdersByAddress(address string) ([]model.Order, error) {
 	if tx := s.db.Where("maker = ? OR taker = ?", address, address).Find(&orders); tx.Error != nil {
 		return nil, tx.Error
 	}
-	for i := range orders {
-		if err := s.fillSwapDetails(&orders[i]); err != nil {
+	db := s.db.Preload("InitiatorAtomicSwap").Preload("FollowerAtomicSwap")
+		if err := db.Order("id ASC").Find(&orders).Error; err != nil {
 			return nil, err
-		}
 	}
 	return orders, nil
 }
@@ -571,11 +570,10 @@ func (s *store) GetActiveOrders() ([]model.Order, error) {
 	if tx := s.db.Where("status IN ?", []model.Status{model.Created, model.Filled}).Find(&orders); tx.Error != nil {
 		return nil, tx.Error
 	}
-	for i := range orders {
-		if err := s.fillSwapDetails(&orders[i]); err != nil {
+	db := s.db.Preload("InitiatorAtomicSwap").Preload("FollowerAtomicSwap")
+		if err := db.Order("id ASC").Find(&orders).Error; err != nil {
 			return nil, err
 		}
-	}
 	return orders, nil
 }
 
@@ -614,6 +612,8 @@ func (s *store) GetOrder(orderID uint) (*model.Order, error) {
 	if tx := s.db.First(order, orderID); tx.Error != nil {
 		return nil, tx.Error
 	}
+
+	
 	return order, s.fillSwapDetails(order)
 }
 func (s *store) GetOrderBySwapID(swapID uint) (*model.Order, error) {
