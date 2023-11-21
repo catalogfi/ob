@@ -87,7 +87,7 @@ func (s *Server) subscribe(msg []byte, ctx context.Context) <-chan interface{} {
 			close(responses)
 		}()
 
-		values := strings.Split(string(msg), "_")
+		values := strings.Split(string(msg), "::")
 		if len(values) != 2 || strings.ToLower(values[0]) != "subscribe" {
 			responses <- WebsocketError{Code: 1, Error: fmt.Sprintf("invalid message %s", msg)}
 			return
