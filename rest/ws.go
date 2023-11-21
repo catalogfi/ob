@@ -114,7 +114,7 @@ func (s *Server) subscribe(msg []byte, ctx context.Context) <-chan interface{} {
 			return
 		}
 
-		isOrderPair, err := regexp.Match("^[a-zA-Z:]+-[a-zA-Z:]+", []byte(values[1]))
+		isOrderPair, err := regexp.Match("^[a-zA-Z_]+(:0x[0-9a-fA-F]{40})?-[a-zA-Z_]+(:0x[0-9a-fA-F]{40})?", []byte(values[1]))
 		if err == nil && isOrderPair {
 			for response := range s.subscribeToOpenOrders(values[1], ctx) {
 				responses <- response
