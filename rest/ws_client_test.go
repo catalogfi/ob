@@ -52,7 +52,7 @@ var _ = Describe("subscribe to order status updates", func() {
 			InitiatorAtomicSwap: &model.AtomicSwap{},
 			FollowerAtomicSwap:  &model.AtomicSwap{},
 		}, nil).Times(1)
-		client.Subscribe("subscribe_5")
+		client.Subscribe("subscribe::5")
 		listener := client.Listen()
 		order := <-listener
 		Expect(order.(rest.UpdatedOrder).Order.Status).To(Equal(model.Executed))
@@ -60,14 +60,14 @@ var _ = Describe("subscribe to order status updates", func() {
 
 	It("should return an updated order error if get order fails", func() {
 		mockStore.EXPECT().GetOrder(uint(5)).Return(nil, errMock).Times(1)
-		client.Subscribe("subscribe_5")
+		client.Subscribe("subscribe::5")
 		listener := client.Listen()
 		order := <-listener
 		Expect(order.(rest.UpdatedOrder).Error).ToNot(BeEmpty())
 	})
 
 	It("should return a websocket error if the order id is not a uint64 value", func() {
-		client.Subscribe("subscribe_5123132312739812738192381023920183199392101827918321676876876876876786876876768767687812738192381023920183199392101827918321676876876876876786876876768767687")
+		client.Subscribe("subscribe::5123132312739812738192381023920183199392101827918321676876876876876786876876768767687812738192381023920183199392101827918321676876876876876786876876768767687")
 		listener := client.Listen()
 		err := <-listener
 		Expect(err.(rest.WebsocketError).Error).ToNot(BeEmpty())
@@ -90,7 +90,7 @@ var _ = Describe("subscribe to order status updates", func() {
 			}
 		}).Times(2)
 
-		client.Subscribe("subscribe_5")
+		client.Subscribe("subscribe::5")
 		listener := client.Listen()
 		order1 := <-listener
 		Expect(order1.(rest.UpdatedOrder).Order.Status).To(Equal(model.Created))
@@ -125,7 +125,7 @@ var _ = Describe("subscribe to order status updates", func() {
 			}
 		}).Times(4)
 
-		client.Subscribe("subscribe_5")
+		client.Subscribe("subscribe::5")
 		listener := client.Listen()
 		order1 := <-listener
 		Expect(order1.(rest.UpdatedOrder).Order.Status).To(Equal(model.Unknown))
@@ -142,7 +142,7 @@ var _ = Describe("subscribe to all open orders", func() {
 			"", "", "", mockOrderPair, "", model.Created, 0.0, 0.0, 0.0, 0.0, 0, 0, true,
 		).Return(nil, errMock).Times(1)
 
-		client.Subscribe(fmt.Sprintf("subscribe_%s", mockOrderPair))
+		client.Subscribe(fmt.Sprintf("subscribe::%s", mockOrderPair))
 		listener := client.Listen()
 		order := <-listener
 		Expect(order.(rest.OpenOrder).Error).ToNot(BeEmpty())
@@ -167,7 +167,7 @@ var _ = Describe("subscribe to all open orders", func() {
 			}
 		}).Times(3)
 
-		client.Subscribe(fmt.Sprintf("subscribe_%s", mockOrderPair))
+		client.Subscribe(fmt.Sprintf("subscribe::%s", mockOrderPair))
 		listener := client.Listen()
 		order := <-listener
 		Expect(order.(rest.OpenOrder).Order.Status).To(Equal(model.Created))
@@ -180,7 +180,7 @@ var _ = Describe("subscribe to orders on an address", func() {
 	It("should return the error if it get orders fail", func() {
 		mockStore.EXPECT().GetOrdersByAddress(mockAddress).Return(nil, errMock).Times(1)
 
-		client.Subscribe(fmt.Sprintf("subscribe_%s", mockAddress))
+		client.Subscribe(fmt.Sprintf("subscribe::%s", mockAddress))
 		listener := client.Listen()
 		order := <-listener
 		Expect(order.(rest.UpdatedOrders).Error).ToNot(BeEmpty())
@@ -210,7 +210,7 @@ var _ = Describe("subscribe to orders on an address", func() {
 			}
 		}).Times(4)
 
-		client.Subscribe(fmt.Sprintf("subscribe_%s", mockAddress))
+		client.Subscribe(fmt.Sprintf("subscribe::%s", mockAddress))
 		listener := client.Listen()
 		order := <-listener
 		Expect(order.(rest.UpdatedOrders).Error).To(BeEmpty())
@@ -226,7 +226,7 @@ var _ = Describe("subscribe to orders on an address", func() {
 
 var _ = Describe("subscribe to orders on an address", func() {
 	It("should return a websocket error if an invalid subscribe string is sent", func() {
-		client.Subscribe("subscribe_<hello>")
+		client.Subscribe("subscribe::<hello>")
 		listener := client.Listen()
 		order := <-listener
 		Expect(order.(rest.WebsocketError).Error).ToNot(BeEmpty())
