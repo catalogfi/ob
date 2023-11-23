@@ -144,10 +144,10 @@ func (w *watcher) Status(initateTxHash string) (uint64, uint64, bool, error) {
 	if err != nil {
 		return 0, 0, false, fmt.Errorf("failed to get confirmations: %w", err)
 	}
-	isIW, err := w.IsInstantWallet(txHashes[0])
-	if err != nil {
-		return 0, 0, false, fmt.Errorf("failed to check for instant wallet txs: %w", err)
-	}
+	isIW, _ := w.IsInstantWallet(txHashes[0])
+	// if err != nil {
+	// 	return 0, 0, false, fmt.Errorf("failed to check for instant wallet txs: %w", err)
+	// }
 
 	if len(txHashes) > 1 {
 		for _, txHash := range txHashes[1:] {
@@ -162,10 +162,10 @@ func (w *watcher) Status(initateTxHash string) (uint64, uint64, bool, error) {
 				conf = nextConf
 			}
 			if isIW {
-				isIW, err = w.IsInstantWallet(txHash)
-				if err != nil {
-					return 0, 0, false, fmt.Errorf("failed to check for instant wallet txs: %w", err)
-				}
+				isIW, _ = w.IsInstantWallet(txHash)
+				// if err != nil {
+				// 	return 0, 0, false, fmt.Errorf("failed to check for instant wallet txs: %w", err)
+				// }
 			}
 		}
 	}
