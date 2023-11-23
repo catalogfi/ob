@@ -220,7 +220,7 @@ func (s *Server) subscribeToOpenOrders(orderPair string, ctx context.Context) <-
 			case <-ctx.Done():
 				return
 			default:
-				orders, err := s.store.FilterOrders("", "", "", orderPair, "", model.Created, 0.0, 0.0, 0.0, 0.0, 0, 0, true)
+				orders, err := s.store.FilterOrders("", "", orderPair, "", "", model.Created, 0.0, 0.0, 0.0, 0.0, 0, 0, true)
 				if err != nil {
 					responses <- OpenOrder{Error: fmt.Sprintf("failed to get orders on pair %s: %v", orderPair, err)}
 					s.logger.Error("failed to get open orders", zap.Error(err))
