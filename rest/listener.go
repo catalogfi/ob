@@ -28,15 +28,20 @@ func NewDBListener(dsn string,
 
 }
 
-func (listener *DBListener) Start(ordersUpdatechan string, swapsUpdatechan string) {
+func (listener *DBListener) Start(ordersUpdatechan string, swapsUpdatechan string, ordersAddedChan string) {
 
 	logError := func(ev pq.ListenerEventType, err error) {
 		if err != nil {
 			listener.logger.Error(err.Error())
 		}
 	}
-	ordersListener := pq.NewListener(listener.dsn, 10*time.Second, time.Minute, logError)
-	err := ordersListener.Listen(ordersUpdatechan)
+	orderUpdatesListener := pq.NewListener(listener.dsn, 10*time.Second, time.Minute, logError)
+	err := orderUpdatesListener.Listen(ordersUpdatechan)
+	if err != nil {
+		panic(err)
+	}
+	orderAddedListener := pq.NewListener(listener.dsn, 10*time.Second, time.Minute, logError)
+	err = orderAddedListener.Listen(ordersAddedChan)
 	if err != nil {
 		panic(err)
 	}
@@ -49,7 +54,7 @@ func (listener *DBListener) Start(ordersUpdatechan string, swapsUpdatechan strin
 
 	listener.logger.Info("Started listening to postgres events...")
 
-	listener.waitForEvent(ordersListener, swapsListener)
+	listener.waitForEvent(orderUpdatesListener, orderAddedListener, swapsListener)
 
 }
 
@@ -57,12 +62,13 @@ func (listener *DBListener) Start(ordersUpdatechan string, swapsUpdatechan strin
 // sid -> swap id
 // on -> orders notification
 // sn -> swaps notification
-// ol -> orders listener
+// uol -> updated orders listener
+// nol -> new orders listener
 // sl -> swaps listener
-func (listener *DBListener) waitForEvent(ol *pq.Listener, sl *pq.Listener) {
+func (listener *DBListener) waitForEvent(uol, nol, sl *pq.Listener) {
 	for {
 		select {
-		case on := <-ol.Notify:
+		case on := <-uol.Notify:
 			if on == nil {
 				continue
 			}
@@ -76,10 +82,33 @@ func (listener *DBListener) waitForEvent(ol *pq.Listener, sl *pq.Listener) {
 			order, err := listener.store.GetOrder(uint(oid))
 			if err != nil {
 				listener.logger.Error("Failed to get order", zap.String("error", err.Error()), zap.Uint64("order id:", oid))
+				continue
 			}
 			err = listener.socketPool.FilterAndBufferOrder(*order)
 			if err != nil {
 				listener.logger.Error("Failed to write order to channel", zap.Uint64("order id:", oid))
+				continue
+			}
+		case on := <-nol.Notify:
+			if on == nil {
+				continue
+			}
+			listener.logger.Info(fmt.Sprint("Received data from channel [", on.Channel, "] :"))
+			oid, err := strconv.ParseUint(on.Extra, 10, 64)
+			if err != nil {
+				listener.logger.Error(fmt.Sprintf("Error processing id: %v", err))
+				continue
+			}
+			listener.logger.Info("received order:", zap.Uint64("order id:", oid))
+			order, err := listener.store.GetOrder(uint(oid))
+			if err != nil {
+				listener.logger.Error("Failed to get order", zap.String("error", err.Error()), zap.Uint64("order id:", oid))
+				continue
+			}
+			err = listener.socketPool.FilterAndBufferOrder(*order)
+			if err != nil {
+				listener.logger.Error("Failed to write order to channel", zap.Uint64("order id:", oid))
+				continue
 			}
 		case sn := <-sl.Notify:
 			if sn == nil {
@@ -94,6 +123,7 @@ func (listener *DBListener) waitForEvent(ol *pq.Listener, sl *pq.Listener) {
 			order, err := listener.store.GetOrderBySwapID(uint(sid))
 			if err != nil {
 				listener.logger.Error("Failed to get order by swap id", zap.String("error", err.Error()), zap.Uint64("swap id:", sid))
+				continue
 			}
 			listener.logger.Info("received order:", zap.Uint64("order id:", uint64(order.ID)), zap.Uint64("swap id:", sid))
 			err = listener.socketPool.FilterAndBufferOrder(*order)
@@ -103,7 +133,7 @@ func (listener *DBListener) waitForEvent(ol *pq.Listener, sl *pq.Listener) {
 		case <-time.After(90 * time.Second):
 			listener.logger.Info("Received no events for 90 seconds, checking connection")
 			go func() {
-				ol.Ping()
+				uol.Ping()
 				sl.Ping()
 			}()
 		}

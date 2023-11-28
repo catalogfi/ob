@@ -53,7 +53,11 @@ func main() {
 	}
 
 	screener := screener.NewScreener(store.Gorm(), envConfig.TRM_KEY)
-	server := rest.NewServer(store, envConfig.CONFIG, logger, envConfig.SERVER_SECRET, nil, screener)
+	socketPool := rest.NewSocketPool()
+	listener := rest.NewDBListener(envConfig.PSQL_DB, socketPool, logger, store)
+	go listener.Start("updates_to_orders", "updates_to_atomic_swaps", "added_to_orders")
+
+	server := rest.NewServer(store, envConfig.CONFIG, logger, envConfig.SERVER_SECRET, socketPool, screener)
 	if err := server.Run(context.Background(), fmt.Sprintf(":%s", envConfig.PORT)); err != nil {
 		panic(err)
 	}

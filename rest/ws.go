@@ -134,42 +134,25 @@ type WebsocketError struct {
 func (s *Server) subscribeToOrderUpdates(id uint, ctx context.Context) <-chan UpdatedOrder {
 	responses := make(chan UpdatedOrder)
 	go func() {
-		defer close(responses)
+		defer func() {
+			s.socketPool.RemoveOrderUpdatesChannel(id, responses)
+			close(responses)
+		}()
 
+		s.socketPool.AddOrderUpdatesChannel(id, responses)
 		order, err := s.store.GetOrder(id)
 		if err != nil {
-			responses <- UpdatedOrder{Error: fmt.Sprintf("failed to get order %d: %v", id, err)}
+			responses <- UpdatedOrder{Error: fmt.Sprintf("failed to get orders for %s: %v", id, err)}
 			s.logger.Error("failed to get order", zap.Error(err))
 			return
 		}
-		responses <- UpdatedOrder{Order: *order}
-		if order.Status >= model.Executed {
-			return
-		}
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				newOrder, err := s.store.GetOrder(id)
-				if err != nil {
-					responses <- UpdatedOrder{Error: fmt.Sprintf("failed to get order %d: %v", id, err)}
-					s.logger.Error("failed to get order", zap.Error(err))
-					return
-				}
-				if order.Status == newOrder.Status && order.FollowerAtomicSwap.Status == newOrder.FollowerAtomicSwap.Status && order.InitiatorAtomicSwap.Status == newOrder.InitiatorAtomicSwap.Status {
-					time.Sleep(time.Second * 2)
-					continue
-				}
-				order = newOrder
-				fmt.Println(order)
-				responses <- UpdatedOrder{Order: *order}
-				if order.Status >= model.Executed {
-					return
-				}
-			}
+		currentState := UpdatedOrder{
+			Order: *order,
 		}
+		responses <- currentState
+
+		<-ctx.Done()
 	}()
 	return responses
 }
@@ -179,71 +162,58 @@ func (s *Server) subscribeToUpdatedOrders(creator string, ctx context.Context) <
 
 	go func() {
 		defer func() {
-			s.socketPool.RemoveSocketChannel(creator, responses)
+			s.socketPool.RemoveUpdatedOrdersChannel(creator, responses)
 			close(responses)
 		}()
 
-		for {
-			s.socketPool.AddSocketChannel(creator, responses)
-			orders, err := s.store.GetOrdersByAddress(creator)
-			if err != nil {
-				responses <- UpdatedOrders{Error: fmt.Sprintf("failed to get orders for %s: %v", creator, err)}
-				s.logger.Error("failed to get order", zap.Error(err))
-				return
-			}
-
-			newOrders := UpdatedOrders{
-				Orders: orders,
-			}
-			responses <- newOrders
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-			}
+		s.socketPool.AddUpdatedOrdersChannel(creator, responses)
+		orders, err := s.store.GetOrdersByAddress(creator)
+		if err != nil {
+			responses <- UpdatedOrders{Error: fmt.Sprintf("failed to get orders for %s: %v", creator, err)}
+			s.logger.Error("failed to get orders", zap.Error(err))
+			return
 		}
+
+		newOrders := UpdatedOrders{
+			Orders: orders,
+		}
+		responses <- newOrders
+
+		<-ctx.Done()
+
 	}()
 	return responses
 }
 
-func (s *Server) subscribeToOpenOrders(orderPair string, ctx context.Context) <-chan OpenOrder {
-	responses := make(chan OpenOrder)
+func (s *Server) subscribeToOpenOrders(orderPair string, ctx context.Context) <-chan OpenOrders {
+	responses := make(chan OpenOrders)
 	go func() {
-		defer close(responses)
-		processed := map[uint]bool{}
+		defer func() {
+			s.socketPool.RemoveOpenOrdersChannel(orderPair, responses)
+			close(responses)
+		}()
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				orders, err := s.store.FilterOrders("", "", orderPair, "", "", model.Created, 0.0, 0.0, 0.0, 0.0, 0, 0, true)
-				if err != nil {
-					responses <- OpenOrder{Error: fmt.Sprintf("failed to get orders on pair %s: %v", orderPair, err)}
-					s.logger.Error("failed to get open orders", zap.Error(err))
-					break
-				}
-
-				for _, order := range orders {
-					if _, ok := processed[order.ID]; ok {
-						continue
-					}
-
-					processed[order.ID] = true
-					responses <- OpenOrder{Order: order}
-				}
-			}
+		s.socketPool.AddOpenOrdersChannel(orderPair, responses)
+		orders, err := s.store.FilterOrders("", "", orderPair, "", "", model.Created, 0.0, 0.0, 0.0, 0.0, 0, 0, true)
+		if err != nil {
+			responses <- OpenOrders{Error: fmt.Sprintf("failed to get orders for %s: %v", orderPair, err)}
+			s.logger.Error("failed to get open orders", zap.Error(err))
+			return
 		}
+
+		newOrders := OpenOrders{
+			Orders: orders,
+		}
+		responses <- newOrders
+
+		<-ctx.Done()
 	}()
 	return responses
 }
 
-type OpenOrder struct {
-	Order model.Order `json:"order"`
-	Error string      `json:"error"`
+type OpenOrders struct {
+	Orders []model.Order `json:"orders"`
+	Error string        `json:"error"`
 }
 
 type UpdatedOrders struct {
@@ -254,30 +224,4 @@ type UpdatedOrders struct {
 type UpdatedOrder struct {
 	Order model.Order `json:"order"`
 	Error string      `json:"error"`
-}
-
-func updatedOrders(orders map[uint]model.Order, newOrders []model.Order) (UpdatedOrders, bool) {
-	hasUpdated := false
-	// Remove unchanged orders
-	for i := 0; i < len(newOrders); i++ {
-		exist, ok := orders[newOrders[i].ID]
-		if !ok || isDifferent(exist, newOrders[i]) {
-			orders[newOrders[i].ID] = newOrders[i]
-			hasUpdated = true
-		} else {
-			newOrders = append(newOrders[:i], newOrders[i+1:]...)
-			i--
-		}
-	}
-
-	fmt.Println(newOrders, hasUpdated)
-	return UpdatedOrders{Orders: newOrders}, hasUpdated
-}
-
-func isDifferent(a, b model.Order) bool {
-	return a.Status != b.Status ||
-		(a.FollowerAtomicSwap.Status != b.FollowerAtomicSwap.Status) ||
-		(a.InitiatorAtomicSwap.Status != b.InitiatorAtomicSwap.Status) ||
-		(a.FollowerAtomicSwap.CurrentConfirmations != b.FollowerAtomicSwap.CurrentConfirmations || a.InitiatorAtomicSwap.CurrentConfirmations != b.InitiatorAtomicSwap.CurrentConfirmations) ||
-		(a.FollowerAtomicSwap.FilledAmount != b.FollowerAtomicSwap.FilledAmount || a.InitiatorAtomicSwap.FilledAmount != b.InitiatorAtomicSwap.FilledAmount)
 }

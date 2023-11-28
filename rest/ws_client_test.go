@@ -145,7 +145,7 @@ var _ = Describe("subscribe to all open orders", func() {
 		client.Subscribe(fmt.Sprintf("subscribe::%s", mockOrderPair))
 		listener := client.Listen()
 		order := <-listener
-		Expect(order.(rest.OpenOrder).Error).ToNot(BeEmpty())
+		Expect(order.(rest.OpenOrders).Error).ToNot(BeEmpty())
 	})
 
 	It("should return order and error if the getorder returns an order and an error", func() {
@@ -170,9 +170,9 @@ var _ = Describe("subscribe to all open orders", func() {
 		client.Subscribe(fmt.Sprintf("subscribe::%s", mockOrderPair))
 		listener := client.Listen()
 		order := <-listener
-		Expect(order.(rest.OpenOrder).Order.Status).To(Equal(model.Created))
+		Expect(order.(rest.OpenOrders).Orders[0].Status).To(Equal(model.Created))
 		order2 := <-listener
-		Expect(order2.(rest.OpenOrder).Error).ToNot(BeEmpty())
+		Expect(order2.(rest.OpenOrders).Error).ToNot(BeEmpty())
 	})
 })
 
