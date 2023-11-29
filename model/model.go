@@ -295,6 +295,19 @@ type Commitment struct {
 	Value   string
 }
 
+type Response struct {
+	Version string          `json:"jsonrpc"`
+	ID      interface{}     `json:"id"`
+	Result  json.RawMessage `json:"result,omitempty"`
+	Error   *Error          `json:"error,omitempty"`
+}
+
+type Error struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    string `json:"data"`
+}
+
 type ResponseBtcGetCommitment struct {
 	Commitment Commitment `json:"commitment"`
 }
