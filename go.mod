@@ -1,4 +1,4 @@
-module github.com/catalogfi/wbtc-garden
+module github.com/catalogfi/orderbook
 
 go 1.19
 

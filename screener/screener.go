@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/orderbook/model"
 	"gorm.io/gorm"
 )
 

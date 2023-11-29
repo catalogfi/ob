@@ -8,7 +8,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/catalogfi/wbtc-garden/swapper/bitcoin"
+	"github.com/catalogfi/orderbook/swapper/bitcoin"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

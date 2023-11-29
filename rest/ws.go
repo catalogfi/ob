@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/orderbook/model"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -213,7 +213,7 @@ func (s *Server) subscribeToOpenOrders(orderPair string, ctx context.Context) <-
 
 type OpenOrders struct {
 	Orders []model.Order `json:"orders"`
-	Error string        `json:"error"`
+	Error  string        `json:"error"`
 }
 
 type UpdatedOrders struct {
