@@ -269,6 +269,7 @@ func (w *watcher) IsInstantWallet(txHash string) (bool, error) {
 		return false, nil
 	}
 
+	fmt.Println("here0")
 	data, err := json.Marshal(model.RequestBtcGetCommitment{
 		TxHash: txHash,
 	})
@@ -287,11 +288,13 @@ func (w *watcher) IsInstantWallet(txHash string) (bool, error) {
 	}
 
 	resp, err := http.Post(w.iwRpc, "application/json", buf)
+	fmt.Println("here1", err)
 	if err != nil {
 		return false, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		fmt.Println("here2", resp.StatusCode)
 		if resp.StatusCode == http.StatusNotFound {
 			return false, fmt.Errorf("failed to reach the server %v", 404)
 		}
@@ -300,11 +303,14 @@ func (w *watcher) IsInstantWallet(txHash string) (bool, error) {
 		}{}
 		if err := json.NewDecoder(resp.Body).Decode(&errObj); err != nil {
 			errMsg, err := io.ReadAll(resp.Body)
+			fmt.Println("here3", err)
 			if err != nil {
 				return false, fmt.Errorf("failed to read the error message %v", err)
 			}
+			fmt.Println("here4", string(errMsg))
 			return false, fmt.Errorf("failed to decode the error %v", string(errMsg))
 		}
+		fmt.Println("here5", errObj.Error)
 		return false, fmt.Errorf("request failed %v", errObj.Error)
 	}
 	response := model.ResponseBtcGetCommitment{}

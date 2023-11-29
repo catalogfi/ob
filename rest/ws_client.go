@@ -100,7 +100,7 @@ func typeCast(t string, from interface{}) (interface{}, error) {
 		return nil, err
 	}
 	switch t {
-	case "rest.OpenOrder":
+	case "rest.OpenOrders":
 		obj := OpenOrders{}
 		return obj, json.Unmarshal(data, &obj)
 	case "rest.UpdatedOrders":

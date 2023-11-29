@@ -11,6 +11,9 @@ import (
 	"github.com/catalogfi/orderbook/model"
 	"github.com/catalogfi/orderbook/store"
 	"github.com/catalogfi/orderbook/watcher"
+	watchers "github.com/catalogfi/orderbook/watcher"
+	"github.com/catalogfi/orderbook/screener"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/getsentry/sentry-go"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -19,9 +22,12 @@ import (
 )
 
 type Config struct {
-	SENTRY_DSN string
-	PSQL_DB    string        `binding:"required"`
-	CONFIG     model.Network `binding:"required"`
+	SENTRY_DSN    string
+	PORT          string       `binding:"required"`
+	PSQL_DB       string       `binding:"required"`
+	SERVER_SECRET string       `binding:"required"`
+	CONFIG        model.Config `binding:"required"`
+	TRM_KEY       string
 }
 
 func LoadConfiguration(file string) Config {
@@ -32,7 +38,9 @@ func LoadConfiguration(file string) Config {
 	}
 	defer configFile.Close()
 	jsonParser := json.NewDecoder(configFile)
-	jsonParser.Decode(&config)
+	if err := jsonParser.Decode(&config); err != nil {
+		panic(err)
+	}
 	return config
 }
 
@@ -64,6 +72,24 @@ func main() {
 		}
 		logger = zapsentry.AttachCoreToLogger(core, logger)
 		defer logger.Sync()
+	}
+
+	screener := screener.NewScreener(store.Gorm(), envConfig.TRM_KEY)
+	for chain, Network := range envConfig.CONFIG.Network {
+		if chain.IsBTC() {
+			//interval is set to 10 seconds to detect iw tx's quicky
+			btcWatcher := watchers.NewBTCWatcher(store, chain, envConfig.CONFIG, screener, 5*time.Second, logger)
+			go btcWatcher.Watch(context.Background())
+		} else if chain.IsEVM() {
+			for asset, token := range Network.Assets {
+				ethWatcher, err := watchers.NewEthereumWatcher(store, chain, Network, common.HexToAddress(string(asset)), token.StartBlock, uint64(Network.EventWindow), screener, logger)
+				if err != nil {
+					panic(err)
+				}
+				go ethWatcher.Watch()
+			}
+		}
+
 	}
 
 	watcher := watcher.NewWatcher(logger, store, 4)
