@@ -269,7 +269,6 @@ func (w *watcher) IsInstantWallet(txHash string) (bool, error) {
 		return false, nil
 	}
 
-	fmt.Println("here0")
 	data, err := json.Marshal(model.RequestBtcGetCommitment{
 		TxHash: txHash,
 	})
@@ -288,7 +287,6 @@ func (w *watcher) IsInstantWallet(txHash string) (bool, error) {
 	}
 
 	resp, err := http.Post(w.iwRpc, "application/json", buf)
-	fmt.Println("here1", err)
 	if err != nil {
 		return false, err
 	}
