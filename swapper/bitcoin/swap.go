@@ -8,7 +8,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/catalogfi/wbtc-garden/swapper"
+	"github.com/catalogfi/orderbook/swapper"
 	"go.uber.org/zap"
 )
 

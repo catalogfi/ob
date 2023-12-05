@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/orderbook/model"
 	"go.uber.org/zap"
 )
 

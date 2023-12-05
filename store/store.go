@@ -16,10 +16,10 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/catalogfi/wbtc-garden/model"
-	"github.com/catalogfi/wbtc-garden/rest"
-	"github.com/catalogfi/wbtc-garden/swapper/bitcoin"
-	"github.com/catalogfi/wbtc-garden/watcher"
+	"github.com/catalogfi/orderbook/model"
+	"github.com/catalogfi/orderbook/rest"
+	"github.com/catalogfi/orderbook/swapper/bitcoin"
+	"github.com/catalogfi/orderbook/watcher"
 	"github.com/ethereum/go-ethereum/common"
 	"gorm.io/gorm"
 )

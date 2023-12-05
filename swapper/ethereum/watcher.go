@@ -7,9 +7,9 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/catalogfi/wbtc-garden/model"
-	"github.com/catalogfi/wbtc-garden/swapper"
-	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/AtomicSwap"
+	"github.com/catalogfi/orderbook/model"
+	"github.com/catalogfi/orderbook/swapper"
+	"github.com/catalogfi/orderbook/swapper/ethereum/typings/AtomicSwap"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
