@@ -5,11 +5,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/catalogfi/wbtc-garden/mocks"
-	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/orderbook/mocks"
+	"github.com/catalogfi/orderbook/model"
 	"gorm.io/gorm"
 
-	. "github.com/catalogfi/wbtc-garden/watcher"
+	. "github.com/catalogfi/orderbook/watcher"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
