@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/catalogfi/orderbook/swapper/bitcoin"
+	"github.com/catalogfi/wbtc-garden/swapper/bitcoin"
 	"github.com/fatih/color"
 	"go.uber.org/zap"
 

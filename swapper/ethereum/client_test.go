@@ -3,8 +3,8 @@ package ethereum_test
 import (
 	"math/big"
 
-	"github.com/catalogfi/orderbook/swapper/ethereum"
-	"github.com/catalogfi/orderbook/swapper/ethereum/typings/TestERC20"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum"
+	"github.com/catalogfi/wbtc-garden/swapper/ethereum/typings/TestERC20"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/crypto"
 	"go.uber.org/zap"

@@ -5,9 +5,9 @@ import (
 	"encoding/hex"
 	"os"
 
-	"github.com/catalogfi/orderbook/internal/path"
-	"github.com/catalogfi/orderbook/model"
-	. "github.com/catalogfi/orderbook/store"
+	"github.com/catalogfi/wbtc-garden/internal/path"
+	"github.com/catalogfi/wbtc-garden/model"
+	. "github.com/catalogfi/wbtc-garden/store"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/driver/sqlite"

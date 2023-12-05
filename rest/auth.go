@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/catalogfi/orderbook/model"
-	"github.com/catalogfi/orderbook/rest/utils"
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/rest/utils"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"

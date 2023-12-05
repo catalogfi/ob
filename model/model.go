@@ -3,7 +3,6 @@ package model
 import (
 	"database/sql"
 	"database/sql/driver"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -275,39 +274,4 @@ type Blacklist struct {
 type LockedAmount struct {
 	Asset  string
 	Amount sql.NullInt64
-}
-
-// for guardian requests
-
-type Request struct {
-	Version string          `json:"jsonrpc"`
-	ID      interface{}     `json:"id"`
-	Method  string          `json:"method"`
-	Params  json.RawMessage `json:"params,omitempty"`
-}
-
-type RequestBtcGetCommitment struct {
-	TxHash string `json:"tx_hash"`
-}
-
-type Commitment struct {
-	Success bool
-	Value   string
-}
-
-type Response struct {
-	Version string          `json:"jsonrpc"`
-	ID      interface{}     `json:"id"`
-	Result  json.RawMessage `json:"result,omitempty"`
-	Error   *Error          `json:"error,omitempty"`
-}
-
-type Error struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    string `json:"data"`
-}
-
-type ResponseBtcGetCommitment struct {
-	Commitment Commitment `json:"commitment"`
 }

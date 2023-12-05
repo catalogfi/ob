@@ -11,7 +11,7 @@ import (
 	btcutil "github.com/btcsuite/btcd/btcutil"
 	chaincfg "github.com/btcsuite/btcd/chaincfg"
 	wire "github.com/btcsuite/btcd/wire"
-	bitcoin "github.com/catalogfi/orderbook/swapper/bitcoin"
+	bitcoin "github.com/catalogfi/wbtc-garden/swapper/bitcoin"
 	gomock "go.uber.org/mock/gomock"
 )
 

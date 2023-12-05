@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catalogfi/orderbook/model"
+	"github.com/catalogfi/wbtc-garden/model"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )

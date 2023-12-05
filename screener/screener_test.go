@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/catalogfi/orderbook/model"
+	"github.com/catalogfi/wbtc-garden/model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 

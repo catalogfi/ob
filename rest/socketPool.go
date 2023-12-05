@@ -3,7 +3,7 @@ package rest
 import (
 	"sync"
 
-	"github.com/catalogfi/orderbook/model"
+	"github.com/catalogfi/wbtc-garden/model"
 )
 
 type socketPool struct {

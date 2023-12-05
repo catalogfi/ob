@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/catalogfi/orderbook/model"
-	"github.com/catalogfi/orderbook/screener"
+	"github.com/catalogfi/wbtc-garden/model"
+	"github.com/catalogfi/wbtc-garden/screener"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"

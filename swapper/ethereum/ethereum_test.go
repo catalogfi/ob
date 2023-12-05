@@ -47,8 +47,8 @@ var _ = Describe("ethereum swap", func() {
 // 	"math/big"
 // 	"time"
 //
-// 	"github.com/catalogfi/orderbook/swapper"
-// 	"github.com/catalogfi/orderbook/swapper/ethereum"
+// 	"github.com/catalogfi/wbtc-garden/swapper"
+// 	"github.com/catalogfi/wbtc-garden/swapper/ethereum"
 // 	"github.com/ethereum/go-ethereum/common"
 // 	"github.com/ethereum/go-ethereum/crypto"
 // 	. "github.com/onsi/ginkgo/v2"
