@@ -12,7 +12,7 @@ $order_update_event$ LANGUAGE plpgsql;
 
 -- #2
 -- Function to notify the swap id 
--- called when an update happens on atoomic_swaps table
+-- called when an update happens on atomic_swaps table
 CREATE OR REPLACE FUNCTION notify_changes_with_swap_id()
 RETURNS TRIGGER AS $swap_update_event$
 BEGIN
@@ -21,13 +21,24 @@ BEGIN
 END;
 $swap_update_event$ LANGUAGE plpgsql;
 
+-- #3
+-- Function to notify the order id when a new order is created
+-- called when an new order is created on orders table
+CREATE OR REPLACE FUNCTION notify_creation_with_order_id()
+RETURNS TRIGGER AS $order_created_event$
+BEGIN
+    PERFORM pg_notify('added_to_orders',NEW.id::text);
+    RETURN NEW;
+END;
+$order_created_event$ LANGUAGE plpgsql;
+
 -- #TRIGGERS
 -- #1
 -- trigger for insert events on orders
 CREATE OR REPLACE TRIGGER notify_orders_insert_trigger
 AFTER INSERT ON orders
 FOR EACH ROW
-EXECUTE FUNCTION notify_changes_with_order_id();
+EXECUTE FUNCTION notify_creation_with_order_id();
 
 -- #2
 -- triger for update events on orders

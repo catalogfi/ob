@@ -537,30 +537,25 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 	if page != 0 && perPage != 0 {
 		tx = tx.Offset((page - 1) * perPage).Limit(perPage)
 	}
+
+	// check if verbose
+	if verbose {
+		tx = tx.Preload("InitiatorAtomicSwap").Preload("FollowerAtomicSwap")
+		tx.Order("id ASC")
+	}
+
 	if tx = tx.Find(&orders); tx.Error != nil {
 		return nil, tx.Error
 	}
 
-	if verbose {
-		for i := range orders {
-			if err := s.fillSwapDetails(&orders[i]); err != nil {
-				return nil, err
-			}
-		}
-	}
 	return orders, nil
 }
 
 // filter the orders based on the given query parameters
 func (s *store) GetOrdersByAddress(address string) ([]model.Order, error) {
 	orders := []model.Order{}
-	if tx := s.db.Where("maker = ? OR taker = ?", address, address).Find(&orders); tx.Error != nil {
+	if tx := s.db.Where("maker = ? OR taker = ?", address, address).Preload("InitiatorAtomicSwap").Preload("FollowerAtomicSwap").Find(&orders); tx.Error != nil {
 		return nil, tx.Error
-	}
-	for i := range orders {
-		if err := s.fillSwapDetails(&orders[i]); err != nil {
-			return nil, err
-		}
 	}
 	return orders, nil
 }
@@ -568,13 +563,8 @@ func (s *store) GetOrdersByAddress(address string) ([]model.Order, error) {
 // get all the orders with active atomic swaps
 func (s *store) GetActiveOrders() ([]model.Order, error) {
 	orders := []model.Order{}
-	if tx := s.db.Where("status IN ?", []model.Status{model.Created, model.Filled}).Find(&orders); tx.Error != nil {
+	if tx := s.db.Where("status IN ?", []model.Status{model.Created, model.Filled}).Preload("InitiatorAtomicSwap").Preload("FollowerAtomicSwap").Find(&orders); tx.Error != nil {
 		return nil, tx.Error
-	}
-	for i := range orders {
-		if err := s.fillSwapDetails(&orders[i]); err != nil {
-			return nil, err
-		}
 	}
 	return orders, nil
 }
@@ -614,6 +604,7 @@ func (s *store) GetOrder(orderID uint) (*model.Order, error) {
 	if tx := s.db.First(order, orderID); tx.Error != nil {
 		return nil, tx.Error
 	}
+
 	return order, s.fillSwapDetails(order)
 }
 func (s *store) GetOrderBySwapID(swapID uint) (*model.Order, error) {
