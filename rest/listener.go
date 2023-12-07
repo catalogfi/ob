@@ -134,6 +134,7 @@ func (listener *DBListener) waitForEvent(uol, nol, sl *pq.Listener) {
 			listener.logger.Info("Received no events for 90 seconds, checking connection")
 			go func() {
 				uol.Ping()
+				nol.Ping()
 				sl.Ping()
 			}()
 		}
