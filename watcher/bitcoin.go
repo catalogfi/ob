@@ -147,25 +147,6 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			swap.Status = model.Initiated
 		}
 
-	} else if swap.IsInstantWallet && swap.InitiateBlockNumber == 0 && swap.Status == model.Initiated {
-		//when we detect iw, we set status to inited, but we would not
-		//know the block number, so we do that here
-		blockHeight, confs, _, err := watcher.Status(swap.InitiateTxHash)
-		if err != nil {
-			return err
-		}
-		if confs == 0 {
-			return nil
-		}
-		// we have atleast 1 confirmation at this point
-		if swap.InitiateBlockNumber == 0 {
-			swap.InitiateBlockNumber = blockHeight
-		}
-		if confs >= swap.MinimumConfirmations {
-			swap.CurrentConfirmations = swap.MinimumConfirmations
-		} else if confs != swap.CurrentConfirmations {
-			swap.CurrentConfirmations = confs
-		}
 	} else if swap.Status != model.Redeemed && swap.Status != model.Refunded {
 		currentBlock, err := btcClient.GetTipBlockHeight()
 		if err != nil {
@@ -177,7 +158,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			return err
 		}
 
-		if currentBlock >= swap.InitiateBlockNumber+expiry {
+		if swap.InitiateBlockNumber > 0 && currentBlock >= swap.InitiateBlockNumber+expiry {
 			refunded, txHash, err := watcher.IsRefunded()
 			if err != nil {
 				return err
@@ -203,6 +184,25 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			swap.Status = model.Redeemed
 			swap.RedeemTxHash = txHash
 			swap.Secret = hex.EncodeToString(secret)
+		}
+	} else if swap.IsInstantWallet && swap.InitiateBlockNumber == 0 && swap.Status == model.Initiated {
+		//when we detect iw, we set status to inited, but we would not
+		//know the block number, so we do that here
+		blockHeight, confs, _, err := watcher.Status(swap.InitiateTxHash)
+		if err != nil {
+			return err
+		}
+		if confs == 0 {
+			return nil
+		}
+		// we have atleast 1 confirmation at this point
+		if swap.InitiateBlockNumber == 0 {
+			swap.InitiateBlockNumber = blockHeight
+		}
+		if confs >= swap.MinimumConfirmations {
+			swap.CurrentConfirmations = swap.MinimumConfirmations
+		} else if confs != swap.CurrentConfirmations {
+			swap.CurrentConfirmations = confs
 		}
 	}
 	return store.UpdateSwap(swap)
