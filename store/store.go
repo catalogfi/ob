@@ -212,6 +212,14 @@ func (s *store) usdValue(swaps []model.AtomicSwap, config model.Network) (*big.I
 	return tvl, nil
 }
 
+func (s *store) getUSDValue(amount *big.Int, price float64, decimals int64) *big.Int {
+	normaliser := new(big.Int).Exp(big.NewInt(10), big.NewInt(decimals), nil)
+	normalisedAmount := new(big.Float).Quo(new(big.Float).SetInt(amount), new(big.Float).SetInt(normaliser))
+	amountValue := new(big.Float).Mul(big.NewFloat(price), normalisedAmount)
+	val, _ := amountValue.Int(nil)
+	return val
+}
+
 // create a new order with the given details
 func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userBtcWalletAddress string, config model.Config) (uint, error) {
 	s.mu.Lock()
@@ -264,22 +272,6 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		return 0, fmt.Errorf("invalid receive amount")
 	}
 
-	if config.DailyLimit != "" {
-		// get the total amount traded by the user in the last 24 hrs for limit checks
-		tradedValue, err := s.ValueTradedByUserYesterday(creator, config.Network)
-		if err != nil {
-			return 0, err
-		}
-		dailyLimit, ok := new(big.Int).SetString(config.DailyLimit, 10)
-		if !ok {
-			return 0, fmt.Errorf("invalid daily limit: %v", err)
-		}
-
-		if tradedValue.Cmp(dailyLimit) >= 0 {
-			return 0, fmt.Errorf("reached daily limit")
-		}
-	}
-
 	initiatorSwapPrice, err := s.price(sendChain, sendAsset, config)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get price for %s: %v", sendAsset, err)
@@ -288,6 +280,24 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	followerSwapPrice, err := s.price(receiveChain, receiveAsset, config)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get price for %s: %v", receiveAsset, err)
+	}
+
+	if config.DailyLimit != "" {
+		// get the total amount traded by the user in the last 24 hrs for limit checks
+		tradedValue, err := s.ValueTradedByUserYesterday(creator, config.Network)
+		if err != nil {
+			return 0, err
+		}
+		sendUsdValue := s.getUSDValue(sendAmt, initiatorSwapPrice.Price, config.Network[sendChain].Assets[sendAsset].Decimals)
+		currentValue := new(big.Int).Add(tradedValue, sendUsdValue)
+		dailyLimit, ok := new(big.Int).SetString(config.DailyLimit, 10)
+		if !ok {
+			return 0, fmt.Errorf("invalid daily limit: %v", err)
+		}
+
+		if currentValue.Cmp(dailyLimit) >= 0 {
+			return 0, fmt.Errorf("reached daily limit")
+		}
 	}
 
 	// get the number of orders to calculate user specific nonce
