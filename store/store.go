@@ -212,7 +212,7 @@ func (s *store) usdValue(swaps []model.AtomicSwap, config model.Network) (*big.I
 	return tvl, nil
 }
 
-func (s *store) getUSDValue(amount *big.Int, price float64, decimals int64) *big.Int {
+func (s *store) calculateUSDValue(amount *big.Int, price float64, decimals int64) *big.Int {
 	normaliser := new(big.Int).Exp(big.NewInt(10), big.NewInt(decimals), nil)
 	normalisedAmount := new(big.Float).Quo(new(big.Float).SetInt(amount), new(big.Float).SetInt(normaliser))
 	amountValue := new(big.Float).Mul(big.NewFloat(price), normalisedAmount)
@@ -288,7 +288,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		if err != nil {
 			return 0, err
 		}
-		sendUsdValue := s.getUSDValue(sendAmt, initiatorSwapPrice.Price, config.Network[sendChain].Assets[sendAsset].Decimals)
+		sendUsdValue := s.calculateUSDValue(sendAmt, initiatorSwapPrice.Price, config.Network[sendChain].Assets[sendAsset].Decimals)
 		currentValue := new(big.Int).Add(tradedValue, sendUsdValue)
 		dailyLimit, ok := new(big.Int).SetString(config.DailyLimit, 10)
 		if !ok {
@@ -296,7 +296,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		}
 
 		if currentValue.Cmp(dailyLimit) >= 0 {
-			return 0, fmt.Errorf("reached daily limit")
+			return 0, fmt.Errorf("reached daily limit,daily limit : %s, current value : %s", dailyLimit, currentValue)
 		}
 	}
 
