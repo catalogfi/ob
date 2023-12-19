@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const SwapInitiationTimeout = 12 * time.Hour
+const SwapInitiationTimeout = 1 * time.Hour
 const OrderTimeout = 3 * time.Minute
 
 type Store interface {
