@@ -154,7 +154,7 @@ func (s *store) ValueTradedByUserYesterday(user string, config model.Network) (*
 }
 
 func (s *store) valueTradedByUserYesterday(user string, config model.Network) (*big.Int, error) {
-	yesterday := time.Now().Add(-24 * time.Hour).UTC()
+	yesterday := time.Now().UTC().Truncate(24 * time.Hour)
 	orders := []model.Order{}
 	if tx := s.db.Where("(maker = ? OR taker = ?) AND status >= ? AND status < ? AND created_at >= ?", user, user, model.Created, model.FailedSoft, yesterday).Find(&orders); tx.Error != nil {
 		return nil, tx.Error
