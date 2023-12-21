@@ -83,6 +83,14 @@ func (c Chain) IsBTC() bool {
 	return c.Params() != nil
 }
 
+func (c Chain) IsMainnet() bool {
+	switch c {
+	case Bitcoin, Ethereum, EthereumOptimism, EthereumArbitrum, EthereumPolygon, EthereumAvalanche, EthereumBNB:
+		return true
+	}
+	return false
+}
+
 func (c Chain) Params() *chaincfg.Params {
 	switch c {
 	case Bitcoin:
