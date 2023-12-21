@@ -232,7 +232,7 @@ func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, cha
 		}
 	}
 
-	if screener != nil {
+	if screener != nil && chain.IsMainnet() {
 		isBlacklisted, err := screener.IsBlacklisted(txSenders)
 		if err != nil {
 			return 0, "", err

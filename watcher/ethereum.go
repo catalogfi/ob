@@ -221,12 +221,14 @@ func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener
 		return nil
 	}
 
-	isBlacklisted, err := screener.IsBlacklisted(map[string]model.Chain{cSwap.Initiator.Hex(): swap.Chain})
-	if err != nil {
-		return NewRecoverableError(fmt.Errorf("failed to check if address is blacklisted, %s", cSwap.Initiator.Hex()))
-	}
-	if isBlacklisted {
-		return NewIgnorableError(fmt.Errorf("address is blacklisted, %s", cSwap.Initiator.Hex()))
+	if screener != nil {
+		isBlacklisted, err := screener.IsBlacklisted(map[string]model.Chain{cSwap.Initiator.Hex(): swap.Chain})
+		if err != nil {
+			return NewRecoverableError(fmt.Errorf("failed to check if address is blacklisted, %s", cSwap.Initiator.Hex()))
+		}
+		if isBlacklisted {
+			return NewIgnorableError(fmt.Errorf("address is blacklisted, %s", cSwap.Initiator.Hex()))
+		}
 	}
 
 	amount, ok := new(big.Int).SetString(swap.Amount, 10)
