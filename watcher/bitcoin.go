@@ -130,25 +130,26 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 		}
 
 	} else if swap.InitiateTxHash != "" && swap.Status == model.Detected {
-		_, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
+		filledAmount, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
 		if err != nil {
 			return err
 		}
+		swap.FilledAmount = strconv.FormatUint(filledAmount, 10)
 		swap.InitiateTxHash = txHash
 		confirmations, err := GetBTCConfirmations(btcClient, txHash)
 		if err != nil {
 			return err
 		}
-		if confirmations.LatestTxConfirmations > 0 && swap.InitiateBlockNumber == 0 {
+		if confirmations.LatestTxConfirmations > 0 && swap.InitiateBlockNumber == 0 && filledAmount >= amount {
 			if confirmations.LatestTxConfirmations-confirmations.FirstTxConfirmations >= uint64(expiry/2) {
 				return store.UpdateSwap(swap)
 			}
 			swap.InitiateBlockNumber = confirmations.LatestTxHeight
+			swap.Status = model.Initiated
 		}
 		swap.CurrentConfirmations = confirmations.LatestTxConfirmations
 		if swap.CurrentConfirmations >= swap.MinimumConfirmations {
 			swap.CurrentConfirmations = swap.MinimumConfirmations
-			swap.Status = model.Initiated
 		}
 
 	} else if swap.Status != model.Redeemed && swap.Status != model.Refunded {
