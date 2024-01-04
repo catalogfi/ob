@@ -104,6 +104,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 
 		swap.FilledAmount = strconv.FormatUint(filledAmount, 10)
 		swap.InitiateTxHash = txHash
+		swap.Status = model.Detected
 		if filledAmount >= amount {
 			_, conf, isIw, err := watcher.Status(txHash)
 			if err != nil {
@@ -124,8 +125,6 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			if isIw {
 				swap.Status = model.Initiated
 				swap.IsInstantWallet = true
-			} else {
-				swap.Status = model.Detected
 			}
 		}
 
