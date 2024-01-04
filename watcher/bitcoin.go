@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -25,6 +24,13 @@ type BTCWatcher struct {
 	interval time.Duration
 	logger   *zap.Logger
 	chain    model.Chain
+}
+
+type Confirmations struct {
+	LatestTxConfirmations uint64
+	LatestTxHeight        uint64
+	FirstTxConfirmations  uint64
+	FirstTxHeight         uint64
 }
 
 func NewBTCWatcher(store Store, chain model.Chain, config model.Config, screener screener.Screener, interval time.Duration, logger *zap.Logger) *BTCWatcher {
@@ -60,6 +66,7 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 	}
 
 	for _, swap := range swaps {
+		fmt.Println(swap.ID)
 		btcClient, err := LoadBTCClient(swap.Chain, w.config.Network[swap.Chain], nil)
 		if err != nil {
 			w.logger.Error("failed to load client", zap.Error(err))
@@ -71,7 +78,7 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 			continue
 		}
 
-		if err := UpdateSwapStatus(watcher, btcClient, w.screener, w.store, &swap); err != nil {
+		if err := UpdateSwapStatus(watcher, btcClient, w.screener, w.store, &swap, w.config.Network[swap.Chain].Expiry); err != nil {
 			w.logger.Error("failed to update swap status", zap.Error(err))
 			continue
 		}
@@ -79,22 +86,14 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 	return nil
 }
 
-func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screener screener.Screener, store Store, swap *model.AtomicSwap) error {
+func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screener screener.Screener, store Store, swap *model.AtomicSwap, expiry int64) error {
 
-	var filledAmt uint64
 	var err error
-	filledAmt = 0
-	if swap.FilledAmount != "" {
-		filledAmt, err = strconv.ParseUint(swap.FilledAmount, 10, 64)
-		if err != nil {
-			return err
-		}
-	}
 	amount, err := strconv.ParseUint(swap.Amount, 10, 64)
 	if err != nil {
 		return err
 	}
-	if swap.InitiateTxHash == "" || (swap.InitiateTxHash != "" && filledAmt < amount && swap.Chain.IsBTC()) && swap.Status == model.NotStarted {
+	if swap.Status == model.NotStarted {
 		filledAmount, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
 		if err != nil {
 			return err
@@ -106,7 +105,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 		swap.FilledAmount = strconv.FormatUint(filledAmount, 10)
 		swap.InitiateTxHash = txHash
 		if filledAmount >= amount {
-			_, conf, isIw, err := watcher.Status(swap.InitiateTxHash)
+			_, conf, isIw, err := watcher.Status(txHash)
 			if err != nil {
 				return err
 			}
@@ -131,17 +130,22 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 		}
 
 	} else if swap.InitiateTxHash != "" && swap.Status == model.Detected {
-		height, confirmations, _, err := watcher.Status(swap.InitiateTxHash)
+		_, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
 		if err != nil {
 			return err
 		}
-		if confirmations > 0 && swap.InitiateBlockNumber == 0 {
-			swap.InitiateBlockNumber = height
+		swap.InitiateTxHash = txHash
+		confirmations, err := GetBTCConfirmations(btcClient, txHash)
+		if err != nil {
+			return err
 		}
-
-		if confirmations != swap.CurrentConfirmations {
-			swap.CurrentConfirmations = confirmations
+		if confirmations.LatestTxConfirmations > 0 && swap.InitiateBlockNumber == 0 {
+			if confirmations.LatestTxConfirmations-confirmations.FirstTxConfirmations >= uint64(expiry/2) {
+				return store.UpdateSwap(swap)
+			}
+			swap.InitiateBlockNumber = confirmations.LatestTxHeight
 		}
+		swap.CurrentConfirmations = confirmations.LatestTxConfirmations
 		if swap.CurrentConfirmations >= swap.MinimumConfirmations {
 			swap.CurrentConfirmations = swap.MinimumConfirmations
 			swap.Status = model.Initiated
@@ -153,12 +157,12 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			return err
 		}
 
-		expiry, err := strconv.ParseUint(swap.Timelock, 10, 64)
+		timelock, err := strconv.ParseUint(swap.Timelock, 10, 64)
 		if err != nil {
 			return err
 		}
 
-		if swap.InitiateBlockNumber > 0 && currentBlock >= swap.InitiateBlockNumber+expiry {
+		if swap.InitiateBlockNumber > 0 && currentBlock >= swap.InitiateBlockNumber+timelock {
 			refunded, txHash, err := watcher.IsRefunded()
 			if err != nil {
 				return err
@@ -188,21 +192,20 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 	} else if swap.IsInstantWallet && swap.InitiateBlockNumber == 0 && swap.Status == model.Initiated {
 		//when we detect iw, we set status to inited, but we would not
 		//know the block number, so we do that here
-		blockHeight, confs, _, err := watcher.Status(swap.InitiateTxHash)
+		confs, err := GetBTCConfirmations(btcClient, swap.InitiateTxHash)
 		if err != nil {
 			return err
 		}
-		if confs == 0 {
+		if confs.LatestTxConfirmations == 0 {
 			return nil
 		}
 		// we have atleast 1 confirmation at this point
 		if swap.InitiateBlockNumber == 0 {
-			swap.InitiateBlockNumber = blockHeight
+			swap.InitiateBlockNumber = confs.LatestTxHeight
 		}
-		if confs >= swap.MinimumConfirmations {
+		swap.CurrentConfirmations = confs.LatestTxConfirmations
+		if confs.LatestTxConfirmations >= swap.MinimumConfirmations {
 			swap.CurrentConfirmations = swap.MinimumConfirmations
-		} else if confs != swap.CurrentConfirmations {
-			swap.CurrentConfirmations = confs
 		}
 	}
 	return store.UpdateSwap(swap)
@@ -246,25 +249,37 @@ func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, cha
 	return bal, strings.Join(txs, ","), nil
 }
 
-func GetBTCConfirmations(btcClient bitcoin.Client, txHash string) (uint64, uint64, error) {
-	latestDepositBlockHeight := uint64(0)
-	latestDepositConfirmations := uint64(math.MaxUint64)
+func GetBTCConfirmations(btcClient bitcoin.Client, txHash string) (Confirmations, error) {
+	var conf Confirmations
+
 	txHashes := strings.Split(txHash, ",")
-	for _, txHash := range txHashes {
+	blockHeight, confirmations, err := btcClient.GetConfirmations(txHashes[0])
+	if err != nil {
+		return conf, err
+	}
+
+	conf.LatestTxConfirmations = confirmations
+	conf.FirstTxConfirmations = confirmations
+	conf.LatestTxHeight = blockHeight
+	conf.FirstTxHeight = blockHeight
+
+	for _, txHash := range txHashes[1:] {
 		blockHeight, confirmations, err := btcClient.GetConfirmations(txHash)
 		if err != nil {
-			return 0, 0, err
+			return conf, err
 		}
 
-		if blockHeight > uint64(latestDepositBlockHeight) {
-			latestDepositBlockHeight = blockHeight
+		if blockHeight < uint64(conf.LatestTxHeight) {
+			conf.LatestTxHeight = blockHeight
+			conf.LatestTxConfirmations = confirmations
 		}
 
-		if confirmations < latestDepositConfirmations {
-			latestDepositConfirmations = confirmations
+		if blockHeight > uint64(conf.FirstTxHeight) {
+			conf.FirstTxHeight = blockHeight
+			conf.FirstTxConfirmations = confirmations
 		}
 	}
-	return latestDepositBlockHeight, latestDepositConfirmations, nil
+	return conf, nil
 }
 
 func LoadBTCClient(chain model.Chain, config model.NetworkConfig, btcStore bitcoin.Store) (bitcoin.Client, error) {

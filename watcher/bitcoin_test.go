@@ -338,7 +338,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 		It("should fail if BTCInitiateStatus check fails", func() {
 			// mockWatcher.EXPECT().Identifier().Return("")
 			// mockBTCClient.EXPECT().Net().Return(&chaincfg.TestNet3Params)
-			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &model.AtomicSwap{OnChainIdentifier: ""})
+			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &model.AtomicSwap{OnChainIdentifier: ""}, 72)
 			Expect(err).Should(Not(BeNil()))
 		})
 
@@ -360,7 +360,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			// 	},
 			// }}, uint64(100000), nil)
 			// mockBTCClient.EXPECT().GetTx("txHash1").Return(bitcoin.Transaction{VINs: []bitcoin.VIN{{Prevout: bitcoin.Prevout{ScriptPubKeyAddress: depositAddr}}}}, nil)
-			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "ffee"})
+			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "ffee"}, 72)
 			Expect(err).Should(Not(BeNil()))
 		})
 
@@ -385,7 +385,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			initialSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "120000"}
 			updatedSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "120000", FilledAmount: "100000", InitiateTxHash: "txHash1"}
 			mockStore.EXPECT().UpdateSwap(&updatedSwap).Return(nil)
-			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(BeNil())
 		})
 
@@ -411,7 +411,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			initialSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "100000"}
 			updatedSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "100000", FilledAmount: "100000", InitiateTxHash: "txHash1", Status: model.Detected}
 			mockStore.EXPECT().UpdateSwap(&updatedSwap).Return(nil)
-			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(BeNil())
 		})
 
@@ -444,7 +444,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 		// 	initialSwap := model.AtomicSwap{OnChainIdentifier: "", Amount: "200000"}
 		// 	updatedSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "200000", FilledAmount: "200000", InitiateTxHash: "txHash1,txHash2", Status: model.Detected}
 		// 	mockStore.EXPECT().UpdateSwap(&updatedSwap).Return(nil)
-		// 	err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+		// 	err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap,72)
 		// 	Expect(err).Should(BeNil())
 		// })
 
@@ -452,7 +452,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			// mockWatcher.EXPECT().Identifier().Return("")
 			// mockBTCClient.EXPECT().GetConfirmations(mockTxHash).Return(uint64(0), uint64(0), mockError)
 
-			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &model.AtomicSwap{OnChainIdentifier: "", InitiateTxHash: mockTxHash, Status: model.Detected})
+			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &model.AtomicSwap{OnChainIdentifier: "", InitiateTxHash: mockTxHash, Status: model.Detected}, 72)
 			Expect(err).Should(Not(BeNil()))
 		})
 
@@ -464,7 +464,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			initialSwap := model.AtomicSwap{OnChainIdentifier: "", MinimumConfirmations: 6, InitiateTxHash: mockTxHash, Status: model.Detected, Amount: "200000", CurrentConfirmations: 0}
 			updatedSwap := model.AtomicSwap{OnChainIdentifier: "", MinimumConfirmations: 6, InitiateTxHash: mockTxHash, Status: model.Detected, CurrentConfirmations: 4, Amount: "200000"}
 			mockStore.EXPECT().UpdateSwap(&updatedSwap).Return(nil)
-			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(BeNil())
 		})
 
@@ -478,7 +478,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			initialSwap := model.AtomicSwap{OnChainIdentifier: "", MinimumConfirmations: 10, InitiateTxHash: "txHash1,txHash2,txHash3", Status: model.Detected, Amount: "20000"}
 			updatedSwap := model.AtomicSwap{OnChainIdentifier: "", MinimumConfirmations: 10, InitiateTxHash: "txHash1,txHash2,txHash3", Status: model.Initiated, CurrentConfirmations: 10, InitiateBlockNumber: 102, Amount: "20000"}
 			mockStore.EXPECT().UpdateSwap(&updatedSwap).Return(nil)
-			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(BeNil())
 		})
 
@@ -486,7 +486,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			// mockWatcher.EXPECT().Identifier().Return("")
 			// mockBTCClient.EXPECT().GetTipBlockHeight().Return(uint64(0), mockError)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: "", InitiateTxHash: mockTxHash, Status: model.Initiated}
-			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(Not(BeNil()))
 		})
 
@@ -494,7 +494,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			// mockWatcher.EXPECT().Identifier().Return("")
 			// mockBTCClient.EXPECT().GetTipBlockHeight().Return(uint64(10000), nil)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: "", InitiateTxHash: mockTxHash, Status: model.Initiated, Timelock: "ffee"}
-			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(Not(BeNil()))
 		})
 
@@ -503,7 +503,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			// mockBTCClient.EXPECT().GetTipBlockHeight().Return(uint64(10000), nil)
 			// mockWatcher.EXPECT().IsRedeemed().Return(false, []byte{}, "", mockError)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: "", InitiateTxHash: mockTxHash, InitiateBlockNumber: 9999, Timelock: "1000", Status: model.Initiated}
-			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(Not(BeNil()))
 		})
 
@@ -512,7 +512,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			mockBTCClient.EXPECT().GetTipBlockHeight().Return(uint64(10000), nil)
 			mockWatcher.EXPECT().IsRedeemed().Return(false, []byte{}, "", nil)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: "", InitiateTxHash: mockTxHash, InitiateBlockNumber: 9999, Timelock: "100000", Status: model.Initiated, Amount: "20000"}
-			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(BeNil())
 		})
 
@@ -524,7 +524,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			initialSwap := model.AtomicSwap{OnChainIdentifier: "", InitiateTxHash: mockTxHash, InitiateBlockNumber: 9999, Timelock: "1000", Status: model.Initiated, Amount: "20000"}
 			finalSwap := model.AtomicSwap{OnChainIdentifier: "", InitiateTxHash: mockTxHash, InitiateBlockNumber: 9999, Timelock: "1000", Secret: hex.EncodeToString(secret[:]), RedeemTxHash: mockTxHash, Status: model.Redeemed, Amount: "20000"}
 			mockStore.EXPECT().UpdateSwap(&finalSwap).Return(nil)
-			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(BeNil())
 		})
 
@@ -533,7 +533,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			// mockBTCClient.EXPECT().GetTipBlockHeight().Return(uint64(10000), nil)
 			// mockWatcher.EXPECT().IsRefunded().Return(false, "", mockError)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: "", InitiateBlockNumber: 5000, Timelock: "4999", InitiateTxHash: mockTxHash, Status: model.Initiated}
-			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(Not(BeNil()))
 		})
 
@@ -545,7 +545,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			// finalSwap := model.AtomicSwap{OnChainIdentifier: "", InitiateBlockNumber: 5000, Timelock: "499999", InitiateTxHash: mockTxHash, Status: model.Initiated, Amount: "200000"}
 
 			// mockStore.EXPECT().UpdateSwap(&finalSwap).Return(nil)
-			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(BeNil())
 		})
 
@@ -556,7 +556,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			initialSwap := model.AtomicSwap{OnChainIdentifier: "", InitiateBlockNumber: 5000, Timelock: "49999", InitiateTxHash: mockTxHash, Status: model.Redeemed, Amount: "200000"}
 			finalSwap := model.AtomicSwap{OnChainIdentifier: "", InitiateBlockNumber: 5000, Timelock: "49999", InitiateTxHash: mockTxHash, Status: model.Redeemed, Amount: "200000"}
 			mockStore.EXPECT().UpdateSwap(&finalSwap).Return(nil)
-			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(BeNil())
 		})
 	})
@@ -566,17 +566,17 @@ var _ = Describe("Bitcoin Watcher", func() {
 
 		It("should fail if the btc client fails to get confirmations", func() {
 			mockBTCClient.EXPECT().GetConfirmations(mockTxHash).Return(uint64(0), uint64(0), mockError)
-			height, conf, err := GetBTCConfirmations(mockBTCClient, mockTxHash)
-			Expect(height).Should(Equal(uint64(0)))
-			Expect(conf).Should(Equal(uint64(0)))
+			conf, err := GetBTCConfirmations(mockBTCClient, mockTxHash)
+			Expect(conf.FirstTxConfirmations).Should(Equal(uint64(0)))
+			Expect(conf.FirstTxHeight).Should(Equal(uint64(0)))
 			Expect(err).Should(Not(BeNil()))
 		})
 
 		It("should successfully return block height and confirmations when there is one utxo", func() {
 			mockBTCClient.EXPECT().GetConfirmations(mockTxHash).Return(uint64(100), uint64(4), nil)
-			height, conf, err := GetBTCConfirmations(mockBTCClient, mockTxHash)
-			Expect(height).Should(Equal(uint64(100)))
-			Expect(conf).Should(Equal(uint64(4)))
+			conf, err := GetBTCConfirmations(mockBTCClient, mockTxHash)
+			Expect(conf.FirstTxConfirmations).Should(Equal(uint64(0)))
+			Expect(conf.FirstTxHeight).Should(Equal(uint64(0)))
 			Expect(err).Should(BeNil())
 		})
 
@@ -585,9 +585,9 @@ var _ = Describe("Bitcoin Watcher", func() {
 			mockBTCClient.EXPECT().GetConfirmations("txHash1").Return(uint64(100), uint64(4), nil)
 			mockBTCClient.EXPECT().GetConfirmations("txHash2").Return(uint64(102), uint64(2), nil)
 			mockBTCClient.EXPECT().GetConfirmations("txHash3").Return(uint64(101), uint64(3), nil)
-			height, conf, err := GetBTCConfirmations(mockBTCClient, mockTxHashes)
-			Expect(height).Should(Equal(uint64(102)))
-			Expect(conf).Should(Equal(uint64(2)))
+			conf, err := GetBTCConfirmations(mockBTCClient, mockTxHashes)
+			Expect(conf.FirstTxConfirmations).Should(Equal(uint64(0)))
+			Expect(conf.FirstTxHeight).Should(Equal(uint64(0)))
 			Expect(err).Should(BeNil())
 		})
 	})
@@ -754,7 +754,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 
 			// mockBTCClient.EXPECT().GetConfirmations(mockTxHash).Return(uint64(100), uint64(4), nil)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: "", MinimumConfirmations: 6, InitiateTxHash: mockTxHash, Status: model.Detected, Amount: "200000", CurrentConfirmations: 0, FilledAmount: "-1000"}
-			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err := UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(Not(BeNil()))
 		})
 
@@ -779,7 +779,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			mockBTCClient.EXPECT().GetTx("txHash1").Return(bitcoin.Transaction{VINs: []bitcoin.VIN{{Prevout: bitcoin.Prevout{ScriptPubKeyAddress: depositAddr}}}}, nil)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "100000"}
 
-			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(Not(BeNil()))
 		})
 
@@ -804,7 +804,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			}}, uint64(100000), nil)
 			mockBTCClient.EXPECT().GetTx("txHash1").Return(bitcoin.Transaction{VINs: []bitcoin.VIN{{Prevout: bitcoin.Prevout{ScriptPubKeyAddress: depositAddr}}}}, nil)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "100000"}
-			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(Not(BeNil()))
 		})
 
@@ -830,7 +830,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			}}, uint64(100000), nil)
 			mockBTCClient.EXPECT().GetTx("txHash1").Return(bitcoin.Transaction{VINs: []bitcoin.VIN{{Prevout: bitcoin.Prevout{ScriptPubKeyAddress: depositAddr}}}}, nil)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "100000"}
-			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(Not(BeNil()))
 		})
 
@@ -856,7 +856,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			}}, uint64(100000), nil)
 			mockBTCClient.EXPECT().GetTx("txHash1").Return(bitcoin.Transaction{VINs: []bitcoin.VIN{{Prevout: bitcoin.Prevout{ScriptPubKeyAddress: depositAddr}}}}, nil)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "100000"}
-			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(BeNil())
 		})
 
@@ -882,7 +882,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			}}, uint64(100000), nil)
 			mockBTCClient.EXPECT().GetTx("txHash1").Return(bitcoin.Transaction{VINs: []bitcoin.VIN{{Prevout: bitcoin.Prevout{ScriptPubKeyAddress: depositAddr}}}}, nil)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "100000"}
-			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(BeNil())
 		})
 
@@ -908,7 +908,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			// }}, uint64(100000), nil)
 			// mockBTCClient.EXPECT().GetTx("txHash1").Return(bitcoin.Transaction{VINs: []bitcoin.VIN{{Prevout: bitcoin.Prevout{ScriptPubKeyAddress: depositAddr}}}}, nil)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "100000", IsInstantWallet: true, InitiateBlockNumber: 0, Status: model.Initiated, InitiateTxHash: "txHash1", FilledAmount: "100000"}
-			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(BeNil())
 		})
 
@@ -934,7 +934,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			// }}, uint64(100000), nil)
 			// mockBTCClient.EXPECT().GetTx("txHash1").Return(bitcoin.Transaction{VINs: []bitcoin.VIN{{Prevout: bitcoin.Prevout{ScriptPubKeyAddress: depositAddr}}}}, nil)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "100000", IsInstantWallet: true, InitiateBlockNumber: 0, Status: model.Initiated, InitiateTxHash: "txHash1", FilledAmount: "100000", CurrentConfirmations: 1, MinimumConfirmations: 3}
-			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(BeNil())
 		})
 
@@ -962,7 +962,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			// }}, uint64(100000), nil)
 			// mockBTCClient.EXPECT().GetTx("txHash1").Return(bitcoin.Transaction{VINs: []bitcoin.VIN{{Prevout: bitcoin.Prevout{ScriptPubKeyAddress: depositAddr}}}}, nil)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "100000", IsInstantWallet: false, InitiateBlockNumber: 0, Timelock: "200", Status: model.Initiated, InitiateTxHash: "txHash1", FilledAmount: "100000", CurrentConfirmations: 1, MinimumConfirmations: 3}
-			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(BeNil())
 		})
 
@@ -990,7 +990,7 @@ var _ = Describe("Bitcoin Watcher", func() {
 			// }}, uint64(100000), nil)
 			// mockBTCClient.EXPECT().GetTx("txHash1").Return(bitcoin.Transaction{VINs: []bitcoin.VIN{{Prevout: bitcoin.Prevout{ScriptPubKeyAddress: depositAddr}}}}, nil)
 			initialSwap := model.AtomicSwap{OnChainIdentifier: mockAddress, Amount: "100000", IsInstantWallet: false, InitiateBlockNumber: 0, Timelock: "200", Status: model.Initiated, InitiateTxHash: "txHash1", FilledAmount: "100000", CurrentConfirmations: 1, MinimumConfirmations: 3}
-			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap)
+			err = UpdateSwapStatus(mockWatcher, mockBTCClient, nil, mockStore, &initialSwap, 72)
 			Expect(err).Should(BeNil())
 		})
 	})
