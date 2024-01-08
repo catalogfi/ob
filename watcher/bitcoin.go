@@ -67,6 +67,9 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 
 	for _, swap := range swaps {
 		fmt.Println(swap.ID)
+		if swap.ID != 2555 {
+			continue
+		}
 		btcClient, err := LoadBTCClient(swap.Chain, w.config.Network[swap.Chain], nil)
 		if err != nil {
 			w.logger.Error("failed to load client", zap.Error(err))
@@ -146,13 +149,23 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 
 		if confirmations.LatestTxConfirmations > timelock {
 			swap.Status = model.Expired
-		} else if filledAmount >= amount && confirmations.LatestTxConfirmations > 0 && swap.InitiateBlockNumber == 0 && confirmations.FirstTxConfirmations-confirmations.LatestTxConfirmations < uint64(expiry/2) {
-			swap.InitiateBlockNumber = confirmations.LatestTxHeight
-			swap.Status = model.Initiated
+			return store.UpdateSwap(swap)
 		}
-		swap.CurrentConfirmations = confirmations.LatestTxConfirmations
-		if swap.CurrentConfirmations >= swap.MinimumConfirmations {
-			swap.CurrentConfirmations = swap.MinimumConfirmations
+
+		if confirmations.FirstTxConfirmations-confirmations.LatestTxConfirmations >= uint64(expiry/2) {
+			return store.UpdateSwap(swap)
+		}
+
+		if filledAmount >= amount && confirmations.LatestTxConfirmations > 0 {
+			if swap.InitiateBlockNumber == 0 {
+				swap.InitiateBlockNumber = confirmations.LatestTxHeight
+			}
+			swap.CurrentConfirmations = confirmations.LatestTxConfirmations
+			if swap.CurrentConfirmations >= swap.MinimumConfirmations {
+				swap.CurrentConfirmations = swap.MinimumConfirmations
+				swap.InitiateBlockNumber = confirmations.LatestTxHeight
+				swap.Status = model.Initiated
+			}
 		}
 
 	} else if swap.Status != model.Redeemed && swap.Status != model.Refunded {
