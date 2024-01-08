@@ -142,12 +142,13 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 		confirmations, err := GetBTCConfirmations(btcClient, txHash)
 		if err != nil {
 			return err
-		} else if filledAmount >= amount && confirmations.LatestTxConfirmations > 0 && swap.InitiateBlockNumber == 0 && confirmations.LatestTxConfirmations-confirmations.FirstTxConfirmations >= uint64(expiry/2) {
-			swap.InitiateBlockNumber = confirmations.LatestTxHeight
-			swap.Status = model.Initiated
 		}
+
 		if confirmations.LatestTxConfirmations > timelock {
 			swap.Status = model.Expired
+		} else if filledAmount >= amount && confirmations.LatestTxConfirmations > 0 && swap.InitiateBlockNumber == 0 && confirmations.FirstTxConfirmations-confirmations.LatestTxConfirmations < uint64(expiry/2) {
+			swap.InitiateBlockNumber = confirmations.LatestTxHeight
+			swap.Status = model.Initiated
 		}
 		swap.CurrentConfirmations = confirmations.LatestTxConfirmations
 		if swap.CurrentConfirmations >= swap.MinimumConfirmations {
@@ -160,7 +161,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			return err
 		}
 
-		if swap.InitiateBlockNumber > 0 && currentBlock >= swap.InitiateBlockNumber+timelock {
+		if (swap.InitiateBlockNumber > 0 && currentBlock >= swap.InitiateBlockNumber+timelock) || (swap.Status == model.Expired && swap.InitiateBlockNumber == 0) {
 			refunded, txHash, err := watcher.IsRefunded()
 			if err != nil {
 				return err
