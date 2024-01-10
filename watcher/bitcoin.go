@@ -148,7 +148,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			return store.UpdateSwap(swap)
 		}
 
-		if confirmations.FirstTxConfirmations-confirmations.LatestTxConfirmations >= uint64(expiry/2) {
+		if confirmations.FirstTxConfirmations-confirmations.LatestTxConfirmations > uint64(expiry/2) {
 			return store.UpdateSwap(swap)
 		}
 
