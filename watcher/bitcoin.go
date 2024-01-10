@@ -66,10 +66,6 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 	}
 
 	for _, swap := range swaps {
-		fmt.Println(swap.ID)
-		if swap.ID != 2555 {
-			continue
-		}
 		btcClient, err := LoadBTCClient(swap.Chain, w.config.Network[swap.Chain], nil)
 		if err != nil {
 			w.logger.Error("failed to load client", zap.Error(err))
