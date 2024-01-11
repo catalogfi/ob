@@ -251,6 +251,8 @@ func (w *EthereumL2Watcher) HandleEVML2Initiate(log types.Log, store Store, cSwa
 		return NewRecoverableError(fmt.Errorf("failed to get current block number"))
 	}
 
+	w.logger.Info(fmt.Sprintf("Mapping %d on l2 to %d", log.BlockNumber, currentL1Block))
+
 	swap.InitiateTxHash = log.TxHash.String()
 	swap.InitiateBlockNumber = currentL1Block
 	swap.Status = model.Detected
