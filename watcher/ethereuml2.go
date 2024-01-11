@@ -89,6 +89,7 @@ func (w *EthereumL2Watcher) Watch() {
 			continue
 		}
 		currentL1Block, err := w.client.GetL1CurrentBlock()
+		fmt.Println("here", currentL1Block,err)
 		if err != nil {
 			w.logger.Error("failed to get current block number", zap.Error(err))
 			continue

@@ -6,9 +6,10 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
-	"log"
+	"io"
 	"math/big"
 	"net/http"
+	"strconv"
 
 	"github.com/catalogfi/orderbook/swapper/ethereum/typings/AtomicSwap"
 	"github.com/catalogfi/orderbook/swapper/ethereum/typings/ERC20"
@@ -83,7 +84,9 @@ func (client *client) GetCurrentBlock() (uint64, error) {
 }
 
 type L2Block struct {
-	L1BlockNumber uint64 `json:"l1BlockNumber"`
+	Data struct {
+		L1BlockNumber string `json:"l1BlockNumber"`
+	} `json:"result"`
 }
 
 // for arbitrum like clients
@@ -110,18 +113,24 @@ func (client *client) GetL1CurrentBlock() (uint64, error) {
 
 	// Create an HTTP client and send the request
 	httpClient := &http.Client{}
+
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
-	defer resp.Body.Close()
-
-	err = json.NewDecoder(resp.Body).Decode(&l2Block)
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read block number: %w", err)
+	}
+	if err := json.Unmarshal(data, &l2Block); err != nil {
+		return 0, fmt.Errorf("failed to unmarshal block number: %w", err)
+	}
+	n, err := strconv.ParseUint(l2Block.Data.L1BlockNumber[2:], 16, 64)
 	if err != nil {
 		return 0, err
 	}
 
-	return l2Block.L1BlockNumber, nil
+	return n, nil
 }
 func (client *client) GetL1BlockAt(blockNumber uint64) (uint64, error) {
 	h := fmt.Sprintf("0x%x", blockNumber)
@@ -147,18 +156,26 @@ func (client *client) GetL1BlockAt(blockNumber uint64) (uint64, error) {
 
 	// Create an HTTP client and send the request
 	httpClient := &http.Client{}
+
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
-	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	fmt.Println(string(data))
+	if err != nil {
+		return 0, fmt.Errorf("failed to read block number: %w", err)
+	}
+	if err := json.Unmarshal(data, &l2Block); err != nil {
+		return 0, fmt.Errorf("failed to unmarshal block number: %w", err)
+	}
 
-	err = json.NewDecoder(resp.Body).Decode(&l2Block)
+	n, err := strconv.ParseUint(l2Block.Data.L1BlockNumber[2:], 16, 64)
 	if err != nil {
 		return 0, err
 	}
 
-	return l2Block.L1BlockNumber, nil
+	return n, nil
 }
 
 func (client *client) GetProvider() *ethclient.Client {
