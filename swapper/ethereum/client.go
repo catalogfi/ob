@@ -29,6 +29,7 @@ type Client interface {
 	GetTransactOpts(privKey *ecdsa.PrivateKey) (*bind.TransactOpts, error)
 	GetCurrentBlock() (uint64, error)
 	GetL1CurrentBlock() (uint64, error)
+	GetL1BlockAt(uint64) (uint64, error)
 	GetProvider() *ethclient.Client
 	GetTokenAddress(contractAddr common.Address) (common.Address, error)
 	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
@@ -94,6 +95,43 @@ func (client *client) GetL1CurrentBlock() (uint64, error) {
 		"method": "eth_getBlockByNumber",
 		"params": [
 		    "latest",
+		    false
+		]
+	    }`)
+
+	// Create a new HTTP request
+	req, err := http.NewRequest("POST", client.url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return 0, err
+	}
+
+	// Set headers (Content-Type is important)
+	req.Header.Set("Content-Type", "application/json")
+
+	// Create an HTTP client and send the request
+	httpClient := &http.Client{}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	err = json.NewDecoder(resp.Body).Decode(&l2Block)
+	if err != nil {
+		return 0, err
+	}
+
+	return l2Block.L1BlockNumber, nil
+}
+func (client *client) GetL1BlockAt(blockNumber uint64) (uint64, error) {
+	h := fmt.Sprintf("0x%x", blockNumber)
+	var l2Block L2Block
+	jsonBody := []byte(`{
+		"id": 1,
+		"jsonrpc": "2.0",
+		"method": "eth_getBlockByNumber",
+		"params": [
+		    "` + h + `",
 		    false
 		]
 	    }`)

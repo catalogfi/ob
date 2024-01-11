@@ -109,7 +109,7 @@ func (w *EthereumL2Watcher) Watch() {
 			w.logger.Error("failed to get logs", zap.Error(err))
 			continue
 		}
-		werr := HandleEVML2Logs(eventIds, logsSlice, w.store, w.screener, w.AtomicSwap, w.logger, currentL1Block)
+		werr := w.HandleEVML2Logs(eventIds, logsSlice, w.store, w.screener, w.AtomicSwap, w.logger)
 		if werr != nil {
 			var nonrecoverable *NonRecoverableError
 			if errors.As(werr, &nonrecoverable) {
@@ -119,7 +119,7 @@ func (w *EthereumL2Watcher) Watch() {
 			w.logger.Error("failed to handle EVML2 logs", zap.Error(werr))
 		}
 
-		err = UpdateEVML2Confirmations(w.store, w.chain, currentL1Block)
+		err = w.UpdateEVML2Confirmations(w.store, w.chain, currentL1Block)
 		if err != nil {
 			w.logger.Error("failed to update confirmations", zap.Error(err))
 		}
@@ -129,7 +129,7 @@ func (w *EthereumL2Watcher) Watch() {
 	}
 }
 
-func HandleEVML2Logs(eventIds [][]common.Hash, logs []types.Log, store Store, screener screener.Screener, contract *AtomicSwap.AtomicSwap, logger *zap.Logger, l1BlockNumber uint64) error {
+func (w *EthereumL2Watcher) HandleEVML2Logs(eventIds [][]common.Hash, logs []types.Log, store Store, screener screener.Screener, contract *AtomicSwap.AtomicSwap, logger *zap.Logger) error {
 	for _, log := range logs {
 		switch log.Topics[0] {
 		case eventIds[0][0]:
@@ -140,7 +140,7 @@ func HandleEVML2Logs(eventIds [][]common.Hash, logs []types.Log, store Store, sc
 				return NewNonRecoverableError(fmt.Errorf("failed to get swap order: %s", err))
 			}
 			handler := func() error {
-				return HandleEVML2Initiate(log, store, cSwap, screener, l1BlockNumber)
+				return w.HandleEVML2Initiate(log, store, cSwap, screener)
 			}
 			wErr := RetryOnWatcherError(handler, retryCount)
 			var nonrecoverable *NonRecoverableError
@@ -171,7 +171,7 @@ func HandleEVML2Logs(eventIds [][]common.Hash, logs []types.Log, store Store, sc
 }
 
 // update confirmation status of unconfirmed initiates
-func UpdateEVML2Confirmations(store Store, chain model.Chain, currentBlock uint64) error {
+func (w *EthereumL2Watcher) UpdateEVML2Confirmations(store Store, chain model.Chain, currentBlock uint64) error {
 	swaps, err := store.GetActiveSwaps(chain)
 	if err != nil {
 		return err
@@ -204,7 +204,7 @@ func UpdateEVML2Confirmations(store Store, chain model.Chain, currentBlock uint6
 	return nil
 }
 
-func HandleEVML2Initiate(log types.Log, store Store, cSwap Swap, screener screener.Screener, l1BLockNumber uint64) error {
+func (w *EthereumL2Watcher) HandleEVML2Initiate(log types.Log, store Store, cSwap Swap, screener screener.Screener) error {
 	swap, err := store.SwapByOCID(log.Topics[1].Hex()[2:])
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -246,8 +246,13 @@ func HandleEVML2Initiate(log types.Log, store Store, cSwap Swap, screener screen
 		return NewIgnorableError(fmt.Errorf("incorrect redeemer: %s", swap.RedeemerAddress))
 	}
 
+	currentL1Block, err := w.client.GetL1BlockAt(log.BlockNumber)
+	if err != nil {
+		return NewRecoverableError(fmt.Errorf("failed to get current block number"))
+	}
+
 	swap.InitiateTxHash = log.TxHash.String()
-	swap.InitiateBlockNumber = l1BLockNumber
+	swap.InitiateBlockNumber = currentL1Block
 	swap.Status = model.Detected
 
 	err = store.UpdateSwap(&swap)
