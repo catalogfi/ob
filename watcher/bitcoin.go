@@ -198,7 +198,8 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			swap.RedeemTxHash = txHash
 			swap.Secret = hex.EncodeToString(secret)
 		}
-	} else if swap.IsInstantWallet && swap.InitiateBlockNumber == 0 && swap.Status == model.Initiated {
+	} 
+	if swap.IsInstantWallet && swap.InitiateBlockNumber == 0 && swap.Status == model.Initiated {
 		//when we detect iw, we set status to inited, but we would not
 		//know the block number, so we do that here
 		confs, err := GetBTCConfirmations(btcClient, swap.InitiateTxHash)
