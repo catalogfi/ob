@@ -148,7 +148,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			return store.UpdateSwap(swap)
 		}
 
-		if confirmations.FirstTxConfirmations-confirmations.LatestTxConfirmations > uint64(expiry/2) {
+		if int64(confirmations.FirstTxConfirmations)-int64(confirmations.LatestTxConfirmations) > int64(expiry/2) {
 			return store.UpdateSwap(swap)
 		}
 
@@ -278,12 +278,12 @@ func GetBTCConfirmations(btcClient bitcoin.Client, txHash string) (Confirmations
 			return conf, err
 		}
 
-		if blockHeight < uint64(conf.LatestTxHeight) {
+		if blockHeight > uint64(conf.LatestTxHeight) {
 			conf.LatestTxHeight = blockHeight
 			conf.LatestTxConfirmations = confirmations
 		}
 
-		if blockHeight > uint64(conf.FirstTxHeight) {
+		if blockHeight < uint64(conf.FirstTxHeight) {
 			conf.FirstTxHeight = blockHeight
 			conf.FirstTxConfirmations = confirmations
 		}
