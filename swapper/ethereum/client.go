@@ -1,10 +1,15 @@
 package ethereum
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
+	"net/http"
+	"strconv"
 
 	"github.com/catalogfi/orderbook/swapper/ethereum/typings/AtomicSwap"
 	"github.com/catalogfi/orderbook/swapper/ethereum/typings/ERC20"
@@ -24,6 +29,8 @@ var (
 type Client interface {
 	GetTransactOpts(privKey *ecdsa.PrivateKey) (*bind.TransactOpts, error)
 	GetCurrentBlock() (uint64, error)
+	GetL1CurrentBlock() (uint64, error)
+	GetL1BlockAt(uint64) (uint64, error)
 	GetProvider() *ethclient.Client
 	GetTokenAddress(contractAddr common.Address) (common.Address, error)
 	GetERC20Balance(tokenAddr common.Address, address common.Address) (*big.Int, error)
@@ -74,6 +81,101 @@ func (client *client) GetTransactOpts(privKey *ecdsa.PrivateKey) (*bind.Transact
 
 func (client *client) GetCurrentBlock() (uint64, error) {
 	return client.provider.BlockNumber(context.Background())
+}
+
+type L2Block struct {
+	Data struct {
+		L1BlockNumber string `json:"l1BlockNumber"`
+	} `json:"result"`
+}
+
+// for arbitrum like clients
+func (client *client) GetL1CurrentBlock() (uint64, error) {
+	var l2Block L2Block
+	jsonBody := []byte(`{
+		"id": 1,
+		"jsonrpc": "2.0",
+		"method": "eth_getBlockByNumber",
+		"params": [
+		    "latest",
+		    false
+		]
+	    }`)
+
+	// Create a new HTTP request
+	req, err := http.NewRequest("POST", client.url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return 0, err
+	}
+
+	// Set headers (Content-Type is important)
+	req.Header.Set("Content-Type", "application/json")
+
+	// Create an HTTP client and send the request
+	httpClient := &http.Client{}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read block number: %w", err)
+	}
+	if err := json.Unmarshal(data, &l2Block); err != nil {
+		return 0, fmt.Errorf("failed to unmarshal block number: %w", err)
+	}
+	n, err := strconv.ParseUint(l2Block.Data.L1BlockNumber[2:], 16, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return n, nil
+}
+func (client *client) GetL1BlockAt(blockNumber uint64) (uint64, error) {
+	h := fmt.Sprintf("0x%x", blockNumber)
+	var l2Block L2Block
+	jsonBody := []byte(`{
+		"id": 1,
+		"jsonrpc": "2.0",
+		"method": "eth_getBlockByNumber",
+		"params": [
+		    "` + h + `",
+		    false
+		]
+	    }`)
+
+	// Create a new HTTP request
+	req, err := http.NewRequest("POST", client.url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return 0, err
+	}
+
+	// Set headers (Content-Type is important)
+	req.Header.Set("Content-Type", "application/json")
+
+	// Create an HTTP client and send the request
+	httpClient := &http.Client{}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	data, err := io.ReadAll(resp.Body)
+	fmt.Println(string(data))
+	if err != nil {
+		return 0, fmt.Errorf("failed to read block number: %w", err)
+	}
+	if err := json.Unmarshal(data, &l2Block); err != nil {
+		return 0, fmt.Errorf("failed to unmarshal block number: %w", err)
+	}
+
+	n, err := strconv.ParseUint(l2Block.Data.L1BlockNumber[2:], 16, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return n, nil
 }
 
 func (client *client) GetProvider() *ethclient.Client {
