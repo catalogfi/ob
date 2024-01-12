@@ -570,6 +570,14 @@ func (s *store) GetOrdersByAddress(address string) ([]model.Order, error) {
 	return orders, nil
 }
 
+func (s *store) GetPendingOrdersForAddress(address string) ([]model.Order, error) {
+	orders := []model.Order{}
+	if tx := s.db.Where("(maker = ? OR taker = ?) AND orders.status = ?", address, address, model.Filled).Preload("InitiatorAtomicSwap").Preload("FollowerAtomicSwap").Order("id DESC").Find(&orders); tx.Error != nil {
+		return nil, tx.Error
+	}
+	return orders, nil
+}
+
 // get all the orders with active atomic swaps
 func (s *store) GetActiveOrders() ([]model.Order, error) {
 	orders := []model.Order{}
