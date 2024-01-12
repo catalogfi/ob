@@ -58,6 +58,8 @@ type Store interface {
 	GetOrderBySwapID(swapID uint) (*model.Order, error)
 	// get orders by address
 	GetOrdersByAddress(address string) ([]model.Order, error)
+
+	GetPendingOrdersForAddress(address string) ([]model.Order, error)
 	// cancel order by id
 	CancelOrder(creator string, orderID uint) error
 	// get all orders for the given user

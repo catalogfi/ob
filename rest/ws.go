@@ -93,6 +93,19 @@ func (s *Server) subscribe(msg []byte, ctx context.Context) <-chan interface{} {
 			return
 		}
 
+		isOnlyPendingPending, err := regexp.Match("^0x[0-9a-fA-F]{40}-onlyPending$", []byte(values[1]))
+		if err == nil && isOnlyPendingPending {
+			addrValues := strings.Split(string(values[1]), "-")
+			if len(addrValues) != 2 {
+				responses <- WebsocketError{Code: 1, Error: fmt.Sprintf("invalid subscribe message %s", values[1])}
+				return
+			}
+			for order := range s.subscribeToPendingAndUpdatedOrders(strings.ToLower(addrValues[0]), ctx) {
+				responses <- order
+			}
+			return
+		}
+
 		isAddress, err := regexp.Match("^0x[0-9a-fA-F]{40}$", []byte(values[1]))
 		if err == nil && isAddress {
 			for order := range s.subscribeToUpdatedOrders(strings.ToLower(values[1]), ctx) {
@@ -168,6 +181,33 @@ func (s *Server) subscribeToUpdatedOrders(creator string, ctx context.Context) <
 
 		s.socketPool.AddUpdatedOrdersChannel(creator, responses)
 		orders, err := s.store.GetOrdersByAddress(creator)
+		if err != nil {
+			responses <- UpdatedOrders{Error: fmt.Sprintf("failed to get orders for %s: %v", creator, err)}
+			s.logger.Error("failed to get orders", zap.Error(err))
+			return
+		}
+
+		newOrders := UpdatedOrders{
+			Orders: orders,
+		}
+		responses <- newOrders
+
+		<-ctx.Done()
+
+	}()
+	return responses
+}
+func (s *Server) subscribeToPendingAndUpdatedOrders(creator string, ctx context.Context) <-chan UpdatedOrders {
+	responses := make(chan UpdatedOrders)
+
+	go func() {
+		defer func() {
+			s.socketPool.RemoveUpdatedOrdersChannel(creator, responses)
+			close(responses)
+		}()
+
+		s.socketPool.AddUpdatedOrdersChannel(creator, responses)
+		orders, err := s.store.GetPendingOrdersForAddress(creator)
 		if err != nil {
 			responses <- UpdatedOrders{Error: fmt.Sprintf("failed to get orders for %s: %v", creator, err)}
 			s.logger.Error("failed to get orders", zap.Error(err))

@@ -162,7 +162,7 @@ func (client *client) GetL1BlockAt(blockNumber uint64) (uint64, error) {
 		return 0, err
 	}
 	data, err := io.ReadAll(resp.Body)
-	fmt.Println(string(data))
+
 	if err != nil {
 		return 0, fmt.Errorf("failed to read block number: %w", err)
 	}
