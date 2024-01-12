@@ -743,19 +743,19 @@ func CheckHash(hash string) (string, error) {
 func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
 	if chain.IsBTC() {
 		switch {
-		case value.Cmp(big.NewInt(10000)) < 1:
+		case value.Cmp(big.NewInt(100000)) < 1:
 			return 1
 
-		case value.Cmp(big.NewInt(100000)) < 1:
+		case value.Cmp(big.NewInt(1000000)) < 1:
 			return 2
 
-		case value.Cmp(big.NewInt(1000000)) < 1:
+		case value.Cmp(big.NewInt(10000000)) < 1:
 			return 4
 
-		case value.Cmp(big.NewInt(10000000)) < 1:
+		case value.Cmp(big.NewInt(100000000)) < 1:
 			return 6
 
-		case value.Cmp(big.NewInt(100000000)) < 1:
+		case value.Cmp(big.NewInt(1000000000)) < 1:
 			return 8
 
 		default:
@@ -763,19 +763,19 @@ func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
 		}
 	} else if chain.IsEVM() {
 		switch {
-		case value.Cmp(big.NewInt(10000)) < 1:
+		case value.Cmp(big.NewInt(100000)) < 1:
 			return 6
 
-		case value.Cmp(big.NewInt(100000)) < 1:
+		case value.Cmp(big.NewInt(1000000)) < 1:
 			return 12
 
-		case value.Cmp(big.NewInt(1000000)) < 1:
+		case value.Cmp(big.NewInt(10000000)) < 1:
 			return 18
 
-		case value.Cmp(big.NewInt(10000000)) < 1:
+		case value.Cmp(big.NewInt(100000000)) < 1:
 			return 24
 
-		case value.Cmp(big.NewInt(100000000)) < 1:
+		case value.Cmp(big.NewInt(1000000000)) < 1:
 			return 30
 
 		default:
