@@ -575,7 +575,6 @@ func (s *store) GetPendingOrdersForAddress(address string) ([]model.Order, error
 	if tx := s.db.Where("(maker = ? OR taker = ?) AND orders.status = ?", address, address, model.Filled).Preload("InitiatorAtomicSwap").Preload("FollowerAtomicSwap").Order("id DESC").Find(&orders); tx.Error != nil {
 		return nil, tx.Error
 	}
-	fmt.Println("orders", orders, address)
 	return orders, nil
 }
 
