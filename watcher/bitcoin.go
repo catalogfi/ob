@@ -88,6 +88,7 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screener screener.Screener, store Store, swap *model.AtomicSwap, expiry int64) error {
 
 	var err error
+	isFirstupdate := false
 	amount, err := strconv.ParseUint(swap.Amount, 10, 64)
 	if err != nil {
 		return err
@@ -126,6 +127,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 				// TODO: blacklist this maker
 			}
 			if isIw {
+				isFirstupdate = true
 				swap.Status = model.Initiated
 				swap.IsInstantWallet = true
 			}
@@ -198,8 +200,8 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			swap.RedeemTxHash = txHash
 			swap.Secret = hex.EncodeToString(secret)
 		}
-	} 
-	if swap.IsInstantWallet && swap.InitiateBlockNumber == 0 && swap.Status == model.Initiated {
+	}
+	if swap.IsInstantWallet && swap.InitiateBlockNumber == 0 && swap.Status == model.Initiated && !isFirstupdate {
 		//when we detect iw, we set status to inited, but we would not
 		//know the block number, so we do that here
 		confs, err := GetBTCConfirmations(btcClient, swap.InitiateTxHash)
