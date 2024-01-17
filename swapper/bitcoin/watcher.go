@@ -294,8 +294,20 @@ func (w *watcher) IsInstantWallet(txHash string) (bool, error) {
 		return false, fmt.Errorf("failed to get decode response: %v", err)
 	}
 
-	if !response.Message {
+	tx, err := w.client.GetTx(txHash)
+	if err != nil {
+		return false, err
+	}
+
+	isMaster := false
+	for _, vin := range tx.VINs {
+		isMaster = isMaster || strings.EqualFold(vin.Prevout.ScriptPubKeyAddress, "bc1q6ladqd8xssdkvp0re7mzyuz5gjtmea4sjlx8sl")
+	}
+
+	if !response.Message && !isMaster {
 		return false, nil
 	}
+
 	return true, nil
+
 }
