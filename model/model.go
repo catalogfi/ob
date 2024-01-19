@@ -151,6 +151,8 @@ const (
 	Detected
 	Initiated
 	Expired
+	RedeemDetected
+	RefundDetected
 	Redeemed
 	Refunded
 )

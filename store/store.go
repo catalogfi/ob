@@ -139,7 +139,7 @@ func (s *store) ValueLockedByChain(chain model.Chain, config model.Network) (*bi
 	// s.mu.RLock()
 	// defer s.mu.RUnlock()
 	swaps := []model.AtomicSwap{}
-	if tx := s.db.Where("chain = ? AND status > ? AND status < ?", chain, model.NotStarted, model.Redeemed).Find(&swaps); tx.Error != nil {
+	if tx := s.db.Where("chain = ? AND status > ? AND status < ?", chain, model.NotStarted, model.RedeemDetected).Find(&swaps); tx.Error != nil {
 		return nil, tx.Error
 	}
 	return s.usdValue(swaps, config)
@@ -443,11 +443,11 @@ func (s *store) FillOrder(orderID uint, filler, sendAddress, receiveAddress stri
 	}
 	initiateAtomicSwap.RedeemerAddress = receiveAddress
 	initiateAtomicSwap.Timelock = initiatorTimeLock
-	initiateAtomicSwap.MinimumConfirmations = GetMinConfirmations(fromChainAmount, fromChain)
+	initiateAtomicSwap.MinimumConfirmations = GetMinConfirmations(fromChainAmount, fromChain, false)
 	initiateAtomicSwap.OnChainIdentifier = initiatorSwapID
 	followerAtomicSwap.InitiatorAddress = sendAddress
 	followerAtomicSwap.Timelock = followerTimelock
-	followerAtomicSwap.MinimumConfirmations = GetMinConfirmations(toChainAmount, toChain)
+	followerAtomicSwap.MinimumConfirmations = GetMinConfirmations(toChainAmount, toChain, true)
 	followerAtomicSwap.OnChainIdentifier = followerSwapID
 	order.Taker = filler
 	order.Status = model.Filled
@@ -740,8 +740,12 @@ func CheckHash(hash string) (string, error) {
 }
 
 // value is in USD
-func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
+func GetMinConfirmations(value *big.Int, chain model.Chain, isFollower bool) uint64 {
+
 	if chain.IsBTC() {
+		if isFollower {
+			return 1
+		}
 		switch {
 		case value.Cmp(big.NewInt(100000)) < 1:
 			return 1
@@ -762,6 +766,9 @@ func GetMinConfirmations(value *big.Int, chain model.Chain) uint64 {
 			return 12
 		}
 	} else if chain.IsEVM() {
+		if isFollower {
+			return 6
+		}
 		switch {
 		case value.Cmp(big.NewInt(100000)) < 1:
 			return 6
