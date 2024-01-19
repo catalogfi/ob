@@ -592,7 +592,7 @@ func (s *store) GetActiveSwaps(chain model.Chain) ([]model.AtomicSwap, error) {
 	swaps := []model.AtomicSwap{}
 	if tx := s.db.Table("atomic_swaps").
 		Joins("JOIN orders ON atomic_swaps.id = orders.initiator_atomic_swap_id OR atomic_swaps.id = orders.follower_atomic_swap_id").
-		Where("orders.status = ? AND atomic_swaps.status IN ? AND atomic_swaps.chain = ? AND atomic_swaps.on_chain_identifier != ''", model.Filled, []model.SwapStatus{model.NotStarted, model.Initiated, model.Detected, model.Expired}, chain).
+		Where("orders.status = ? AND atomic_swaps.status IN ? AND atomic_swaps.chain = ? AND atomic_swaps.on_chain_identifier != ''", model.Filled, []model.SwapStatus{model.NotStarted, model.Initiated, model.Detected, model.Expired, model.RedeemDetected, model.RefundDetected}, chain).
 		Find(&swaps); tx.Error != nil {
 		return nil, tx.Error
 	}
