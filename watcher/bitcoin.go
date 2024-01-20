@@ -166,33 +166,31 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			return err
 		}
 
-		if (swap.InitiateBlockNumber > 0 && currentBlock > swap.InitiateBlockNumber+timelock) || (swap.Status == model.Expired && swap.InitiateBlockNumber == 0) {
+		if (swap.InitiateBlockNumber > 0 && currentBlock > swap.InitiateBlockNumber+timelock) || (swap.Status == model.Expired) {
 			refunded, txHash, err := watcher.IsRefunded()
 			if err != nil {
 				return err
 			}
 			if !refunded {
-				if swap.Status == model.Expired {
-					return nil
-				}
 				swap.Status = model.Expired
 			} else {
 				swap.Status = model.RefundDetected
 				swap.RefundTxHash = txHash
 			}
 
-		} else {
-			redeemed, secret, txHash, err := watcher.IsRedeemed()
-			if err != nil {
-				return err
-			}
-			if !redeemed {
-				return nil
-			}
-			swap.Status = model.RedeemDetected
-			swap.RedeemTxHash = txHash
-			swap.Secret = hex.EncodeToString(secret)
 		}
+
+		redeemed, secret, txHash, err := watcher.IsRedeemed()
+		if err != nil {
+			return err
+		}
+		if !redeemed {
+			return nil
+		}
+		swap.Status = model.RedeemDetected
+		swap.RedeemTxHash = txHash
+		swap.Secret = hex.EncodeToString(secret)
+
 	} else if swap.Status == model.RedeemDetected || swap.Status == model.RefundDetected {
 		isConfirmed, txHash, err := BTCRedeemOrRefundStatus(btcClient, swap.OnChainIdentifier)
 		if err != nil {
