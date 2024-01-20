@@ -258,7 +258,7 @@ func BTCRedeemOrRefundStatus(btcClient bitcoin.Client, scriptAddress string) (bo
 		return false, "", err
 	}
 
-	txs, err := btcClient.GetTxs(addr.String())
+	txs, err := btcClient.GetTxs(addr.EncodeAddress())
 	if err != nil {
 		return false, "", err
 	}
@@ -269,7 +269,7 @@ func BTCRedeemOrRefundStatus(btcClient bitcoin.Client, scriptAddress string) (bo
 
 	for _, tx := range txs {
 		for vin := range tx.VINs {
-			if tx.VINs[vin].Prevout.ScriptPubKeyAddress == addr.String() {
+			if tx.VINs[vin].Prevout.ScriptPubKeyAddress == addr.EncodeAddress() {
 				return true, tx.TxID, nil
 			}
 		}
