@@ -177,6 +177,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			} else {
 				swap.Status = model.RefundDetected
 				swap.RefundTxHash = txHash
+				return store.UpdateSwap(swap)
 			}
 
 		}
