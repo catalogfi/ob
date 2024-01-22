@@ -54,9 +54,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	if err != nil {
-		panic(err)
-	}
 
 	logger, err := zap.NewDevelopment()
 	if err != nil {
