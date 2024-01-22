@@ -166,17 +166,17 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			return err
 		}
 
-		if (swap.InitiateBlockNumber > 0 && currentBlock > swap.InitiateBlockNumber+timelock) || (swap.Status == model.Expired) {
+		if (swap.InitiateBlockNumber > 0 && currentBlock >= swap.InitiateBlockNumber+timelock) || (swap.Status == model.Expired) {
 			refunded, txHash, err := watcher.IsRefunded()
 			if err != nil {
 				return err
 			}
-			if !refunded && swap.Status != model.Expired {
-				swap.Status = model.Expired
-				return store.UpdateSwap(swap)
-			} else {
+			if refunded {
 				swap.Status = model.RefundDetected
 				swap.RefundTxHash = txHash
+				return store.UpdateSwap(swap)
+			} else if swap.Status != model.Expired {
+				swap.Status = model.Expired
 				return store.UpdateSwap(swap)
 			}
 
