@@ -450,3 +450,7 @@ func (client *instantClient) FundInstanstWallet(from *btcec.PrivateKey, amount i
 	client.store.PutSecret(pubkey.String(), hex.EncodeToString(newSecret), RefundTxGenerated, client.code)
 	return txHash, nil
 }
+
+func (client *instantClient) GetTxs(addr string) ([]Transaction, error) {
+	return client.GetTxs(addr)
+}

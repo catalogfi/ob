@@ -88,7 +88,6 @@ func (w *BTCWatcher) ProcessBTCSwaps() error {
 func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screener screener.Screener, store Store, swap *model.AtomicSwap, expiry int64) error {
 
 	var err error
-	isFirstupdate := false
 	amount, err := strconv.ParseUint(swap.Amount, 10, 64)
 	if err != nil {
 		return err
@@ -98,7 +97,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 		return err
 	}
 	if swap.Status == model.NotStarted {
-		filledAmount, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
+		filledAmount, _, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
 		if err != nil {
 			return err
 		}
@@ -110,11 +109,11 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 		swap.InitiateTxHash = txHash
 		swap.Status = model.Detected
 		if filledAmount >= amount {
-			_, conf, isIw, err := watcher.Status(txHash)
+			confirmations, err := GetBTCConfirmations(btcClient, txHash)
 			if err != nil {
 				return err
 			}
-			if conf > 2 {
+			if confirmations.FirstTxConfirmations > 2 {
 				order, err := store.GetOrderBySwapID(swap.ID)
 				if err != nil {
 					return fmt.Errorf("failed to get order of a non valid tx:%v", err)
@@ -124,19 +123,17 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 					return fmt.Errorf("failed to update a non valid order:%v", err)
 				}
 				return nil
-				// TODO: blacklist this maker
-			}
-			if isIw {
-				isFirstupdate = true
-				swap.Status = model.Initiated
-				swap.IsInstantWallet = true
 			}
 		}
 
 	} else if swap.InitiateTxHash != "" && swap.Status == model.Detected {
-		filledAmount, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
+		filledAmount, utxos, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
 		if err != nil {
 			return err
+		}
+		if utxos == 0 {
+			swap.Status = model.NotStarted
+			return store.UpdateSwap(swap)
 		}
 		swap.FilledAmount = strconv.FormatUint(filledAmount, 10)
 		swap.InitiateTxHash = txHash
@@ -167,71 +164,70 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 			}
 		}
 
-	} else if swap.Status != model.Redeemed && swap.Status != model.Refunded {
+	} else if swap.Status != model.RedeemDetected && swap.Status != model.RefundDetected {
 		currentBlock, err := btcClient.GetTipBlockHeight()
 		if err != nil {
 			return err
 		}
 
-		if (swap.InitiateBlockNumber > 0 && currentBlock > swap.InitiateBlockNumber+timelock) || (swap.Status == model.Expired && swap.InitiateBlockNumber == 0) {
+		if (swap.InitiateBlockNumber > 0 && currentBlock >= swap.InitiateBlockNumber+timelock) || (swap.Status == model.Expired) {
 			refunded, txHash, err := watcher.IsRefunded()
 			if err != nil {
 				return err
 			}
-			if !refunded {
-				if swap.Status == model.Expired {
-					return nil
-				}
-				swap.Status = model.Expired
-			} else {
-				swap.Status = model.Refunded
+			if refunded {
+				swap.Status = model.RefundDetected
 				swap.RefundTxHash = txHash
+				return store.UpdateSwap(swap)
+			} else if swap.Status != model.Expired {
+				swap.Status = model.Expired
+				return store.UpdateSwap(swap)
 			}
 
-		} else {
-			redeemed, secret, txHash, err := watcher.IsRedeemed()
-			if err != nil {
-				return err
-			}
-			if !redeemed {
-				return nil
-			}
-			swap.Status = model.Redeemed
-			swap.RedeemTxHash = txHash
-			swap.Secret = hex.EncodeToString(secret)
 		}
-	}
-	if swap.IsInstantWallet && swap.InitiateBlockNumber == 0 && swap.Status == model.Initiated && !isFirstupdate {
-		//when we detect iw, we set status to inited, but we would not
-		//know the block number, so we do that here
-		confs, err := GetBTCConfirmations(btcClient, swap.InitiateTxHash)
+
+		redeemed, secret, txHash, err := watcher.IsRedeemed()
 		if err != nil {
 			return err
 		}
-		if confs.LatestTxConfirmations == 0 {
+		if !redeemed {
 			return nil
 		}
-		// we have atleast 1 confirmation at this point
-		if swap.InitiateBlockNumber == 0 {
-			swap.InitiateBlockNumber = confs.LatestTxHeight
+		swap.Status = model.RedeemDetected
+		swap.RedeemTxHash = txHash
+		swap.Secret = hex.EncodeToString(secret)
+
+	} else if swap.Status == model.RedeemDetected || swap.Status == model.RefundDetected {
+		isConfirmed, txHash, err := BTCRedeemOrRefundStatus(btcClient, swap.OnChainIdentifier)
+		if err != nil {
+			return err
 		}
-		swap.CurrentConfirmations = confs.LatestTxConfirmations
-		if confs.LatestTxConfirmations >= swap.MinimumConfirmations {
-			swap.CurrentConfirmations = swap.MinimumConfirmations
+		if !isConfirmed {
+			return nil
 		}
+
+		if swap.Status == model.RedeemDetected {
+			swap.Status = model.Redeemed
+			swap.RedeemTxHash = txHash
+		}
+		if swap.Status == model.RefundDetected {
+			swap.Status = model.Refunded
+			swap.RefundTxHash = txHash
+		}
+
 	}
 	return store.UpdateSwap(swap)
 }
 
-func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, chain model.Chain, scriptAddress string) (uint64, string, error) {
+func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, chain model.Chain, scriptAddress string) (uint64, int, string, error) {
 	addr, err := btcutil.DecodeAddress(scriptAddress, btcClient.Net())
 	if err != nil {
-		return 0, "", err
+		return 0, 0, "", err
 	}
 
 	utxos, bal, err := btcClient.GetUTXOs(addr, 0)
 	if err != nil || bal == 0 {
-		return 0, "", err
+		return 0, 0, "", err
 	}
 
 	txs := make([]string, len(utxos))
@@ -240,7 +236,7 @@ func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, cha
 		txs[i] = utxo.TxID
 		tx, err := btcClient.GetTx(utxo.TxID)
 		if err != nil {
-			return 0, "", err
+			return 0, 0, "", err
 		}
 		for _, vin := range tx.VINs {
 			txSenders[vin.Prevout.ScriptPubKeyAddress] = chain
@@ -250,15 +246,39 @@ func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, cha
 	if screener != nil && chain.IsMainnet() {
 		isBlacklisted, err := screener.IsBlacklisted(txSenders)
 		if err != nil {
-			return 0, "", err
+			return 0, 0, "", err
 		}
 
 		if isBlacklisted {
-			return 0, "", fmt.Errorf("blacklisted deposits detected")
+			return 0, 0, "", fmt.Errorf("blacklisted deposits detected")
 		}
 	}
 
-	return bal, strings.Join(txs, ","), nil
+	return bal, len(utxos), strings.Join(txs, ","), nil
+}
+func BTCRedeemOrRefundStatus(btcClient bitcoin.Client, scriptAddress string) (bool, string, error) {
+	addr, err := btcutil.DecodeAddress(scriptAddress, btcClient.Net())
+	if err != nil {
+		return false, "", err
+	}
+
+	txs, err := btcClient.GetTxs(addr.EncodeAddress())
+	if err != nil {
+		return false, "", err
+	}
+
+	if len(txs) == 0 {
+		return false, "", nil
+	}
+
+	for _, tx := range txs {
+		for vin := range tx.VINs {
+			if tx.VINs[vin].Prevout.ScriptPubKeyAddress == addr.EncodeAddress() {
+				return tx.Status.Confirmed, tx.TxID, nil
+			}
+		}
+	}
+	return false, "", nil
 }
 
 func GetBTCConfirmations(btcClient bitcoin.Client, txHash string) (Confirmations, error) {

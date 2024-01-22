@@ -35,6 +35,7 @@ type Client interface {
 	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
 	Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error)
 	GetTx(txid string) (Transaction, error)
+	GetTxs(addr string) ([]Transaction, error)
 	Spend(script []byte, scriptSig wire.TxWitness, spender *btcec.PrivateKey, waitBlocks uint) (string, error)
 	Net() *chaincfg.Params
 	CalculateTransferFee(nInputs, nOutputs int, txVersion int32) (uint64, error)
@@ -244,6 +245,10 @@ func (client *client) CalculateRedeemFee() (uint64, error) {
 
 func (client *client) GetFeeRates() (FeeRates, error) {
 	return client.indexer.GetFeeRates()
+}
+
+func (client *client) GetTxs(txid string) ([]Transaction, error) {
+	return client.indexer.GetTxs(txid)
 }
 
 type FeeRates struct {

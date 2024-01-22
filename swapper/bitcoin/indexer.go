@@ -25,6 +25,7 @@ type Indexer interface {
 	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
 	SubmitTx(tx *wire.MsgTx) (string, error)
 	GetFeeRates() (FeeRates, error)
+	GetTxs(txid string) ([]Transaction, error)
 }
 
 type indexer struct {
@@ -109,6 +110,18 @@ func (indexer *indexer) GetFeeRates() (FeeRates, error) {
 		err = ierr
 	}
 	return FeeRates{}, err
+}
+
+func (indexer *indexer) GetTxs(addr string) ([]Transaction, error) {
+	var err error
+	for _, indexer := range indexer.indexers {
+		txs, ierr := indexer.GetTxs(addr)
+		if ierr == nil {
+			return txs, ierr
+		}
+		err = ierr
+	}
+	return []Transaction{}, err
 }
 
 func NewMempool(url string) Indexer {
@@ -227,6 +240,19 @@ func (mempool *mempool) GetFeeRates() (FeeRates, error) {
 		return FeeRates{}, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
 	return feeRates, nil
+}
+
+func (mempool *mempool) GetTxs(addr string) ([]Transaction, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/address/%s/txs", mempool.url, addr))
+	if err != nil {
+		return []Transaction{}, fmt.Errorf("failed to get transactions: %w", err)
+	}
+	var txs []Transaction
+	if err := json.NewDecoder(resp.Body).Decode(&txs); err != nil {
+		return []Transaction{}, fmt.Errorf("failed to decode transactions: %w", err)
+	}
+
+	return txs, nil
 }
 
 type blockstream struct {
@@ -368,4 +394,17 @@ func (blockstream *blockstream) GetFeeRates() (FeeRates, error) {
 		MinimumFee:  int(math.Ceil(fees["144"])),
 		EconomyFee:  int(math.Ceil(fees["504"])),
 	}, nil
+}
+
+func (blockstream *blockstream) GetTxs(addr string) ([]Transaction, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/address/%s/txs", blockstream.url, addr))
+	if err != nil {
+		return []Transaction{}, fmt.Errorf("failed to get transactions: %w", err)
+	}
+	var txs []Transaction
+	if err := json.NewDecoder(resp.Body).Decode(&txs); err != nil {
+		return []Transaction{}, fmt.Errorf("failed to decode transactions: %w", err)
+	}
+
+	return txs, nil
 }
