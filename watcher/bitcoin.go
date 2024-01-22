@@ -97,7 +97,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 		return err
 	}
 	if swap.Status == model.NotStarted {
-		filledAmount, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
+		filledAmount, _, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
 		if err != nil {
 			return err
 		}
@@ -127,9 +127,13 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 		}
 
 	} else if swap.InitiateTxHash != "" && swap.Status == model.Detected {
-		filledAmount, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
+		filledAmount, utxos, txHash, err := BTCInitiateStatus(btcClient, screener, swap.Chain, swap.OnChainIdentifier)
 		if err != nil {
 			return err
+		}
+		if utxos == 0 {
+			swap.Status = model.NotStarted
+			return store.UpdateSwap(swap)
 		}
 		swap.FilledAmount = strconv.FormatUint(filledAmount, 10)
 		swap.InitiateTxHash = txHash
@@ -215,15 +219,15 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 	return store.UpdateSwap(swap)
 }
 
-func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, chain model.Chain, scriptAddress string) (uint64, string, error) {
+func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, chain model.Chain, scriptAddress string) (uint64, int, string, error) {
 	addr, err := btcutil.DecodeAddress(scriptAddress, btcClient.Net())
 	if err != nil {
-		return 0, "", err
+		return 0, 0, "", err
 	}
 
 	utxos, bal, err := btcClient.GetUTXOs(addr, 0)
 	if err != nil || bal == 0 {
-		return 0, "", err
+		return 0, 0, "", err
 	}
 
 	txs := make([]string, len(utxos))
@@ -232,7 +236,7 @@ func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, cha
 		txs[i] = utxo.TxID
 		tx, err := btcClient.GetTx(utxo.TxID)
 		if err != nil {
-			return 0, "", err
+			return 0, 0, "", err
 		}
 		for _, vin := range tx.VINs {
 			txSenders[vin.Prevout.ScriptPubKeyAddress] = chain
@@ -242,15 +246,15 @@ func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, cha
 	if screener != nil && chain.IsMainnet() {
 		isBlacklisted, err := screener.IsBlacklisted(txSenders)
 		if err != nil {
-			return 0, "", err
+			return 0, 0, "", err
 		}
 
 		if isBlacklisted {
-			return 0, "", fmt.Errorf("blacklisted deposits detected")
+			return 0, 0, "", fmt.Errorf("blacklisted deposits detected")
 		}
 	}
 
-	return bal, strings.Join(txs, ","), nil
+	return bal, len(utxos), strings.Join(txs, ","), nil
 }
 func BTCRedeemOrRefundStatus(btcClient bitcoin.Client, scriptAddress string) (bool, string, error) {
 	addr, err := btcutil.DecodeAddress(scriptAddress, btcClient.Net())
