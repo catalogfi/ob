@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type Config struct {
@@ -48,6 +49,7 @@ func main() {
 	envConfig := LoadConfiguration(path.ConfigPath)
 	store, err := store.New(postgres.Open(envConfig.PSQL_DB), path.SQLSetupPath, &gorm.Config{
 		NowFunc: func() time.Time { return time.Now().UTC() },
+		Logger:  logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		panic(err)
@@ -81,12 +83,22 @@ func main() {
 			btcWatcher := watchers.NewBTCWatcher(store, chain, envConfig.CONFIG, screener, 5*time.Second, logger)
 			go btcWatcher.Watch(context.Background())
 		} else if chain.IsEVM() {
-			for asset, token := range Network.Assets {
-				ethWatcher, err := watchers.NewEthereumWatcher(store, chain, Network, common.HexToAddress(string(asset)), token.StartBlock, uint64(Network.EventWindow), screener, logger)
-				if err != nil {
-					panic(err)
+			if chain == model.EthereumArbitrum {
+				for asset, token := range Network.Assets {
+					ethl2Watcher, err := watchers.NewEthereumL2Watcher(store, chain, Network, common.HexToAddress(string(asset)), token.StartBlock, uint64(Network.EventWindow), screener, logger)
+					if err != nil {
+						panic(err)
+					}
+					go ethl2Watcher.Watch()
 				}
-				go ethWatcher.Watch()
+			} else {
+				for asset, token := range Network.Assets {
+					ethWatcher, err := watchers.NewEthereumWatcher(store, chain, Network, common.HexToAddress(string(asset)), token.StartBlock, uint64(Network.EventWindow), screener, logger)
+					if err != nil {
+						panic(err)
+					}
+					go ethWatcher.Watch()
+				}
 			}
 		}
 

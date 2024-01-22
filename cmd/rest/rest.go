@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type Config struct {
@@ -42,12 +43,13 @@ func main() {
 	envConfig := LoadConfiguration(path.ConfigPath)
 	store, err := store.New(postgres.Open(envConfig.PSQL_DB), path.SQLSetupPath, &gorm.Config{
 		NowFunc: func() time.Time { return time.Now().UTC() },
+		Logger:  logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		panic(err)
 	}
 
-	logger, err := zap.NewDevelopment()
+	logger, err := zap.NewProduction()
 	if err != nil {
 		panic(err)
 	}
