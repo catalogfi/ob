@@ -156,7 +156,6 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 				swap.InitiateBlockNumber = confirmations.LatestTxHeight
 			}
 			swap.CurrentConfirmations = confirmations.LatestTxConfirmations
-			fmt.Println(swap.CurrentConfirmations, swap.MinimumConfirmations, swap.ID)
 			if swap.CurrentConfirmations >= swap.MinimumConfirmations {
 				swap.CurrentConfirmations = swap.MinimumConfirmations
 				swap.InitiateBlockNumber = confirmations.LatestTxHeight
@@ -301,14 +300,20 @@ func GetBTCConfirmations(btcClient bitcoin.Client, txHash string) (Confirmations
 			return conf, err
 		}
 
-		if blockHeight > uint64(conf.LatestTxHeight) {
-			conf.LatestTxHeight = blockHeight
-			conf.LatestTxConfirmations = confirmations
+		if blockHeight != 0 {
+			if conf.FirstTxHeight == 0 || blockHeight < conf.FirstTxHeight {
+				conf.FirstTxHeight = blockHeight
+				conf.FirstTxConfirmations = confirmations
+			}
 		}
 
-		if blockHeight < uint64(conf.FirstTxHeight) {
-			conf.FirstTxHeight = blockHeight
-			conf.FirstTxConfirmations = confirmations
+		if conf.LatestTxHeight == 0 {
+			continue
+		}
+
+		if blockHeight > conf.LatestTxHeight || blockHeight == 0 {
+			conf.LatestTxHeight = blockHeight
+			conf.LatestTxConfirmations = confirmations
 		}
 	}
 	return conf, nil
