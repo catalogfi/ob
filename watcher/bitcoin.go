@@ -301,14 +301,16 @@ func GetBTCConfirmations(btcClient bitcoin.Client, txHash string) (Confirmations
 			return conf, err
 		}
 
-		if blockHeight > uint64(conf.LatestTxHeight) {
+		if blockHeight > uint64(conf.LatestTxHeight) || blockHeight == 0 {
 			conf.LatestTxHeight = blockHeight
 			conf.LatestTxConfirmations = confirmations
+			continue // important to continue here
 		}
 
 		if blockHeight < uint64(conf.FirstTxHeight) {
 			conf.FirstTxHeight = blockHeight
 			conf.FirstTxConfirmations = confirmations
+			continue
 		}
 	}
 	return conf, nil
