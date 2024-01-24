@@ -238,8 +238,12 @@ func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, cha
 	}
 
 	utxos, bal, err := btcClient.GetUTXOs(addr, 0)
-	if err != nil || bal == 0 {
+	if err != nil {
 		return 0, 0, "", fmt.Errorf("failed to get utxos: %v", err)
+	}
+
+	if bal == 0 {
+		return 0, 0, "", nil
 	}
 
 	txs := make([]string, len(utxos))
