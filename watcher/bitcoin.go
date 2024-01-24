@@ -197,10 +197,23 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 		swap.Secret = hex.EncodeToString(secret)
 
 	} else if swap.Status == model.RedeemDetected || swap.Status == model.RefundDetected {
-		isConfirmed, txHash, err := BTCRedeemOrRefundStatus(btcClient, swap.OnChainIdentifier)
+		isConfirmed, isFound, txHash, err := BTCRedeemOrRefundStatus(btcClient, swap.OnChainIdentifier)
 		if err != nil {
 			return err
 		}
+
+		if !isFound {
+			if swap.Status == model.RedeemDetected {
+				swap.Status = model.Initiated
+				swap.RedeemTxHash = ""
+			}
+			if swap.Status == model.RefundDetected {
+				swap.Status = model.Initiated
+				swap.RefundTxHash = ""
+			}
+			return store.UpdateSwap(swap)
+		}
+
 		if !isConfirmed {
 			return nil
 		}
@@ -221,12 +234,12 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, chain model.Chain, scriptAddress string) (uint64, int, string, error) {
 	addr, err := btcutil.DecodeAddress(scriptAddress, btcClient.Net())
 	if err != nil {
-		return 0, 0, "", err
+		return 0, 0, "", fmt.Errorf("failed to decode address: %v", err)
 	}
 
 	utxos, bal, err := btcClient.GetUTXOs(addr, 0)
 	if err != nil || bal == 0 {
-		return 0, 0, "", err
+		return 0, 0, "", fmt.Errorf("failed to get utxos: %v", err)
 	}
 
 	txs := make([]string, len(utxos))
@@ -235,7 +248,7 @@ func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, cha
 		txs[i] = utxo.TxID
 		tx, err := btcClient.GetTx(utxo.TxID)
 		if err != nil {
-			return 0, 0, "", err
+			return 0, 0, "", fmt.Errorf("failed to get tx: %v", err)
 		}
 		for _, vin := range tx.VINs {
 			txSenders[vin.Prevout.ScriptPubKeyAddress] = chain
@@ -245,7 +258,7 @@ func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, cha
 	if screener != nil && chain.IsMainnet() {
 		isBlacklisted, err := screener.IsBlacklisted(txSenders)
 		if err != nil {
-			return 0, 0, "", err
+			return 0, 0, "", fmt.Errorf("failed to check blacklisted deposits: %v", err)
 		}
 
 		if isBlacklisted {
@@ -255,29 +268,32 @@ func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, cha
 
 	return bal, len(utxos), strings.Join(txs, ","), nil
 }
-func BTCRedeemOrRefundStatus(btcClient bitcoin.Client, scriptAddress string) (bool, string, error) {
+
+// returns isConfirmed, isFound, txHash, error
+// isFound is true if the tx is found in the mempool or in a block
+func BTCRedeemOrRefundStatus(btcClient bitcoin.Client, scriptAddress string) (bool, bool, string, error) {
 	addr, err := btcutil.DecodeAddress(scriptAddress, btcClient.Net())
 	if err != nil {
-		return false, "", err
+		return false, false, "", fmt.Errorf("failed to decode address: %v", err)
 	}
 
 	txs, err := btcClient.GetTxs(addr.EncodeAddress())
 	if err != nil {
-		return false, "", err
+		return false, false, "", fmt.Errorf("failed to get txs: %v", err)
 	}
 
 	if len(txs) == 0 {
-		return false, "", nil
+		return false, false, "", nil
 	}
 
 	for _, tx := range txs {
 		for vin := range tx.VINs {
 			if tx.VINs[vin].Prevout.ScriptPubKeyAddress == addr.EncodeAddress() {
-				return tx.Status.Confirmed, tx.TxID, nil
+				return tx.Status.Confirmed, true, tx.TxID, nil
 			}
 		}
 	}
-	return false, "", nil
+	return false, false, "", nil
 }
 
 func GetBTCConfirmations(btcClient bitcoin.Client, txHash string) (Confirmations, error) {
