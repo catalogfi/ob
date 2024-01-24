@@ -63,7 +63,7 @@ type Store interface {
 	// cancel order by id
 	CancelOrder(creator string, orderID uint) error
 	// get all orders for the given user
-	FilterOrders(maker, taker, orderPair, secretHash, sort string, status model.Status, minPrice, maxPrice float64, minAmount, maxAmount float64, page, perPage int, verbose bool) ([]model.Order, error)
+	FilterOrders(maker, taker, orderPair, secretHash string, status model.Status, minPrice, maxPrice float64, minAmount, maxAmount float64, page, perPage int, verbose bool) ([]model.Order, error)
 }
 
 func NewServer(store Store, config model.Config, logger *zap.Logger, secret string, socketPool SocketPool, screener screener.Screener) *Server {
@@ -389,7 +389,6 @@ func (s *Server) getOrders() gin.HandlerFunc {
 		taker := c.DefaultQuery("taker", "")
 		orderPair := c.DefaultQuery("order_pair", "")
 		secretHash := c.DefaultQuery("secret_hash", "")
-		orderBy := c.DefaultQuery("sort", "")
 
 		maker = strings.ToLower(maker)
 		taker = strings.ToLower(taker)
@@ -439,7 +438,7 @@ func (s *Server) getOrders() gin.HandlerFunc {
 			return
 		}
 
-		orders, err := s.store.FilterOrders(maker, taker, orderPair, secretHash, orderBy, model.Status(status), minPrice, maxPrice, minAmount, maxAmount, page, perPage, verbose)
+		orders, err := s.store.FilterOrders(maker, taker, orderPair, secretHash, model.Status(status), minPrice, maxPrice, minAmount, maxAmount, page, perPage, verbose)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": fmt.Sprintf("failed to get orders %s", err.Error()),

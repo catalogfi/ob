@@ -234,7 +234,7 @@ func (s *Server) subscribeToOpenOrders(orderPair string, ctx context.Context) <-
 		}()
 
 		s.socketPool.AddOpenOrdersChannel(orderPair, responses)
-		orders, err := s.store.FilterOrders("", "", orderPair, "", "", model.Created, 0.0, 0.0, 0.0, 0.0, 0, 0, true)
+		orders, err := s.store.FilterOrders("", "", orderPair, "", model.Created, 0.0, 0.0, 0.0, 0.0, 0, 0, true)
 		if err != nil {
 			responses <- OpenOrders{Error: fmt.Sprintf("failed to get orders for %s: %v", orderPair, err)}
 			s.logger.Error("failed to get open orders", zap.Error(err))

@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -301,7 +300,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	}
 
 	// get the number of orders to calculate user specific nonce
-	orders, err := s.FilterOrders(creator, "", "", "", "", 0, 0, 0, 0, 0, 0, 0, false)
+	orders, err := s.FilterOrders(creator, "", "", "", 0, 0, 0, 0, 0, 0, 0, false)
 	if err != nil {
 		return 0, err
 	}
@@ -486,7 +485,7 @@ func (s *store) CancelOrder(creator string, orderID uint) error {
 }
 
 // filter the orders based on the given query parameters
-func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, status model.Status, minPrice, maxPrice float64, minAmount, maxAmount float64, page, perPage int, verbose bool) ([]model.Order, error) {
+func (s *store) FilterOrders(maker, taker, orderPair, secretHash string, status model.Status, minPrice, maxPrice float64, minAmount, maxAmount float64, page, perPage int, verbose bool) ([]model.Order, error) {
 	orders := []model.Order{}
 	tx := s.db.Table("orders")
 	if orderPair != "" {
@@ -521,26 +520,6 @@ func (s *store) FilterOrders(maker, taker, orderPair, secretHash, sort string, s
 	}
 	if secretHash != "" {
 		tx = tx.Where("orders.secret_hash = ?", secretHash)
-	}
-
-	// sort
-	orderByList := strings.Split(sort, ",")
-	orderByQuery := ""
-	for _, orderBy := range orderByList {
-		if orderBy == "" {
-			continue
-		}
-		if orderByQuery != "" {
-			orderByQuery += ", "
-		}
-		if orderBy[0] == '-' {
-			orderByQuery += orderBy[1:] + " DESC"
-		} else {
-			orderByQuery += orderBy + ""
-		}
-	}
-	if orderByQuery != "" {
-		tx = tx.Order(orderByQuery)
 	}
 
 	// pagination
