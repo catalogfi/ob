@@ -151,6 +151,33 @@ func (s *store) ValueTradedByUserYesterday(user string, config model.Network) (*
 
 	return s.valueTradedByUserYesterday(user, config)
 }
+func (s *store) ValueTradedByUserYesterdayInSats(user string, config model.Network) (*big.Int, error) {
+	// s.mu.RLock()
+	// defer s.mu.RUnlock()
+
+	yesterday := time.Now().UTC().Truncate(24 * time.Hour)
+	var initiatorSum uint64
+	if tx := s.db.Table("orders").
+		Select("COALESCE(SUM(CAST(initiator_atomic_swaps.amount as bigint)), 0)").
+		Joins("JOIN atomic_swaps as initiator_atomic_swaps ON initiator_atomic_swaps.id = orders.initiator_atomic_swap_id").
+		Where("orders.maker = ? AND orders.status >= ? AND orders.status < ? AND orders.created_at >= ?", user, model.Created, model.FailedSoft, yesterday).
+		Scan(&initiatorSum); tx.Error != nil {
+		return nil, tx.Error
+	}
+
+	var followerSum uint64
+	if tx := s.db.Table("orders").
+		Select("COALESCE(SUM(CAST(follower_atomic_swaps.amount as bigint)), 0)").
+		Joins("JOIN atomic_swaps as follower_atomic_swaps ON follower_atomic_swaps.id = orders.follower_atomic_swap_id").
+		Where("orders.taker = ? AND orders.status >= ? AND orders.status < ? AND orders.created_at >= ?", user, model.Created, model.FailedSoft, yesterday).
+		Scan(&followerSum); tx.Error != nil {
+		return nil, tx.Error
+	}
+	sum := big.NewInt(0)
+	sum.Add(sum, new(big.Int).SetUint64(initiatorSum))
+	sum.Add(sum, new(big.Int).SetUint64(followerSum))
+	return sum, nil
+}
 
 func (s *store) valueTradedByUserYesterday(user string, config model.Network) (*big.Int, error) {
 	yesterday := time.Now().UTC().Truncate(24 * time.Hour)
@@ -280,15 +307,18 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	if err != nil {
 		return 0, fmt.Errorf("failed to get price for %s: %v", receiveAsset, err)
 	}
+	sendAmountInSats, ok := new(big.Int).SetString(sendAmount, 10)
+	if !ok {
+		return 0, fmt.Errorf("invalid send value: %v", err)
+	}
 
 	if config.DailyLimit != "" {
 		// get the total amount traded by the user in the last 24 hrs for limit checks
-		tradedValue, err := s.ValueTradedByUserYesterday(creator, config.Network)
+		tradedVolumeinSats, err := s.ValueTradedByUserYesterdayInSats(creator, config.Network)
 		if err != nil {
 			return 0, err
 		}
-		sendUsdValue := s.calculateUSDValue(sendAmt, initiatorSwapPrice.Price, config.Network[sendChain].Assets[sendAsset].Decimals)
-		currentValue := new(big.Int).Add(tradedValue, sendUsdValue)
+		currentValue := new(big.Int).Add(tradedVolumeinSats, sendAmountInSats)
 		dailyLimit, ok := new(big.Int).SetString(config.DailyLimit, 10)
 		if !ok {
 			return 0, fmt.Errorf("invalid daily limit: %v", err)
@@ -323,18 +353,13 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		PriceByOracle:    initiatorSwapPrice.Price,
 	}
 
-	sendValue, err := s.usdValue([]model.AtomicSwap{initiatorAtomicSwap}, config.Network)
-	if err != nil {
-		return 0, fmt.Errorf("invalid send value: %v", err)
-	}
-
 	if config.MinTxLimit != "" {
 		// check if send amount is less than MinTxLimit
 		minTxLimit, ok := new(big.Int).SetString(config.MinTxLimit, 10)
 		if !ok {
 			return 0, fmt.Errorf("invalid min limit: %v", err)
 		}
-		if sendValue.Cmp(minTxLimit) == -1 {
+		if sendAmountInSats.Cmp(minTxLimit) == -1 {
 			return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
 		}
 	}
@@ -346,7 +371,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 			return 0, fmt.Errorf("invalid max limit: %v", err)
 		}
 
-		if sendValue.Cmp(maxTxLimit) == 1 {
+		if sendAmountInSats.Cmp(maxTxLimit) == 1 {
 			return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
 		}
 	}
