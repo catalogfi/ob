@@ -160,7 +160,7 @@ func (s *store) ValueTradedByUserYesterdayInSats(user string, config model.Netwo
 	if tx := s.db.Table("orders").
 		Select("COALESCE(SUM(CAST(initiator_atomic_swaps.amount as bigint)), 0)").
 		Joins("JOIN atomic_swaps as initiator_atomic_swaps ON initiator_atomic_swaps.id = orders.initiator_atomic_swap_id").
-		Where("orders.maker = ? AND orders.status >= ? AND orders.status < ? AND created_at >= ?", user, model.Created, model.FailedSoft, yesterday).
+		Where("orders.maker = ? AND orders.status >= ? AND orders.status < ? AND orders.created_at >= ?", user, model.Created, model.FailedSoft, yesterday).
 		Scan(&initiatorSum); tx.Error != nil {
 		return nil, tx.Error
 	}
@@ -169,7 +169,7 @@ func (s *store) ValueTradedByUserYesterdayInSats(user string, config model.Netwo
 	if tx := s.db.Table("orders").
 		Select("COALESCE(SUM(CAST(follower_atomic_swaps.amount as bigint)), 0)").
 		Joins("JOIN atomic_swaps as follower_atomic_swaps ON follower_atomic_swaps.id = orders.follower_atomic_swap_id").
-		Where("orders.taker = ? AND orders.status >= ? AND orders.status < ? AND created_at >= ?", user, model.Created, model.FailedSoft, yesterday).
+		Where("orders.taker = ? AND orders.status >= ? AND orders.status < ? AND orders.created_at >= ?", user, model.Created, model.FailedSoft, yesterday).
 		Scan(&followerSum); tx.Error != nil {
 		return nil, tx.Error
 	}
