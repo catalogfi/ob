@@ -125,6 +125,11 @@ func (client *client) GetL1CurrentBlock() (uint64, error) {
 	if err := json.Unmarshal(data, &l2Block); err != nil {
 		return 0, fmt.Errorf("failed to unmarshal block number: %w", err)
 	}
+
+	if l2Block.Data.L1BlockNumber == "" {
+		return 0, fmt.Errorf("failed to get block number")
+	}
+
 	n, err := strconv.ParseUint(l2Block.Data.L1BlockNumber[2:], 16, 64)
 	if err != nil {
 		return 0, err
@@ -168,6 +173,10 @@ func (client *client) GetL1BlockAt(blockNumber uint64) (uint64, error) {
 	}
 	if err := json.Unmarshal(data, &l2Block); err != nil {
 		return 0, fmt.Errorf("failed to unmarshal block number: %w", err)
+	}
+
+	if l2Block.Data.L1BlockNumber == "" {
+		return 0, fmt.Errorf("failed to get block number")
 	}
 
 	n, err := strconv.ParseUint(l2Block.Data.L1BlockNumber[2:], 16, 64)
