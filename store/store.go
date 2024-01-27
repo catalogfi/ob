@@ -325,8 +325,8 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 			return 0, fmt.Errorf("invalid daily limit: %v", err)
 		}
 
-		if limit, ok := GrantedLimits[strings.ToLower(creator)]; ok {
-			dailyLimit = big.NewInt(limit)
+		if limit, ok := GrantedLimits[strings.ToLower(creator)]; ok && time.Now().UTC().Before(limit.Expiry) {
+			dailyLimit = big.NewInt(limit.Amount)
 		}
 
 		if currentValue.Cmp(dailyLimit) >= 0 {
