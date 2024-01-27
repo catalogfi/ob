@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -322,6 +323,10 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		dailyLimit, ok := new(big.Int).SetString(config.DailyLimit, 10)
 		if !ok {
 			return 0, fmt.Errorf("invalid daily limit: %v", err)
+		}
+
+		if limit, ok := GrantedLimits[strings.ToLower(creator)]; ok {
+			dailyLimit = big.NewInt(limit)
 		}
 
 		if currentValue.Cmp(dailyLimit) >= 0 {
