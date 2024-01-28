@@ -329,7 +329,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 			dailyLimit = big.NewInt(limit.Amount)
 		}
 
-		if currentValue.Cmp(dailyLimit) >= 0 {
+		if currentValue.Cmp(dailyLimit) > 0 {
 			return 0, fmt.Errorf("reached daily limit,daily limit : %s, current value : %s", dailyLimit, currentValue)
 		}
 	}
