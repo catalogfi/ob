@@ -135,6 +135,7 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 		}
 		if utxos == 0 {
 			swap.Status = model.NotStarted
+			swap.FilledAmount = ""
 			return store.UpdateSwap(swap)
 		}
 		swap.FilledAmount = strconv.FormatUint(filledAmt, 10)
@@ -155,9 +156,9 @@ func UpdateSwapStatus(watcher swapper.Watcher, btcClient bitcoin.Client, screene
 
 		if (filledAmt >= amount && confirmations.LatestTxConfirmations > 0) || confirmedAmt >= amount {
 			if swap.InitiateBlockNumber == 0 {
-				swap.InitiateBlockNumber = confirmations.LatestConfirmedTxConfirmations
+				swap.InitiateBlockNumber = confirmations.LatestConfirmedTxHeight
 			}
-			swap.CurrentConfirmations = confirmations.LatestConfirmedTxHeight
+			swap.CurrentConfirmations = confirmations.LatestConfirmedTxConfirmations
 			if swap.CurrentConfirmations >= swap.MinimumConfirmations {
 				swap.CurrentConfirmations = swap.MinimumConfirmations
 				swap.InitiateBlockNumber = confirmations.LatestConfirmedTxHeight
