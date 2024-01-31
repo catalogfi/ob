@@ -159,7 +159,7 @@ func (client *instantClient) GetTipBlockHeight() (uint64, error) {
 	return client.indexerClient.GetTipBlockHeight()
 }
 
-func (client *instantClient) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error) {
+func (client *instantClient) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, uint64, error) {
 	return client.indexerClient.GetUTXOs(address, amount)
 }
 
@@ -214,7 +214,7 @@ func (client *instantClient) Spend(script []byte, redeemScript wire.TxWitness, f
 	if err != nil {
 		return "", fmt.Errorf("failed to create script address: %w", err)
 	}
-	utxos, balance, err := client.GetUTXOs(scriptAddr, 0)
+	utxos, balance, _, err := client.GetUTXOs(scriptAddr, 0)
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
@@ -235,7 +235,7 @@ func (client *instantClient) Spend(script []byte, redeemScript wire.TxWitness, f
 	if err != nil {
 		return "", fmt.Errorf("failed to decode wallet address: %w", err)
 	}
-	_, balanceOfWallet, err := client.GetUTXOs(walletAddr, 0)
+	_, balanceOfWallet, _, err := client.GetUTXOs(walletAddr, 0)
 	if err != nil {
 		return "", fmt.Errorf("failed to get utxos: %w", err)
 	}
@@ -368,7 +368,7 @@ func (client *instantClient) FundInstanstWallet(from *btcec.PrivateKey, amount i
 	if err != nil {
 		return "", err
 	}
-	_, balance, err := client.GetUTXOs(walletAddr, 0)
+	_, balance, _, err := client.GetUTXOs(walletAddr, 0)
 	if err != nil {
 		return "", err
 	}
@@ -387,7 +387,7 @@ func (client *instantClient) FundInstanstWallet(from *btcec.PrivateKey, amount i
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		fromAddr, _ := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(from.PubKey().SerializeCompressed()), client.Net())
-		utxos, total, err := client.GetUTXOs(fromAddr, uint64(amount))
+		utxos, total, _, err := client.GetUTXOs(fromAddr, uint64(amount))
 		if err != nil {
 			return "", err
 		}

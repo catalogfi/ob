@@ -32,7 +32,7 @@ type Client interface {
 	GetSpendingWitness(address btcutil.Address) ([]string, Transaction, error)
 	GetTipBlockHeight() (uint64, error)
 	GetConfirmations(txHash string) (uint64, uint64, error)
-	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
+	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, uint64, error)
 	Send(to btcutil.Address, amount uint64, from *btcec.PrivateKey) (string, error)
 	GetTx(txid string) (Transaction, error)
 	GetTxs(addr string) ([]Transaction, error)
@@ -87,7 +87,7 @@ func (client *client) GetSpendingWitness(address btcutil.Address) ([]string, Tra
 	return client.indexer.GetSpendingWitness(address)
 }
 
-func (client *client) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error) {
+func (client *client) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, uint64, error) {
 	return client.indexer.GetUTXOs(address, amount)
 }
 
@@ -99,7 +99,7 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 		return "", fmt.Errorf("failed to create address from private key: %w", err)
 	}
 
-	utxosWithoutFee, _, err := client.GetUTXOs(fromAddr, amount)
+	utxosWithoutFee, _, _, err := client.GetUTXOs(fromAddr, amount)
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
@@ -109,7 +109,7 @@ func (client *client) Send(to btcutil.Address, amount uint64, from *btcec.Privat
 		return "", fmt.Errorf("failed to calculate fee: %w", err)
 	}
 
-	utxosWihFee, selectedAmount, err := client.GetUTXOs(fromAddr, amount+fee)
+	utxosWihFee, selectedAmount, _, err := client.GetUTXOs(fromAddr, amount+fee)
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
@@ -161,7 +161,7 @@ func (client *client) Spend(script []byte, redeemScript wire.TxWitness, spender 
 	if err != nil {
 		return "", fmt.Errorf("failed to create script address: %w", err)
 	}
-	utxos, balance, err := client.GetUTXOs(scriptAddr, 0)
+	utxos, balance, _, err := client.GetUTXOs(scriptAddr, 0)
 	if err != nil {
 		return "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}

@@ -22,7 +22,7 @@ type Indexer interface {
 	GetSpendingWitness(address btcutil.Address) ([]string, Transaction, error)
 	GetTipBlockHeight() (uint64, error)
 	GetTx(txid string) (Transaction, error)
-	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error)
+	GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, uint64, error)
 	SubmitTx(tx *wire.MsgTx) (string, error)
 	GetFeeRates() (FeeRates, error)
 	GetTxs(txid string) ([]Transaction, error)
@@ -63,17 +63,17 @@ func (indexer *indexer) GetTipBlockHeight() (uint64, error) {
 	return 0, err
 }
 
-func (indexer *indexer) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error) {
+func (indexer *indexer) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, uint64, error) {
 	var err error
 
 	for _, indexer := range indexer.indexers {
-		utxos, balance, ierr := indexer.GetUTXOs(address, amount)
+		utxos, balance, confirmedBal, ierr := indexer.GetUTXOs(address, amount)
 		if ierr == nil {
-			return utxos, balance, ierr
+			return utxos, balance, confirmedBal, ierr
 		}
 		err = ierr
 	}
-	return nil, 0, err
+	return nil, 0, 0, err
 }
 
 func (indexer *indexer) GetTx(txid string) (Transaction, error) {
@@ -152,27 +152,31 @@ func (mempool *mempool) GetTx(txid string) (Transaction, error) {
 	return tx, nil
 }
 
-func (mempool *mempool) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error) {
+func (mempool *mempool) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, uint64, error) {
 	resp, err := http.Get(fmt.Sprintf("%s/address/%s/utxo", mempool.url, address.EncodeAddress()))
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get UTXOs: %w", err)
+		return nil, 0, 0, fmt.Errorf("failed to get UTXOs: %w", err)
 	}
 	utxos := UTXOs{}
 
 	if err := json.NewDecoder(resp.Body).Decode(&utxos); err != nil {
-		return nil, 0, fmt.Errorf("failed to decode UTXOs: %w", err)
+		return nil, 0, 0, fmt.Errorf("failed to decode UTXOs: %w", err)
 	}
 
 	var balance uint64
+	var confirmedBal uint64
 	for _, utxo := range utxos {
 		balance += utxo.Amount
+		if utxo.Status.Confirmed {
+			confirmedBal += utxo.Amount
+		}
 	}
 
 	if amount == 0 {
-		return utxos, balance, nil
+		return utxos, balance, confirmedBal, nil
 	}
 	if balance < amount {
-		return nil, 0, fmt.Errorf("insufficient balance in %s", address.EncodeAddress())
+		return nil, 0, 0, fmt.Errorf("insufficient balance in %s", address.EncodeAddress())
 	}
 
 	var selected UTXOs
@@ -184,7 +188,7 @@ func (mempool *mempool) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs,
 		selected = append(selected, utxo)
 		total += utxo.Amount
 	}
-	return selected, total, nil
+	return selected, total, confirmedBal, nil
 }
 
 func (mempool *mempool) GetSpendingWitness(address btcutil.Address) ([]string, Transaction, error) {
@@ -287,27 +291,31 @@ func (blockstream *blockstream) GetTx(txid string) (Transaction, error) {
 	return tx, nil
 }
 
-func (blockstream *blockstream) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, error) {
+func (blockstream *blockstream) GetUTXOs(address btcutil.Address, amount uint64) (UTXOs, uint64, uint64, error) {
 	resp, err := http.Get(fmt.Sprintf("%s/address/%s/utxo", blockstream.url, address.EncodeAddress()))
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get UTXOs: %w", err)
+		return nil, 0, 0, fmt.Errorf("failed to get UTXOs: %w", err)
 	}
 	utxos := UTXOs{}
 
 	if err := json.NewDecoder(resp.Body).Decode(&utxos); err != nil {
-		return nil, 0, fmt.Errorf("failed to decode UTXOs: %w", err)
+		return nil, 0, 0, fmt.Errorf("failed to decode UTXOs: %w", err)
 	}
 
 	var balance uint64
+	var confirmedBal uint64
 	for _, utxo := range utxos {
 		balance += utxo.Amount
+		if utxo.Status.Confirmed {
+			confirmedBal += utxo.Amount
+		}
 	}
 
 	if amount == 0 {
-		return utxos, balance, nil
+		return utxos, balance, confirmedBal, nil
 	}
 	if balance < amount {
-		return nil, 0, fmt.Errorf("insufficient balance in %s", address.EncodeAddress())
+		return nil, 0, 0, fmt.Errorf("insufficient balance in %s", address.EncodeAddress())
 	}
 
 	var selected UTXOs
@@ -319,7 +327,7 @@ func (blockstream *blockstream) GetUTXOs(address btcutil.Address, amount uint64)
 		selected = append(selected, utxo)
 		total += utxo.Amount
 	}
-	return selected, total, nil
+	return selected, total, confirmedBal, nil
 }
 
 func (blockstream *blockstream) GetSpendingWitness(address btcutil.Address) ([]string, Transaction, error) {
