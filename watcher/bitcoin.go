@@ -250,18 +250,18 @@ func BTCInitiateStatus(btcClient bitcoin.Client, screener screener.Screener, cha
 	}
 
 	txs := make([]string, len(utxos))
-	if screener != nil && chain.IsMainnet() {
-		txSenders := map[string]model.Chain{}
-		for i, utxo := range utxos {
-			txs[i] = utxo.TxID
-			tx, err := btcClient.GetTx(utxo.TxID)
-			if err != nil {
-				return 0, 0, 0, "", fmt.Errorf("failed to get tx: %v", err)
-			}
-			for _, vin := range tx.VINs {
-				txSenders[vin.Prevout.ScriptPubKeyAddress] = chain
-			}
+	txSenders := map[string]model.Chain{}
+	for i, utxo := range utxos {
+		txs[i] = utxo.TxID
+		tx, err := btcClient.GetTx(utxo.TxID)
+		if err != nil {
+			return 0, 0, 0, "", fmt.Errorf("failed to get tx: %v", err)
 		}
+		for _, vin := range tx.VINs {
+			txSenders[vin.Prevout.ScriptPubKeyAddress] = chain
+		}
+	}
+	if screener != nil && chain.IsMainnet() {
 
 		isBlacklisted, err := screener.IsBlacklisted(txSenders)
 		if err != nil {
