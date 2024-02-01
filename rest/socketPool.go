@@ -97,6 +97,10 @@ func (s *socketPool) AddOrderUpdatesChannel(id uint, channel chan UpdatedOrder) 
 func (s *socketPool) RemoveUpdatedOrdersChannel(creator string, channel chan UpdatedOrders) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if len((s.updatedOrdersPool)[creator]) == 1 {
+		delete(s.updatedOrdersPool, creator)
+		return
+	}
 	for m, n := range (s.updatedOrdersPool)[creator] {
 		if n == channel {
 			(s.updatedOrdersPool)[creator] = append((s.updatedOrdersPool)[creator][0:m], (s.updatedOrdersPool)[creator][m+1:len((s.updatedOrdersPool)[creator])]...)
@@ -107,6 +111,10 @@ func (s *socketPool) RemoveUpdatedOrdersChannel(creator string, channel chan Upd
 func (s *socketPool) RemoveOpenOrdersChannel(orderPair string, channel chan OpenOrders) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if len((s.OpenOrdersPool)[orderPair]) == 1 {
+		delete(s.OpenOrdersPool, orderPair)
+		return
+	}
 	for m, n := range (s.OpenOrdersPool)[orderPair] {
 		if n == channel {
 			(s.OpenOrdersPool)[orderPair] = append((s.OpenOrdersPool)[orderPair][0:m], (s.OpenOrdersPool)[orderPair][m+1:len((s.OpenOrdersPool)[orderPair])]...)
@@ -117,6 +125,10 @@ func (s *socketPool) RemoveOpenOrdersChannel(orderPair string, channel chan Open
 func (s *socketPool) RemoveOrderUpdatesChannel(id uint, channel chan UpdatedOrder) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if len((s.orderUpdatesPool)[id]) == 1 {
+		delete(s.orderUpdatesPool, id)
+		return
+	}
 	for m, n := range (s.orderUpdatesPool)[id] {
 		if n == channel {
 			(s.orderUpdatesPool)[id] = append((s.orderUpdatesPool)[id][0:m], (s.orderUpdatesPool)[id][m+1:len((s.orderUpdatesPool)[id])]...)
