@@ -69,7 +69,7 @@ func (w *watcher) Expired() (bool, error) {
 
 func (w *watcher) IsDetected() (bool, string, string, error) {
 	// Fetch all utxos
-	utxos, bal, err := w.client.GetUTXOs(w.scriptAddr, 0)
+	utxos, bal, _, err := w.client.GetUTXOs(w.scriptAddr, 0)
 	if err != nil {
 		return false, "", "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}
@@ -85,7 +85,7 @@ func (w *watcher) IsDetected() (bool, string, string, error) {
 
 func (w *watcher) IsInitiated() (bool, string, map[string]model.Chain, uint64, error) {
 	// Fetch all utxos
-	utxos, bal, err := w.client.GetUTXOs(w.scriptAddr, 0)
+	utxos, bal, _, err := w.client.GetUTXOs(w.scriptAddr, 0)
 	if err != nil {
 		return false, "", nil, 0, fmt.Errorf("failed to get UTXOs: %w", err)
 	}
@@ -246,7 +246,7 @@ func (w *watcher) IsRefunded() (bool, string, error) {
 	// // script
 	// // ]
 	// return len(witness) == 4, tx.TxID, nil
-	_, bal, err := w.client.GetUTXOs(w.scriptAddr, 0)
+	_, bal, _, err := w.client.GetUTXOs(w.scriptAddr, 0)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to get UTXOs: %w", err)
 	}

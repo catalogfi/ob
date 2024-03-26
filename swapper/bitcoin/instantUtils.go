@@ -83,7 +83,7 @@ func (client *instantClient) GetRedeemTx(ctx context.Context, asTxIns []*wire.Tx
 	if err != nil {
 		return nil, err
 	}
-	_, balance, err := client.GetUTXOs(walletAddr, 0)
+	_, balance, _, err := client.GetUTXOs(walletAddr, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func (client *instantClient) Transfer(ctx context.Context, recipients []Recipien
 		sendAmount += recipient.Amount
 	}
 	var refundAddr btcutil.Address
-	_, balance, _ := client.GetUTXOs(walletAddr, 0)
+	_, balance, _, _ := client.GetUTXOs(walletAddr, 0)
 	// recipients * 2 for change and fee
 	fee := client.CalculateIWRedeemFee(recipients) * 2
 	if err != nil {
@@ -883,7 +883,7 @@ func (client *instantClient) Deposit(ctx context.Context, amount int64, revokeSe
 		return "", err
 	}
 	fromAddr, _ := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(from.PubKey().SerializeCompressed()), client.Net())
-	utxos, total, err := client.GetUTXOs(fromAddr, uint64(amount))
+	utxos, total, _, err := client.GetUTXOs(fromAddr, uint64(amount))
 	if err != nil {
 		return "", err
 	}
