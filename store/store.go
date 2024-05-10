@@ -74,6 +74,14 @@ func setupTriggers(db *gorm.DB, setupPath string) error {
 	return tx.Error
 }
 
+func (s *store) GetSecrets(lastUpdated time.Time) ([]model.SecretRevealed, error) {
+	secrets := []model.SecretRevealed{}
+	if tx := s.db.Table("orders").Select("secret as secret", "secret_updated_at as updated_at").Where("secret_updated_at > ?", lastUpdated).Order("secret_updated_at ASC").Find(&secrets); tx.Error != nil {
+		return nil, tx.Error
+	}
+	return secrets, nil
+}
+
 func (s *store) totalVolume(from, to time.Time, config model.Network) (*big.Int, error) {
 	orders := []model.Order{}
 	if err := s.db.Where("created_at BETWEEN ? AND ? AND status = ?", from, to, model.Executed).Find(&orders).Error; err != nil {
@@ -222,7 +230,8 @@ func (s *store) usdValue(swaps []model.AtomicSwap, config model.Network) (*big.I
 			if !ok {
 				decimals := config[swap.Chain].Assets[swap.Asset].Decimals
 				if decimals == 0 {
-					return nil, fmt.Errorf("failed to get decimals for %v on %v", swap.Asset, swap.Chain)
+					// TODO: maintain legacy assets and blacklist pairs while creation
+					decimals = 8
 				}
 				normaliser = new(big.Int).Exp(big.NewInt(10), big.NewInt(decimals), nil)
 				cacheNormalisers[swap.Asset] = normaliser
@@ -248,7 +257,7 @@ func (s *store) calculateUSDValue(amount *big.Int, price float64, decimals int64
 }
 
 // create a new order with the given details
-func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userBtcWalletAddress string, config model.Config) (uint, error) {
+func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, secretHash, userBtcWalletAddress string, sendAmount, receiveAmount, feeInBtc, feeInSeed *big.Int, IsDiscounted bool, config model.Config) (uint, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// check if creatorAddress is valid eth address
@@ -282,20 +291,11 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	if secretHash, err = CheckHash(secretHash); err != nil {
 		return 0, err
 	}
-	sendAmt, ok := new(big.Int).SetString(sendAmount, 10)
-	if !ok {
-		return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
-	}
 
-	receiveAmt, ok := new(big.Int).SetString(receiveAmount, 10)
-	if !ok {
-		return 0, fmt.Errorf("invalid receive amount: %s", receiveAmount)
-	}
-
-	if sendAmt.Cmp(new(big.Int).SetInt64(0)) <= 0 {
+	if sendAmount.Cmp(new(big.Int).SetInt64(0)) <= 0 {
 		return 0, fmt.Errorf("invalid send amount")
 	}
-	if receiveAmt.Cmp(new(big.Int).SetInt64(0)) <= 0 {
+	if receiveAmount.Cmp(new(big.Int).SetInt64(0)) <= 0 {
 		return 0, fmt.Errorf("invalid receive amount")
 	}
 
@@ -308,10 +308,6 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	if err != nil {
 		return 0, fmt.Errorf("failed to get price for %s: %v", receiveAsset, err)
 	}
-	sendAmountInSats, ok := new(big.Int).SetString(sendAmount, 10)
-	if !ok {
-		return 0, fmt.Errorf("invalid send value: %v", err)
-	}
 
 	if config.DailyLimit != "" {
 		// get the total amount traded by the user in the last 24 hrs for limit checks
@@ -319,7 +315,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		if err != nil {
 			return 0, err
 		}
-		currentValue := new(big.Int).Add(tradedVolumeinSats, sendAmountInSats)
+		currentValue := new(big.Int).Add(tradedVolumeinSats, sendAmount)
 		dailyLimit, ok := new(big.Int).SetString(config.DailyLimit, 10)
 		if !ok {
 			return 0, fmt.Errorf("invalid daily limit: %v", err)
@@ -339,10 +335,14 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 	if err != nil {
 		return 0, err
 	}
-
+	var price float64
 	// ignoring accuracy
-	price, _ := new(big.Float).Quo(new(big.Float).SetInt(sendAmt), new(big.Float).SetInt(receiveAmt)).Float64()
-
+	if IsDiscounted {
+		newReceiveAmt := new(big.Int).Sub(receiveAmount, feeInBtc)
+		price, _ = new(big.Float).Quo(new(big.Float).SetInt(sendAmount), new(big.Float).SetInt(newReceiveAmt)).Float64()
+	} else {
+		price, _ = new(big.Float).Quo(new(big.Float).SetInt(sendAmount), new(big.Float).SetInt(receiveAmount)).Float64()
+	}
 	if math.IsInf(price, 0) {
 		return 0, fmt.Errorf("invalid amount in price")
 	}
@@ -354,7 +354,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		InitiatorAddress: sendAddress,
 		Chain:            sendChain,
 		Asset:            sendAsset,
-		Amount:           sendAmount,
+		Amount:           sendAmount.String(),
 		PriceByOracle:    initiatorSwapPrice.Price,
 	}
 
@@ -364,7 +364,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		if !ok {
 			return 0, fmt.Errorf("invalid min limit: %v", err)
 		}
-		if sendAmountInSats.Cmp(minTxLimit) == -1 {
+		if sendAmount.Cmp(minTxLimit) == -1 {
 			return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
 		}
 	}
@@ -376,7 +376,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 			return 0, fmt.Errorf("invalid max limit: %v", err)
 		}
 
-		if sendAmountInSats.Cmp(maxTxLimit) == 1 {
+		if sendAmount.Cmp(maxTxLimit) == 1 {
 			return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
 		}
 	}
@@ -385,7 +385,7 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		RedeemerAddress: receiveAddress,
 		Chain:           receiveChain,
 		Asset:           receiveAsset,
-		Amount:          receiveAmount,
+		Amount:          receiveAmount.String(),
 		PriceByOracle:   followerSwapPrice.Price,
 	}
 
@@ -410,6 +410,8 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sen
 		Status:                model.Created,
 		SecretNonce:           uint64(len(orders)) + 1,
 		UserBtcWalletAddress:  userBtcWalletAddress,
+		IsDiscounted:          IsDiscounted,
+		FeeInSeed:             feeInSeed.String(),
 	}
 	if tx := trx.Create(&order); tx.Error != nil {
 		return 0, tx.Error

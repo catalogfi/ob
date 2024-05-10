@@ -3,8 +3,12 @@ package model
 import (
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"math/big"
 	"strings"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"gorm.io/gorm"
@@ -180,6 +184,9 @@ type Order struct {
 	Status               Status  `json:"status"`
 	SecretNonce          uint64  `json:"secretNonce"`
 	UserBtcWalletAddress string  `json:"userBtcWalletAddress"`
+	FeeInSeed            string
+	IsDiscounted         bool
+	SecretUpdatedAt      time.Time `json:"-"`
 	RandomMultiplier     uint64
 	RandomScore          uint64
 
@@ -284,4 +291,72 @@ type Blacklist struct {
 type LockedAmount struct {
 	Asset  string
 	Amount sql.NullInt64
+}
+
+type BigInt struct {
+	*big.Int
+}
+
+// Scan implements the sql.Scanner interface
+func (bi *BigInt) Scan(value interface{}) error {
+	if value == nil {
+		bi.Int = new(big.Int).SetInt64(0)
+		return nil
+	}
+
+	switch v := value.(type) {
+	case int64:
+		bi.Int = big.NewInt(v)
+		return nil
+	case []byte:
+		bi.Int = new(big.Int).SetInt64(0)
+		return bi.Int.UnmarshalText(v)
+	case string:
+		if v == "" {
+			v = "0"
+		}
+		bi.Int = new(big.Int).SetInt64(0)
+		return bi.Int.UnmarshalText([]byte(v))
+	default:
+		bi.Int = new(big.Int).SetInt64(0)
+		return errors.New("unsupported type for BigInt")
+	}
+}
+
+// Value implements the driver.Valuer interface
+func (bi BigInt) Value() (driver.Value, error) {
+	if bi.Int == nil {
+		return new(big.Int).SetInt64(0), nil
+	}
+	return bi.Int.Text(10), nil
+}
+
+// MarshalJSON implements the json.Marshaler interface
+func (bi BigInt) MarshalJSON() ([]byte, error) {
+	if bi.Int == nil {
+		return json.Marshal("0")
+	}
+	return json.Marshal(bi.Int.String())
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface
+func (bi *BigInt) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+	if str == "" {
+		str = "0"
+	}
+	var ok bool
+	bi.Int, ok = new(big.Int).SetString(str, 10)
+	if !ok {
+		return errors.New("invalid BigInt value")
+	}
+	return nil
+}
+
+type SecretRevealed struct {
+	Secret    string    `json:"secret"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }

@@ -9,8 +9,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/catalogfi/orderbook/feehub"
 	"github.com/catalogfi/orderbook/model"
+	"github.com/catalogfi/orderbook/price"
 	"github.com/catalogfi/orderbook/screener"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-contrib/cors"
@@ -35,21 +38,23 @@ var upgrader = websocket.Upgrader{
 }
 
 type Server struct {
-	router     *gin.Engine
-	store      Store
-	auth       Auth
-	config     model.Config
-	logger     *zap.Logger
-	secret     string
-	socketPool SocketPool
-	screener   screener.Screener
+	router       *gin.Engine
+	store        Store
+	auth         Auth
+	config       model.Config
+	logger       *zap.Logger
+	secret       string
+	socketPool   SocketPool
+	screener     screener.Screener
+	feeHubClient feehub.FeehubClient
+	priceClient  price.PriceFetcher
 }
 
 type Store interface {
 	// get value locked in the given chain for the given user
 	ValueLockedByChain(chain model.Chain, config model.Network) (*big.Int, error)
 	// create order
-	CreateOrder(creator, sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string, userWalletBTCAddress string, config model.Config) (uint, error)
+	CreateOrder(creator, sendAddress, receiveAddress, orderPair, secretHash, userWalletBTCAddress string, sendAmount, receiveAmount, feeInBtc, feeInSeed *big.Int, IsDiscounted bool, config model.Config) (uint, error)
 	// fill order
 	FillOrder(orderID uint, filler, sendAddress, receiveAddress string, config model.Network) error
 	// get order by id
@@ -64,19 +69,23 @@ type Store interface {
 	CancelOrder(creator string, orderID uint) error
 	// get all orders for the given user
 	FilterOrders(maker, taker, orderPair, secretHash string, status model.Status, minPrice, maxPrice float64, minAmount, maxAmount float64, page, perPage int, verbose bool) ([]model.Order, error)
+
+	GetSecrets(lastUpdated time.Time) ([]model.SecretRevealed, error)
 }
 
-func NewServer(store Store, config model.Config, logger *zap.Logger, secret string, socketPool SocketPool, screener screener.Screener) *Server {
+func NewServer(store Store, config model.Config, logger *zap.Logger, secret string, socketPool SocketPool, screener screener.Screener, fhClient *feehub.FeehubClient, pc price.PriceFetcher) *Server {
 	childLogger := logger.With(zap.String("service", "rest"))
 	return &Server{
-		router:     gin.Default(),
-		store:      store,
-		secret:     secret,
-		logger:     childLogger,
-		auth:       NewAuth(config.Network),
-		config:     config,
-		socketPool: socketPool,
-		screener:   screener,
+		router:       gin.Default(),
+		store:        store,
+		secret:       secret,
+		logger:       childLogger,
+		auth:         NewAuth(config.Network),
+		config:       config,
+		socketPool:   socketPool,
+		screener:     screener,
+		feeHubClient: *fhClient,
+		priceClient:  pc,
 	}
 }
 
@@ -101,6 +110,7 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 	s.router.GET("/nonce", s.nonce())
 	s.router.GET("/assets", s.supportedAssets())
 	s.router.GET("/chains/:chain/value", s.getValueByChain())
+	s.router.GET("/secrets", s.secrets())
 	s.router.POST("/verify", s.verify())
 	{
 		authRoutes.POST("/orders", s.postOrders())
@@ -125,13 +135,16 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 }
 
 type CreateOrder struct {
-	SendAddress          string `json:"sendAddress" binding:"required"`
-	ReceiveAddress       string `json:"receiveAddress" binding:"required"`
-	OrderPair            string `json:"orderPair" binding:"required"`
-	SendAmount           string `json:"sendAmount" binding:"required"`
-	ReceiveAmount        string `json:"receiveAmount" binding:"required"`
-	SecretHash           string `json:"secretHash" binding:"required"`
-	UserWalletBTCAddress string `json:"userWalletBTCAddress" binding:"required"`
+	SendAddress          string                    `json:"sendAddress" binding:"required"`
+	ReceiveAddress       string                    `json:"receiveAddress" binding:"required"`
+	OrderPair            string                    `json:"orderPair" binding:"required"`
+	SendAmount           string                    `json:"sendAmount" binding:"required"`
+	ReceiveAmount        string                    `json:"receiveAmount" binding:"required"`
+	SecretHash           string                    `json:"secretHash" binding:"required"`
+	UserWalletBTCAddress string                    `json:"userWalletBTCAddress" binding:"required"`
+	FeePayment           feehub.ConditionalPayment `json:"feePayment"`
+	Filler               string                    `json:"filler"`
+	IsDiscounted         bool                      `json:"isDiscounted"`
 }
 
 type Auth interface {
@@ -166,6 +179,7 @@ func (s *Server) authenticate(ctx *gin.Context) {
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		if userWallet, exists := claims["userWallet"]; exists {
 			ctx.Set("userWallet", strings.ToLower(userWallet.(string)))
+			ctx.Set("token", tokenString)
 		} else {
 			s.logger.Debug("authorization failure", zap.Error(fmt.Errorf("invalid token claims")))
 			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
@@ -228,6 +242,11 @@ func (s *Server) postOrders() gin.HandlerFunc {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
 			return
 		}
+		token, exists := c.Get("token")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token not found"})
+			return
+		}
 		req := CreateOrder{}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -258,7 +277,69 @@ func (s *Server) postOrders() gin.HandlerFunc {
 			return
 		}
 
-		oid, err := s.store.CreateOrder(strings.ToLower(creator.(string)), req.SendAddress, req.ReceiveAddress, req.OrderPair, req.SendAmount, req.ReceiveAmount, req.SecretHash, req.UserWalletBTCAddress, s.config)
+		sendAmount, ok := new(big.Int).SetString(req.SendAmount, 10)
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("invalid send amount: %s", sendAmount),
+			})
+			return
+		}
+
+		receiveAmount, ok := new(big.Int).SetString(req.ReceiveAmount, 10)
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("invalid receive amount: %s", sendAmount),
+			})
+			return
+		}
+
+		feeInBtc := big.NewInt(0)
+		if req.IsDiscounted {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			btcSeedPrice, err := s.priceClient.GetPrice(ctx)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": fmt.Sprintf("failed to get btc seed price : %v", err.Error()),
+				})
+				return
+			}
+
+			fee := new(big.Float).Quo(new(big.Float).SetInt(req.FeePayment.HTLC.RecvAmount.Int), new(big.Float).SetFloat64(btcSeedPrice.Price))
+			feeInBtc, _ = fee.Int(nil)
+
+			maxFee := new(big.Int).Div(sendAmount, big.NewInt(100))
+
+			if feeInBtc.Cmp(maxFee) > 0 {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": fmt.Sprintf("fee is greater than : %s", maxFee.String()),
+				})
+				return
+			}
+			ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			err = s.feeHubClient.ProcessPayFillerDelegates(ctx, req.FeePayment, req.Filler, token.(string))
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": fmt.Sprintf("failed to process pay filler : %v", err.Error()),
+				})
+				return
+			}
+		}
+
+		oid, err := s.store.CreateOrder(
+			strings.ToLower(creator.(string)),
+			req.SendAddress,
+			req.ReceiveAddress,
+			req.OrderPair,
+			req.SecretHash,
+			req.UserWalletBTCAddress,
+			sendAmount,
+			receiveAmount,
+			feeInBtc,
+			req.FeePayment.HTLC.RecvAmount.Int,
+			req.IsDiscounted,
+			s.config)
 		if err != nil {
 			errorMessage := fmt.Sprintf("failed to create order: %v", err.Error())
 			// fmt.Println(errorMessage, "error")
@@ -477,6 +558,25 @@ func (s *Server) verify() gin.HandlerFunc {
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{"token": tokenString})
+	}
+}
+
+func (s *Server) secrets() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		lastUpdatedUnixNano, err := strconv.ParseInt(ctx.DefaultQuery("lastUpdated", "0"), 10, 64)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("failed to decode last_updated has to be a number: %v", err.Error())})
+			return
+		}
+		lastUpdated := time.Unix(0, lastUpdatedUnixNano)
+		secrets, err := s.store.GetSecrets(lastUpdated)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"error": fmt.Sprintf("failed to get secrets %s", err.Error()),
+			})
+			return
+		}
+		ctx.JSON(http.StatusOK, gin.H{"secrets": secrets})
 	}
 }
 

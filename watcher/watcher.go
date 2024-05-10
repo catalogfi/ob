@@ -96,8 +96,11 @@ func (w *watcher) RunWorker(ctx context.Context) {
 
 func ProcessOrder(order model.Order, store Store, logger *zap.Logger) (model.Order, bool) {
 	// copy secret from follower atomic swap
+	secretUpdated := false
 	if order.Secret != order.FollowerAtomicSwap.Secret {
 		order.Secret = order.FollowerAtomicSwap.Secret
+		order.SecretUpdatedAt = time.Now().UTC()
+		secretUpdated = true
 	}
 	// Special cases regardless of order status
 	switch {
@@ -123,5 +126,5 @@ func ProcessOrder(order model.Order, store Store, logger *zap.Logger) (model.Ord
 		logger.Info("atomic swap executed")
 		order.Status = model.Executed
 	}
-	return order, order.Status != model.Created && order.Status != model.Filled
+	return order, (order.Status != model.Created && order.Status != model.Filled) || secretUpdated
 }

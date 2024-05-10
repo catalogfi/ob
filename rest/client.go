@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/catalogfi/orderbook/model"
 	"github.com/dgrijalva/jwt-go"
@@ -24,6 +25,7 @@ type Client interface {
 	GetFollowerInitiateOrders() ([]model.Order, error)
 	GetFollowerRedeemOrders() ([]model.Order, error)
 	GetInitiatorInitiateOrders() ([]model.Order, error)
+	GetSecrets(lastUpdated time.Time) ([]model.SecretRevealed, error)
 
 	GetFollowerRefundedOrders() ([]model.Order, error)
 	FollowerWaitForRedeemOrders() ([]model.Order, error)
@@ -83,6 +85,22 @@ func (c *client) FillOrder(orderID uint, sendAddress, receiveAddress string) err
 		return fmt.Errorf("failed to create order: %v", errorResponse.Error)
 	}
 	return nil
+}
+
+func (c *client) GetSecrets(lastUpdated time.Time) ([]model.SecretRevealed, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/secrets?lastUpdated=%d", c.url, lastUpdated.UnixNano()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get secrets: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var response struct {
+		Secrets []model.SecretRevealed `json:"secrets"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode secrets: %v", err)
+	}
+	return response.Secrets, nil
 }
 
 func (c *client) CreateOrder(sendAddress, receiveAddress, orderPair, sendAmount, receiveAmount, secretHash string) (uint, error) {
