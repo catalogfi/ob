@@ -33,7 +33,7 @@ type HTLC struct {
 	OnChainExpiry uint64       `json:"-"`
 	SendAmount    model.BigInt `gorm:"type:decimal" default:"0" json:"sendAmount"`
 	RecvAmount    model.BigInt `gorm:"type:decimal" default:"0" json:"receiveAmount"`
-	OrderID       string       `json:"orderId"`
+	OrderID       uint64       `json:"orderId"`
 }
 
 func NewFeehubClient(baseURL string) *FeehubClient {
@@ -43,15 +43,12 @@ func NewFeehubClient(baseURL string) *FeehubClient {
 	}
 }
 
-func (fc *FeehubClient) ProcessPayFillerDelegates(ctx context.Context, ConditionalFee ConditionalPayment, fillerAddr string, auth string) error {
+func (fc *FeehubClient) PayFiller(ctx context.Context, ConditionalFee ConditionalPayment, fillerAddr string, auth string) error {
 	var fee struct {
 		status string `json:"status"`
 	}
 
-	err := fc.SubmitPost(ctx, "payFiller", auth, map[string]interface{}{
-		"sendPayment": ConditionalFee,
-		"filler":      fillerAddr,
-	}, &fee)
+	err := fc.SubmitPost(ctx, "htlc", auth, ConditionalFee, &fee)
 	if err != nil || fee.status != "ok" {
 		return err
 	}
