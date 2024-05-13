@@ -320,7 +320,7 @@ func (s *Server) postOrders() gin.HandlerFunc {
 			}
 			ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			err = s.feeHubClient.ProcessPayFillerDelegates(ctx, req.FeePayment, req.Filler, token.(string))
+			err = s.feeHubClient.PayFiller(ctx, req.FeePayment, req.Filler, token.(string))
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"error": fmt.Sprintf("failed to process pay filler : %v", err.Error()),
