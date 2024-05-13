@@ -307,6 +307,7 @@ func (s *Server) postOrders() gin.HandlerFunc {
 
 			fee := new(big.Float).Quo(new(big.Float).SetInt(req.FeePayment.HTLC.RecvAmount.Int), new(big.Float).SetFloat64(btcSeedPrice.Price))
 			feeInBtc, _ = fee.Int(nil)
+			feeInBtc = new(big.Int).Div(feeInBtc, new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
 
 			maxFee := new(big.Int).Div(sendAmount, big.NewInt(100)).Add(sendAmount, big.NewInt(30000))
 
