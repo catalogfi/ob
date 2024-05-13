@@ -309,7 +309,8 @@ func (s *Server) postOrders() gin.HandlerFunc {
 			feeInBtc, _ = fee.Int(nil)
 			feeInBtc = new(big.Int).Div(feeInBtc, new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
 
-			maxFee := new(big.Int).Div(sendAmount, big.NewInt(100)).Add(sendAmount, big.NewInt(30000))
+			maxFee := new(big.Int).Div(sendAmount, big.NewInt(100))
+			maxFee = maxFee.Add(maxFee, big.NewInt(30000))
 
 			if feeInBtc.Cmp(maxFee) > 0 {
 				c.JSON(http.StatusBadRequest, gin.H{
