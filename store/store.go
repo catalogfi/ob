@@ -257,7 +257,7 @@ func (s *store) calculateUSDValue(amount *big.Int, price float64, decimals int64
 }
 
 // create a new order with the given details
-func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, secretHash, userBtcWalletAddress string, sendAmount, receiveAmount, feeInBtc, feeInSeed *big.Int, IsDiscounted bool, config model.Config) (uint, error) {
+func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, secretHash, userBtcWalletAddress string, sendAmount, receiveAmount, feeInBtc, feeInSeed *big.Int, IsDiscounted bool, config model.Config, afterHook ...rest.AfterHook) (uint, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// check if creatorAddress is valid eth address
@@ -335,28 +335,6 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sec
 	if err != nil {
 		return 0, err
 	}
-	var price float64
-	// ignoring accuracy
-	if IsDiscounted {
-		newReceiveAmt := new(big.Int).Sub(receiveAmount, feeInBtc)
-		price, _ = new(big.Float).Quo(new(big.Float).SetInt(sendAmount), new(big.Float).SetInt(newReceiveAmt)).Float64()
-	} else {
-		price, _ = new(big.Float).Quo(new(big.Float).SetInt(sendAmount), new(big.Float).SetInt(receiveAmount)).Float64()
-	}
-	if math.IsInf(price, 0) {
-		return 0, fmt.Errorf("invalid amount in price")
-	}
-	if math.IsNaN(price) {
-		return 0, fmt.Errorf("invalid amount in price")
-	}
-
-	initiatorAtomicSwap := model.AtomicSwap{
-		InitiatorAddress: sendAddress,
-		Chain:            sendChain,
-		Asset:            sendAsset,
-		Amount:           sendAmount.String(),
-		PriceByOracle:    initiatorSwapPrice.Price,
-	}
 
 	if config.MinTxLimit != "" {
 		// check if send amount is less than MinTxLimit
@@ -380,6 +358,28 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sec
 			return 0, fmt.Errorf("invalid send amount: %s", sendAmount)
 		}
 	}
+	var price float64
+	// ignoring accuracy
+	if IsDiscounted {
+		newReceiveAmt := new(big.Int).Sub(receiveAmount, feeInBtc)
+		price, _ = new(big.Float).Quo(new(big.Float).SetInt(sendAmount), new(big.Float).SetInt(newReceiveAmt)).Float64()
+	} else {
+		price, _ = new(big.Float).Quo(new(big.Float).SetInt(sendAmount), new(big.Float).SetInt(receiveAmount)).Float64()
+	}
+	if math.IsInf(price, 0) {
+		return 0, fmt.Errorf("invalid amount in price")
+	}
+	if math.IsNaN(price) {
+		return 0, fmt.Errorf("invalid amount in price")
+	}
+
+	initiatorAtomicSwap := model.AtomicSwap{
+		InitiatorAddress: sendAddress,
+		Chain:            sendChain,
+		Asset:            sendAsset,
+		Amount:           sendAmount.String(),
+		PriceByOracle:    initiatorSwapPrice.Price,
+	}
 
 	followerAtomicSwap := model.AtomicSwap{
 		RedeemerAddress: receiveAddress,
@@ -392,9 +392,11 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sec
 	trx := s.db.Begin()
 
 	if tx := trx.Create(&initiatorAtomicSwap); tx.Error != nil {
+		trx.Rollback()
 		return 0, tx.Error
 	}
 	if tx := trx.Create(&followerAtomicSwap); tx.Error != nil {
+		trx.Rollback()
 		return 0, tx.Error
 	}
 
@@ -414,7 +416,20 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sec
 		FeeInSeed:             feeInSeed.String(),
 	}
 	if tx := trx.Create(&order); tx.Error != nil {
+		trx.Rollback()
 		return 0, tx.Error
+	}
+
+	if IsDiscounted {
+		if len(afterHook) != 1 {
+			trx.Rollback()
+			return 0, fmt.Errorf("fee payment for filler not found")
+		}
+		err := afterHook[0]()
+		if err != nil {
+			trx.Rollback()
+			return 0, err
+		}
 	}
 
 	if err := trx.Commit().Error; err != nil {

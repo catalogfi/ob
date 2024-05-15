@@ -50,11 +50,13 @@ type Server struct {
 	priceClient  price.PriceFetcher
 }
 
+type AfterHook func() error
+
 type Store interface {
 	// get value locked in the given chain for the given user
 	ValueLockedByChain(chain model.Chain, config model.Network) (*big.Int, error)
 	// create order
-	CreateOrder(creator, sendAddress, receiveAddress, orderPair, secretHash, userWalletBTCAddress string, sendAmount, receiveAmount, feeInBtc, feeInSeed *big.Int, IsDiscounted bool, config model.Config) (uint, error)
+	CreateOrder(creator, sendAddress, receiveAddress, orderPair, secretHash, userWalletBTCAddress string, sendAmount, receiveAmount, feeInBtc, feeInSeed *big.Int, IsDiscounted bool, config model.Config, feePayment ...AfterHook) (uint, error)
 	// fill order
 	FillOrder(orderID uint, filler, sendAddress, receiveAddress string, config model.Network) error
 	// get order by id
@@ -293,6 +295,8 @@ func (s *Server) postOrders() gin.HandlerFunc {
 			return
 		}
 
+		var payfeehook AfterHook = nil
+
 		feeInBtc := big.NewInt(0)
 		if req.IsDiscounted {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -318,14 +322,15 @@ func (s *Server) postOrders() gin.HandlerFunc {
 				})
 				return
 			}
-			ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			err = s.feeHubClient.PayFiller(ctx, req.FeePayment, req.Filler, token.(string))
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error": fmt.Sprintf("failed to process pay filler : %v", err.Error()),
-				})
-				return
+
+			payfeehook = func() error {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				err = s.feeHubClient.PayFiller(ctx, req.FeePayment, req.Filler, token.(string))
+				if err != nil {
+					return fmt.Errorf("failed to process pay filler : %v", err.Error())
+				}
+				return nil
 			}
 		}
 
@@ -341,7 +346,8 @@ func (s *Server) postOrders() gin.HandlerFunc {
 			feeInBtc,
 			req.FeePayment.HTLC.RecvAmount.Int,
 			req.IsDiscounted,
-			s.config)
+			s.config,
+			payfeehook)
 		if err != nil {
 			errorMessage := fmt.Sprintf("failed to create order: %v", err.Error())
 			// fmt.Println(errorMessage, "error")
