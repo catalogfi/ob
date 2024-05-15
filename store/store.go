@@ -392,11 +392,15 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sec
 	trx := s.db.Begin()
 
 	if tx := trx.Create(&initiatorAtomicSwap); tx.Error != nil {
-		trx.Rollback()
+		if err := trx.Rollback().Error; err != nil {
+			return 0, fmt.Errorf("failed to create order %v", err)
+		}
 		return 0, tx.Error
 	}
 	if tx := trx.Create(&followerAtomicSwap); tx.Error != nil {
-		trx.Rollback()
+		if err := trx.Rollback().Error; err != nil {
+			return 0, fmt.Errorf("failed to create order %v", err)
+		}
 		return 0, tx.Error
 	}
 
@@ -416,18 +420,24 @@ func (s *store) CreateOrder(creator, sendAddress, receiveAddress, orderPair, sec
 		FeeInSeed:             feeInSeed.String(),
 	}
 	if tx := trx.Create(&order); tx.Error != nil {
-		trx.Rollback()
+		if err := trx.Rollback().Error; err != nil {
+			return 0, fmt.Errorf("failed to create order %v", err)
+		}
 		return 0, tx.Error
 	}
 
 	if IsDiscounted {
 		if len(afterHook) != 1 {
-			trx.Rollback()
+			if err := trx.Rollback().Error; err != nil {
+				return 0, fmt.Errorf("failed to create order %v", err)
+			}
 			return 0, fmt.Errorf("fee payment for filler not found")
 		}
 		err := afterHook[0]()
 		if err != nil {
-			trx.Rollback()
+			if err := trx.Rollback().Error; err != nil {
+				return 0, fmt.Errorf("failed to create order %v", err)
+			}
 			return 0, err
 		}
 	}

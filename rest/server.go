@@ -324,7 +324,7 @@ func (s *Server) postOrders() gin.HandlerFunc {
 			}
 
 			payfeehook = func() error {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 				defer cancel()
 				err = s.feeHubClient.PayFiller(ctx, req.FeePayment, req.Filler, token.(string))
 				if err != nil {
