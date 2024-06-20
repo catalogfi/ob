@@ -10,14 +10,14 @@ RUN go build -tags netgo -ldflags '-s -w' -o ./rest ./cmd/rest/rest.go
 
 RUN go build -tags netgo -ldflags '-s -w' -o ./watcher ./cmd/watcher/watcher.go
 
-CMD ["./orderbook"]
-
 # move rest to a smaller docker image
 FROM alpine:latest AS rest
 
 COPY --from=builder /app/rest /app
 
 COPY --from=builder /app/config.json /app
+
+COPY --from=builder /app/store/setup.sql /app/store
 
 RUN chmod +x /app/rest
 
@@ -31,6 +31,8 @@ FROM alpine:latest AS watcher
 COPY --from=builder /app/watcher /app
 
 COPY --from=builder /app/config.json /app
+
+COPY --from=builder /app/store/setup.sql /app/store
 
 RUN chmod +x /app/watcher
 
