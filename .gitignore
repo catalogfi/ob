@@ -1,5 +1,6 @@
 *.db
 *.json
+!local-config.json
 *.out
 .env
 .env.*
