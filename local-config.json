@@ -3,7 +3,7 @@
         "Network": {
             "bitcoin_regtest": {
                 "RPC": {
-                    "mempool": "http://localhost:50000"
+                    "blockstream": "http://host.docker.internal:5000"
                 },
                 "Assets": {
                     "primary": {
@@ -17,12 +17,27 @@
             "ethereum_localnet": {
                 "EventWindow": 1000,
                 "RPC": {
-                    "ethrpc": "http://localhost:8545"
+                    "ethrpc": "http://host.docker.internal:8545"
                 },
                 "Assets": {
-                    "<htlc_contract>": {
+                    "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9": {
                         "Oracle": "https://api.coincap.io/v2/assets/bitcoin",
-                        "TokenAddress": "<token_addr>",
+                        "TokenAddress": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+                        "StartBlock": 0,
+                        "Decimals": 8
+                    }
+                },
+                "Expiry": 7200
+            },
+            "ethereum_arbitrumlocalnet": {
+                "EventWindow": 1000,
+                "RPC": {
+                    "ethrpc": "http://host.docker.internal:8546"
+                },
+                "Assets": {
+                    "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9": {
+                        "Oracle": "https://api.coincap.io/v2/assets/bitcoin",
+                        "TokenAddress": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
                         "StartBlock": 0,
                         "Decimals": 8
                     }
@@ -35,7 +50,7 @@
         "DailyLimit": "600000000"
     },
     "PORT": "8080",
-    "PSQL_DB": "",
+    "PSQL_DB": "postgres://postgres:postgres@host.docker.internal:5432/garden?sslmode=disable",
     "SERVER_SECRET": "local_testing_secret_key",
     "FEEHUB_URL": "",
     "PRICE_URL": ""
