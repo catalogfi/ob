@@ -3,7 +3,7 @@
         "Network": {
             "bitcoin_regtest": {
                 "RPC": {
-                    "blockstream": "http://host.docker.internal:5000"
+                    "blockstream": "http://host.docker.internal:3000"
                 },
                 "Assets": {
                     "primary": {
