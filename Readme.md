@@ -55,7 +55,7 @@ Orderbook uses a configuration file(config.json) to manage its settings. Below i
 }
 ```
 
-##### Network Configuration:
+#### Network Configuration :-
 
 Each network configuration under `CONFIG.Network` includes data about a blockchain network that we want to support.
 
@@ -85,7 +85,7 @@ Each network configuration under `CONFIG.Network` includes data about a blockcha
 
 ## Setup
 
-#### prerequisites
+### Prerequisites
 
 - Go 1.19
 
