@@ -114,7 +114,7 @@ func (s *Server) subscribe(msg []byte, ctx context.Context) <-chan interface{} {
 			return
 		}
 
-		isOrderID, err := regexp.Match("[0-9]+$", []byte(values[1]))
+		isOrderID, err := regexp.Match("^[0-9]+$", []byte(values[1]))
 		if err == nil && isOrderID {
 			orderID, err := strconv.ParseUint(values[1], 10, 64)
 			if err != nil {
