@@ -1,0 +1,57 @@
+{
+    "CONFIG": {
+        "Network": {
+            "bitcoin_regtest": {
+                "RPC": {
+                    "blockstream": "http://host.docker.internal:3000"
+                },
+                "Assets": {
+                    "primary": {
+                        "Oracle": "https://api.coincap.io/v2/assets/bitcoin",
+                        "TokenAddress": "primary",
+                        "Decimals": 8
+                    }
+                },
+                "Expiry": 144
+            },
+            "ethereum_localnet": {
+                "EventWindow": 1000,
+                "RPC": {
+                    "ethrpc": "http://host.docker.internal:8545"
+                },
+                "Assets": {
+                    "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512": {
+                        "Oracle": "https://api.coincap.io/v2/assets/bitcoin",
+                        "TokenAddress": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+                        "StartBlock": 0,
+                        "Decimals": 8
+                    }
+                },
+                "Expiry": 7200
+            },
+            "ethereum_arbitrumlocalnet": {
+                "EventWindow": 1000,
+                "RPC": {
+                    "ethrpc": "http://host.docker.internal:8546"
+                },
+                "Assets": {
+                    "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9": {
+                        "Oracle": "https://api.coincap.io/v2/assets/bitcoin",
+                        "TokenAddress": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+                        "StartBlock": 0,
+                        "Decimals": 8
+                    }
+                },
+                "Expiry": 7200
+            }
+        },
+        "MinTxLimit": "100000",
+        "MaxTxLimit": "150000000",
+        "DailyLimit": "600000000"
+    },
+    "PORT": "8080",
+    "PSQL_DB": "postgres://postgres:postgres@host.docker.internal:5432/garden?sslmode=disable",
+    "SERVER_SECRET": "local_testing_secret_key",
+    "FEEHUB_URL": "",
+    "PRICE_URL": ""
+}

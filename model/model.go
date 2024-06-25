@@ -33,17 +33,18 @@ type Config struct {
 type Chain string
 
 const (
-	Bitcoin           Chain = "bitcoin"
-	BitcoinTestnet    Chain = "bitcoin_testnet"
-	BitcoinRegtest    Chain = "bitcoin_regtest"
-	Ethereum          Chain = "ethereum"
-	EthereumSepolia   Chain = "ethereum_sepolia"
-	EthereumLocalnet  Chain = "ethereum_localnet"
-	EthereumOptimism  Chain = "ethereum_optimism"
-	EthereumArbitrum  Chain = "ethereum_arbitrum"
-	EthereumPolygon   Chain = "ethereum_polygon"
-	EthereumAvalanche Chain = "ethereum_avalanche"
-	EthereumBNB       Chain = "ethereum_bnb"
+	Bitcoin                  Chain = "bitcoin"
+	BitcoinTestnet           Chain = "bitcoin_testnet"
+	BitcoinRegtest           Chain = "bitcoin_regtest"
+	Ethereum                 Chain = "ethereum"
+	EthereumSepolia          Chain = "ethereum_sepolia"
+	EthereumLocalnet         Chain = "ethereum_localnet"
+	EthereumOptimism         Chain = "ethereum_optimism"
+	EthereumArbitrum         Chain = "ethereum_arbitrum"
+	EthereumArbitrumLocalnet Chain = "ethereum_arbitrumlocalnet"
+	EthereumPolygon          Chain = "ethereum_polygon"
+	EthereumAvalanche        Chain = "ethereum_avalanche"
+	EthereumBNB              Chain = "ethereum_bnb"
 )
 
 type BtcCompatChain interface {
@@ -68,6 +69,8 @@ func ParseChain(c string) (Chain, error) {
 		return EthereumOptimism, nil
 	case "ethereum_arbitrum", "arbitrum", "ethereum-arbitrum":
 		return EthereumArbitrum, nil
+	case "ethereum_arbitrumlocalnet", "arbitrum_localnet", "ethereum-arbitrumlocalnet", "ethereum_arbitrum_localnet":
+		return EthereumArbitrumLocalnet, nil
 	case "ethereum_polygon", "polygon", "ethereum-polygon":
 		return EthereumPolygon, nil
 	case "ethereum_avalanche", "avalanche", "ethereum-avalanche":
@@ -80,7 +83,7 @@ func ParseChain(c string) (Chain, error) {
 }
 
 func (c Chain) IsEVM() bool {
-	return c == Ethereum || c == EthereumSepolia || c == EthereumLocalnet || c == EthereumOptimism || c == EthereumArbitrum || c == EthereumPolygon || c == EthereumAvalanche || c == EthereumBNB
+	return c == Ethereum || c == EthereumSepolia || c == EthereumLocalnet || c == EthereumOptimism || c == EthereumArbitrum || c == EthereumPolygon || c == EthereumAvalanche || c == EthereumBNB || c == EthereumArbitrumLocalnet
 }
 
 func (c Chain) IsBTC() bool {
