@@ -44,7 +44,7 @@ type redeemerSwap struct {
 func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr common.Address, secretHash []byte, expiry, minConfirmations, amount *big.Int, client Client, eventWindow int64) (swapper.InitiatorSwap, error) {
 
 	initiatorAddr := crypto.PubkeyToAddress(initiator.PublicKey)
-	orderId := sha256.Sum256(append(secretHash, initiatorAddr.Hash().Bytes()...))
+	orderId := sha256.Sum256(append(secretHash, initiatorAddr.Bytes()...))
 
 	latestCheckedBlock := new(big.Int).Sub(expiry, big.NewInt(12000))
 	if latestCheckedBlock.Cmp(big.NewInt(0)) == -1 {
@@ -76,7 +76,7 @@ func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr 
 }
 
 func (initiatorSwap *initiatorSwap) Initiate() (string, error) {
-	return initiatorSwap.client.InitiateAtomicSwap(initiatorSwap.atomicSwapAddr, initiatorSwap.initiator, initiatorSwap.redeemerAddr, initiatorSwap.tokenAddr, initiatorSwap.expiry, initiatorSwap.amount, initiatorSwap.secretHash)
+	return initiatorSwap.client.InitiateGardenHTLC(initiatorSwap.atomicSwapAddr, initiatorSwap.initiator, initiatorSwap.redeemerAddr, initiatorSwap.tokenAddr, initiatorSwap.expiry, initiatorSwap.amount, initiatorSwap.secretHash)
 }
 
 func (initiatorSwap *initiatorSwap) Expired() (bool, error) {
@@ -110,7 +110,7 @@ func (initiatorSwap *initiatorSwap) Refund() (string, error) {
 		return "", err
 	}
 
-	tx, err := initiatorSwap.client.RefundAtomicSwap(initiatorSwap.atomicSwapAddr, transactor, initiatorSwap.tokenAddr, initiatorSwap.orderID)
+	tx, err := initiatorSwap.client.RefundGardenHTLC(initiatorSwap.atomicSwapAddr, transactor, initiatorSwap.tokenAddr, initiatorSwap.orderID)
 	if err != nil {
 		return "", err
 	}
@@ -118,7 +118,7 @@ func (initiatorSwap *initiatorSwap) Refund() (string, error) {
 }
 
 func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr common.Address, secretHash []byte, expiry, amount, minConfirmations *big.Int, client Client, eventWindow int64) (swapper.RedeemerSwap, error) {
-	orderId := sha256.Sum256(append(secretHash, initiatorAddr.Hash().Bytes()...))
+	orderId := sha256.Sum256(append(secretHash, initiatorAddr.Bytes()...))
 	watcher, err := NewWatcher(atomicSwapAddr, secretHash, orderId[:], expiry, minConfirmations, amount, client, eventWindow)
 	if err != nil {
 		return &redeemerSwap{}, err
@@ -149,7 +149,7 @@ func (redeemerSwap *redeemerSwap) Redeem(secret []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return redeemerSwap.client.RedeemAtomicSwap(redeemerSwap.atomicSwapAddr, transactor, redeemerSwap.tokenAddr, redeemerSwap.orderID, secret)
+	return redeemerSwap.client.RedeemGardenHTLC(redeemerSwap.atomicSwapAddr, transactor, redeemerSwap.tokenAddr, redeemerSwap.orderID, secret)
 }
 
 func (redeemerSwap *redeemerSwap) IsInitiated() (bool, string, uint64, error) {

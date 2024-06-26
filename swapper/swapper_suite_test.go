@@ -6,8 +6,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/catalogfi/orderbook/swapper/ethereum/typings/AtomicSwap"
-	"github.com/catalogfi/orderbook/swapper/ethereum/typings/TestERC20"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"

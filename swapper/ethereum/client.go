@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/catalogfi/orderbook/swapper/ethereum/typings/AtomicSwap"
-	"github.com/catalogfi/orderbook/swapper/ethereum/typings/ERC20"
+	GardenHTLC "github.com/catalogfi/blockchain/evm/bindings/contracts/htlc/gardenhtlc"
+	ERC20 "github.com/catalogfi/blockchain/evm/bindings/openzeppelin/contracts/token/ERC20/erc20"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -38,9 +38,9 @@ type Client interface {
 	GetConfirmations(txHash string) (uint64, uint64, error)
 	GetLogs(contract common.Address, fromBlock, toBlock uint64, eventIds [][]common.Hash, eventWindow uint64) ([]types.Log, error)
 	ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, tokenAddr common.Address, toAddr common.Address) (string, error)
-	InitiateAtomicSwap(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error)
-	RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte, secret []byte) (string, error)
-	RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte) (string, error)
+	InitiateGardenHTLC(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error)
+	RedeemGardenHTLC(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte, secret []byte) (string, error)
+	RefundGardenHTLC(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte) (string, error)
 	IsFinal(txHash string, waitBlocks uint64) (bool, uint64, error)
 	ChainID() *big.Int
 }
@@ -192,7 +192,7 @@ func (client *client) GetProvider() *ethclient.Client {
 }
 
 func (client *client) GetTokenAddress(contractAddr common.Address) (common.Address, error) {
-	instance, err := AtomicSwap.NewAtomicSwap(contractAddr, client.provider)
+	instance, err := GardenHTLC.NewGardenHTLC(contractAddr, client.provider)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -239,8 +239,8 @@ func (client *client) ApproveERC20(privKey *ecdsa.PrivateKey, amount *big.Int, t
 	return receipt.TxHash.Hex(), err
 }
 
-func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error) {
-	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
+func (client *client) InitiateGardenHTLC(contract common.Address, initiator *ecdsa.PrivateKey, redeemerAddr, token common.Address, expiry *big.Int, amount *big.Int, secretHash []byte) (string, error) {
+	instance, err := GardenHTLC.NewGardenHTLC(contract, client.provider)
 	if err != nil {
 		return "", err
 	}
@@ -279,8 +279,8 @@ func (client *client) InitiateAtomicSwap(contract common.Address, initiator *ecd
 	return receipt.TxHash.Hex(), nil
 }
 
-func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte, secret []byte) (string, error) {
-	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
+func (client *client) RedeemGardenHTLC(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte, secret []byte) (string, error) {
+	instance, err := GardenHTLC.NewGardenHTLC(contract, client.provider)
 	if err != nil {
 		return "", err
 	}
@@ -294,8 +294,8 @@ func (client *client) RedeemAtomicSwap(contract common.Address, auth *bind.Trans
 	return tx.Hash().Hex(), nil
 }
 
-func (client *client) RefundAtomicSwap(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte) (string, error) {
-	instance, err := AtomicSwap.NewAtomicSwap(contract, client.provider)
+func (client *client) RefundGardenHTLC(contract common.Address, auth *bind.TransactOpts, token common.Address, orderID [32]byte) (string, error) {
+	instance, err := GardenHTLC.NewGardenHTLC(contract, client.provider)
 	if err != nil {
 		return "", err
 	}
@@ -358,7 +358,7 @@ func (client *client) callOpts() *bind.CallOpts {
 }
 
 func (client *client) simulateInitiate(contract, initiatorAddr, redeemerAddr common.Address, expiry *big.Int, amount *big.Int, secretHash [32]byte) error {
-	parsed, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	parsed, err := GardenHTLC.GardenHTLCMetaData.GetAbi()
 	if err != nil {
 		return err
 	}
@@ -375,7 +375,7 @@ func (client *client) simulateInitiate(contract, initiatorAddr, redeemerAddr com
 }
 
 func (client *client) simulateRedeem(contract common.Address, auth *bind.TransactOpts, orderID [32]byte, secret []byte) error {
-	parsed, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	parsed, err := GardenHTLC.GardenHTLCMetaData.GetAbi()
 	if err != nil {
 		return err
 	}
@@ -392,7 +392,7 @@ func (client *client) simulateRedeem(contract common.Address, auth *bind.Transac
 }
 
 func (client *client) simulateRefund(contract common.Address, auth *bind.TransactOpts, orderID [32]byte) error {
-	parsed, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	parsed, err := GardenHTLC.GardenHTLCMetaData.GetAbi()
 	if err != nil {
 		return err
 	}

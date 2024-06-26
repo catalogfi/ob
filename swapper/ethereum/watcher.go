@@ -7,9 +7,9 @@ import (
 	"math/big"
 	"strings"
 
+	GardenHTLC "github.com/catalogfi/blockchain/evm/bindings/contracts/htlc/gardenhtlc"
 	"github.com/catalogfi/orderbook/model"
 	"github.com/catalogfi/orderbook/swapper"
-	"github.com/catalogfi/orderbook/swapper/ethereum/typings/AtomicSwap"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -26,7 +26,7 @@ type watcher struct {
 	minConfirmations *big.Int
 	initiatedBlock   *big.Int
 	eventWindow      *big.Int
-	atomicSwap       *AtomicSwap.AtomicSwap
+	atomicSwap       *GardenHTLC.GardenHTLC
 	// IiwRpc           string
 }
 
@@ -36,7 +36,7 @@ func NewWatcher(atomicSwapAddr common.Address, secretHash, orderId []byte, expir
 		latestCheckedBlock = big.NewInt(0)
 	}
 
-	atomicSwapInstance, _ := AtomicSwap.NewAtomicSwap(atomicSwapAddr, client.GetProvider())
+	atomicSwapInstance, _ := GardenHTLC.NewGardenHTLC(atomicSwapAddr, client.GetProvider())
 	return &watcher{
 		client:           client,
 		atomicSwapAddr:   atomicSwapAddr,
@@ -102,7 +102,7 @@ func (watcher *watcher) Status(txHash string) (uint64, uint64, bool, error) {
 }
 
 func (watcher *watcher) IsDetected() (bool, string, string, error) {
-	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	atomicSwapAbi, err := GardenHTLC.GardenHTLCMetaData.GetAbi()
 	if err != nil {
 		return false, "", "", err
 	}
@@ -131,7 +131,7 @@ func (watcher *watcher) IsDetected() (bool, string, string, error) {
 		return false, "", "", fmt.Errorf("unable to decode amount from Initiated event data")
 	}
 
-	order, err := watcher.atomicSwap.AtomicSwapOrders(nil, common.BytesToHash(watcher.orderId))
+	order, err := watcher.atomicSwap.Orders(nil, common.BytesToHash(watcher.orderId))
 	if err != nil {
 		return false, "", "", err
 	}
@@ -156,7 +156,7 @@ func (watcher *watcher) IsInitiated() (bool, string, map[string]model.Chain, uin
 	// 	currentBlock = big.NewInt(0).Add(watcher.lastCheckedBlock, big.NewInt(MaxQueryBlockRange))
 	// }
 
-	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	atomicSwapAbi, err := GardenHTLC.GardenHTLCMetaData.GetAbi()
 	if err != nil {
 		return false, "", nil, 0, err
 	}
@@ -207,7 +207,7 @@ func (watcher *watcher) IsRedeemed() (bool, []byte, string, error) {
 	// 	currentBlock = big.NewInt(0).Add(watcher.lastCheckedBlock, big.NewInt(MaxQueryBlockRange))
 	// }
 
-	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	atomicSwapAbi, err := GardenHTLC.GardenHTLCMetaData.GetAbi()
 	if err != nil {
 		return false, nil, "", err
 	}
@@ -248,7 +248,7 @@ func (watcher *watcher) IsRefunded() (bool, string, error) {
 	// 	currentBlock = big.NewInt(0).Add(watcher.lastCheckedBlock, big.NewInt(MaxQueryBlockRange))
 	// }
 
-	atomicSwapAbi, err := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	atomicSwapAbi, err := GardenHTLC.GardenHTLCMetaData.GetAbi()
 	if err != nil {
 		return false, "", err
 	}

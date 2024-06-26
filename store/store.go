@@ -736,7 +736,7 @@ func GetSwapId(Chain model.Chain, InitiatorAddress string, RedeemerAddress strin
 		}
 		return scriptAddr.EncodeAddress(), nil
 	} else if Chain.IsEVM() {
-		orderId := sha256.Sum256(append(secHash, common.HexToAddress(InitiatorAddress).Hash().Bytes()...))
+		orderId := sha256.Sum256(append(secHash, common.HexToAddress(InitiatorAddress).Bytes()...))
 		return hex.EncodeToString(orderId[:]), nil
 	}
 	return "", nil

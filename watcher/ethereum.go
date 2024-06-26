@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
+	GardenHTLC "github.com/catalogfi/blockchain/evm/bindings/contracts/htlc/gardenhtlc"
 	"github.com/catalogfi/orderbook/model"
 	"github.com/catalogfi/orderbook/screener"
 	"github.com/catalogfi/orderbook/swapper/ethereum"
-	"github.com/catalogfi/orderbook/swapper/ethereum/typings/AtomicSwap"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -26,10 +26,10 @@ type EthereumWatcher struct {
 	startBlock     uint64
 	interval       time.Duration
 	store          Store
-	atomicSwapAddr common.Address
+	gardenHTLCAddr common.Address
 	client         ethereum.Client
 	ABI            *abi.ABI
-	AtomicSwap     *AtomicSwap.AtomicSwap
+	GardenHTLC     *GardenHTLC.GardenHTLC
 	screener       screener.Screener
 	logger         *zap.Logger
 	ignoreOrders   map[string]bool
@@ -37,12 +37,12 @@ type EthereumWatcher struct {
 }
 
 type Swap struct {
-	Redeemer    common.Address
-	Initiator   common.Address
-	Expiry      *big.Int
-	InitiatedAt *big.Int
-	Amount      *big.Int
 	IsFulfilled bool
+	Initiator   common.Address
+	Redeemer    common.Address
+	InitiatedAt *big.Int
+	Expiry      *big.Int
+	Amount      *big.Int
 }
 
 var retryCount = 5
@@ -67,19 +67,19 @@ func NewEthereumWatcher(store Store, chain model.Chain, config model.NetworkConf
 	if err != nil {
 		return nil, fmt.Errorf("failed to load client: %v", err)
 	}
-	atomicSwap, _ := AtomicSwap.NewAtomicSwap(address, ethClient.GetProvider())
-	atomicSwapAbi, _ := AtomicSwap.AtomicSwapMetaData.GetAbi()
+	gardenHTLC, _ := GardenHTLC.NewGardenHTLC(address, ethClient.GetProvider())
+	gardenHTLCAbi, _ := GardenHTLC.GardenHTLCMetaData.GetAbi()
 	return &EthereumWatcher{
 		chain:          chain,
 		netConfig:      config,
 		interval:       5 * time.Second,
 		store:          store,
-		atomicSwapAddr: address,
+		gardenHTLCAddr: address,
 		client:         ethClient,
 		startBlock:     startBlock,
-		AtomicSwap:     atomicSwap,
+		GardenHTLC:     gardenHTLC,
 		screener:       screener,
-		ABI:            atomicSwapAbi,
+		ABI:            gardenHTLCAbi,
 		logger:         logger,
 		ignoreOrders:   make(map[string]bool),
 		blockSpan:      blockSpan,
@@ -110,12 +110,12 @@ func (w *EthereumWatcher) Watch() {
 		}
 		fromBlock := w.startBlock
 		toBlock := currentBlock
-		logsSlice, err := w.client.GetLogs(w.atomicSwapAddr, fromBlock, toBlock, eventIds, w.blockSpan)
+		logsSlice, err := w.client.GetLogs(w.gardenHTLCAddr, fromBlock, toBlock, eventIds, w.blockSpan)
 		if err != nil {
 			w.logger.Error("failed to get logs", zap.Error(err))
 			continue
 		}
-		werr := HandleEVMLogs(eventIds, logsSlice, w.store, w.screener, w.AtomicSwap, w.logger)
+		werr := HandleEVMLogs(eventIds, logsSlice, w.store, w.screener, w.GardenHTLC, w.logger)
 		if werr != nil {
 			var nonrecoverable *NonRecoverableError
 			if errors.As(werr, &nonrecoverable) {
@@ -134,12 +134,12 @@ func (w *EthereumWatcher) Watch() {
 	}
 }
 
-func HandleEVMLogs(eventIds [][]common.Hash, logs []types.Log, store Store, screener screener.Screener, contract *AtomicSwap.AtomicSwap, logger *zap.Logger) error {
+func HandleEVMLogs(eventIds [][]common.Hash, logs []types.Log, store Store, screener screener.Screener, contract *GardenHTLC.GardenHTLC, logger *zap.Logger) error {
 	for _, log := range logs {
 		switch log.Topics[0] {
 		case eventIds[0][0]:
 			cSwap, err := RetryWithReturnValue(func() (Swap, error) {
-				return contract.AtomicSwapOrders(nil, log.Topics[1])
+				return contract.Orders(nil, log.Topics[1])
 			}, retryCount)
 			if err != nil {
 				return NewNonRecoverableError(fmt.Errorf("failed to get swap order: %s", err))
