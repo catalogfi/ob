@@ -780,49 +780,25 @@ func GetMinConfirmations(value *big.Int, chain model.Chain, isFollower bool) uin
 
 	if chain.IsBTC() {
 		if isFollower {
-			return 1
+			return 0
 		}
 		switch {
-		case value.Cmp(big.NewInt(100000)) < 1:
+		case value.Cmp(big.NewInt(1000000000)) < 1:
 			return 1
 
-		case value.Cmp(big.NewInt(1000000)) < 1:
-			return 2
-
-		case value.Cmp(big.NewInt(10000000)) < 1:
-			return 4
-
-		case value.Cmp(big.NewInt(100000000)) < 1:
-			return 6
-
-		case value.Cmp(big.NewInt(1000000000)) < 1:
-			return 8
-
 		default:
-			return 12
+			return 6
 		}
 	} else if chain.IsEVM() {
 		if isFollower {
-			return 6
+			return 0
 		}
 		switch {
-		case value.Cmp(big.NewInt(100000)) < 1:
-			return 6
-
-		case value.Cmp(big.NewInt(1000000)) < 1:
-			return 12
-
-		case value.Cmp(big.NewInt(10000000)) < 1:
-			return 18
-
-		case value.Cmp(big.NewInt(100000000)) < 1:
-			return 24
-
 		case value.Cmp(big.NewInt(1000000000)) < 1:
-			return 30
+			return 2
 
 		default:
-			return 100
+			return 6
 		}
 	}
 	return 0
