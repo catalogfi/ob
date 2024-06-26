@@ -135,7 +135,7 @@ func (watcher *watcher) IsDetected() (bool, string, string, error) {
 	if err != nil {
 		return false, "", "", err
 	}
-	if order.Expiry.Cmp(watcher.expiry) != 0 {
+	if order.Timelock.Cmp(watcher.expiry) != 0 {
 		return false, "", "", fmt.Errorf("inititate with wrong timelock")
 	}
 

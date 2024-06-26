@@ -41,7 +41,7 @@ type Swap struct {
 	Initiator   common.Address
 	Redeemer    common.Address
 	InitiatedAt *big.Int
-	Expiry      *big.Int
+	Timelock    *big.Int
 	Amount      *big.Int
 }
 
@@ -243,7 +243,7 @@ func HandleEVMInitiate(log types.Log, store Store, cSwap Swap, screener screener
 		return NewIgnorableError(fmt.Errorf("failed to decode timelock: %s", err))
 	}
 
-	if cSwap.Expiry.Cmp(expiry) != 0 {
+	if cSwap.Timelock.Cmp(expiry) != 0 {
 		return NewIgnorableError(fmt.Errorf("incorrect expiry: %s", expiry))
 	}
 

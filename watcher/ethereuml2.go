@@ -238,7 +238,7 @@ func (w *EthereumL2Watcher) HandleEVML2Initiate(log types.Log, store Store, cSwa
 		return NewIgnorableError(fmt.Errorf("failed to decode timelock: %s", err))
 	}
 
-	if cSwap.Expiry.Cmp(expiry) != 0 {
+	if cSwap.Timelock.Cmp(expiry) != 0 {
 		return NewIgnorableError(fmt.Errorf("incorrect expiry: %s", expiry))
 	}
 
