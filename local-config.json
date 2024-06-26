@@ -45,9 +45,8 @@
                 "Expiry": 7200
             }
         },
-        "MinTxLimit": "100000",
-        "MaxTxLimit": "150000000",
-        "DailyLimit": "600000000"
+        "MinTxLimit": "1000",
+        "MaxTxLimit": "150000000"
     },
     "PORT": "8080",
     "PSQL_DB": "postgres://postgres:postgres@host.docker.internal:5432/garden?sslmode=disable",
