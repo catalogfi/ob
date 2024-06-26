@@ -93,8 +93,11 @@ func (w *EthereumWatcher) Watch() {
 		w.ABI.Events["Refunded"].ID,
 	}}
 
+	fmt.Println("Starting watcher for ", w.gardenHTLCAddr, " on ", w.chain, eventIds)
+
 	for {
 		currentBlock, err := w.client.GetCurrentBlock()
+		fmt.Println("Current block: ", currentBlock)
 		if err != nil {
 			w.logger.Error("failed to get current block number", zap.Error(err))
 			continue

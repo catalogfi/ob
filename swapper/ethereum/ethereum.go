@@ -44,8 +44,7 @@ type redeemerSwap struct {
 func NewInitiatorSwap(initiator *ecdsa.PrivateKey, redeemerAddr, atomicSwapAddr common.Address, secretHash []byte, expiry, minConfirmations, amount *big.Int, client Client, eventWindow int64) (swapper.InitiatorSwap, error) {
 
 	initiatorAddr := crypto.PubkeyToAddress(initiator.PublicKey)
-	orderId := sha256.Sum256(append(secretHash, initiatorAddr.Bytes()...))
-
+	orderId := sha256.Sum256(append(secretHash, common.HexToHash(initiatorAddr.Hex()).Bytes()...))
 	latestCheckedBlock := new(big.Int).Sub(expiry, big.NewInt(12000))
 	if latestCheckedBlock.Cmp(big.NewInt(0)) == -1 {
 		latestCheckedBlock = big.NewInt(0)
@@ -118,7 +117,7 @@ func (initiatorSwap *initiatorSwap) Refund() (string, error) {
 }
 
 func NewRedeemerSwap(redeemer *ecdsa.PrivateKey, initiatorAddr, atomicSwapAddr common.Address, secretHash []byte, expiry, amount, minConfirmations *big.Int, client Client, eventWindow int64) (swapper.RedeemerSwap, error) {
-	orderId := sha256.Sum256(append(secretHash, initiatorAddr.Bytes()...))
+	orderId := sha256.Sum256(append(secretHash, common.HexToHash(initiatorAddr.Hex()).Bytes()...))
 	watcher, err := NewWatcher(atomicSwapAddr, secretHash, orderId[:], expiry, minConfirmations, amount, client, eventWindow)
 	if err != nil {
 		return &redeemerSwap{}, err
