@@ -91,7 +91,7 @@ require (
 require (
 	github.com/TheZeroSlave/zapsentry v1.17.0
 	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.4
-	github.com/catalogfi/blockchain v0.1.2-0.20240625142253-7d2085f3e86c
+	github.com/catalogfi/blockchain v0.1.4-0.20240626131123-cf877bd581c0
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/fatih/color v1.16.0
