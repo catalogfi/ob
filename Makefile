@@ -1,8 +1,8 @@
-.PHONY: build run stop logs status restart
+.PHONY: build run stop logs status restart pull
 
 DOCKER_FILE=Dockerfile
 DOCKER=docker
-CONTAINER_NAME=orderbook
+CONTAINER_NAME=ghcr.io/catalogfi/orderbook
 
 all: build
 
@@ -19,6 +19,10 @@ build:
 run:
 	$(call print_message, "Running orderbook container")
 	@$(DOCKER) run -d --name $(CONTAINER_NAME) $(CONTAINER_NAME)
+
+pull:
+	$(call print_message, "Pulling orderbook container")
+	@$(DOCKER) pull $(CONTAINER_NAME)
 
 # Stop the container
 stop:
