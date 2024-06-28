@@ -49,8 +49,6 @@ github.com/btcsuite/winsvc v1.0.0/go.mod h1:jsenWakMcC0zFBFurPLEAyrnc/teJEM1O46f
 github.com/bytedance/sonic v1.5.0/go.mod h1:ED5hyg4y6t3/9Ku1R6dU/4KyJ48DZ4jPhfY1O2AihPM=
 github.com/bytedance/sonic v1.9.1 h1:6iJ6NqdoxCDr6mbY8h18oSO+cShGSMRGCEo7F2h0x8s=
 github.com/bytedance/sonic v1.9.1/go.mod h1:i736AoUSYt75HyZLoJW9ERYxcy6eaN6h4BZXU064P/U=
-github.com/catalogfi/blockchain v0.1.2-0.20240625142253-7d2085f3e86c h1:4XMhmPuQawvVog1B5XJFimklSi9NGWGIm3rEica+0f8=
-github.com/catalogfi/blockchain v0.1.2-0.20240625142253-7d2085f3e86c/go.mod h1:YMfkazVyOqaDqzRCtNwZeS/kAPwDmnjFmrddxrCbwtg=
 github.com/catalogfi/blockchain v0.1.4-0.20240626131123-cf877bd581c0 h1:L0c28OKpvbQWtXTYdwn0fshNMC4IHFQ2gejNqsJaOQ8=
 github.com/catalogfi/blockchain v0.1.4-0.20240626131123-cf877bd581c0/go.mod h1:YMfkazVyOqaDqzRCtNwZeS/kAPwDmnjFmrddxrCbwtg=
 github.com/cespare/cp v0.1.0 h1:SE+dxFebS7Iik5LK0tsi1k9ZCxEaFX4AjQmoyA+1dJk=
