@@ -1,8 +1,8 @@
 # OrderBook
 
-Orderbook is a order matching engine for [garden.finance](https://garden.finance), implemented in Go. Garden Finance is a decentralised exchange which supports atomic swaps, enabling seamless cross-chain bridging. Through this Orderbook API, users can create orders, track the progress of orders, and complete swaps, while market makers can accept orders and complete trades.
+Orderbook is a order matching engine for [garden.finance](https://garden.finance), implemented in Go. Garden Finance is a decentralized exchange which supports atomic swaps, enabling seamless cross-chain bridging. Through this Orderbook API, users can create orders, track the progress of orders, and complete swaps, while market makers can accept orders and complete trades.
 
-Orderbook serves as the intermediary between users and counterparties during swaps. It facilitates transactions by supporting different order types: market orders for immediate execution, limit orders for specific prices(wip), and Dutch auction orders for dynamic price discovery(wip).
+Orderbook serves as the intermediary between users and counter parties during swaps. It facilitates transactions by supporting different order types: market orders for immediate execution, limit orders for specific prices(wip), and Dutch auction orders for dynamic price discovery(wip).
 
 ## Configuration
 
@@ -77,9 +77,9 @@ Each network configuration under `CONFIG.Network` includes data about a blockcha
   - For EVM networks, include `ethrpc`.
 
 - `Assets`:
-  - `<asset>`: Atomicswap contract address deployed in this network.
+  - `<asset>`: Atomic swap contract address deployed in this network.
     - `Oracle`: CoinCap URL for price fetching.
-    - `TokenAddress`: Token contract address supported by the specified atomicswap contract address.
+    - `TokenAddress`: Token contract address supported by the specified atomic swap contract address.
     - `Decimals`: Token decimals.
 - `Expiry`: Atomic swap expiry time in number of blocks.
 
