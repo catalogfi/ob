@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	GardenHTLC "github.com/catalogfi/blockchain/evm/bindings/contracts/htlc/gardenhtlc"
-	"github.com/catalogfi/orderbook/model"
-	"github.com/catalogfi/orderbook/swapper"
+	"github.com/catalogfi/ob/model"
+	"github.com/catalogfi/ob/swapper"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"

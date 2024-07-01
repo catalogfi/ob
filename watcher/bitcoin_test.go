@@ -8,11 +8,11 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/catalogfi/orderbook/mocks"
-	"github.com/catalogfi/orderbook/model"
-	"github.com/catalogfi/orderbook/swapper/bitcoin"
+	"github.com/catalogfi/ob/mocks"
+	"github.com/catalogfi/ob/model"
+	"github.com/catalogfi/ob/swapper/bitcoin"
 
-	. "github.com/catalogfi/orderbook/watcher"
+	. "github.com/catalogfi/ob/watcher"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 

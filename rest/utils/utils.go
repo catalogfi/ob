@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/catalogfi/orderbook/model"
-	ERC1271 "github.com/catalogfi/orderbook/rest/types"
+	"github.com/catalogfi/ob/model"
+	ERC1271 "github.com/catalogfi/ob/rest/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"

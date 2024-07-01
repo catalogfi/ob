@@ -7,7 +7,7 @@ package mocks
 import (
 	reflect "reflect"
 
-	model "github.com/catalogfi/orderbook/model"
+	model "github.com/catalogfi/ob/model"
 	gomock "go.uber.org/mock/gomock"
 )
 

@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/catalogfi/orderbook/model"
-	"github.com/catalogfi/orderbook/screener"
-	"github.com/catalogfi/orderbook/swapper"
-	"github.com/catalogfi/orderbook/swapper/bitcoin"
+	"github.com/catalogfi/ob/model"
+	"github.com/catalogfi/ob/screener"
+	"github.com/catalogfi/ob/swapper"
+	"github.com/catalogfi/ob/swapper/bitcoin"
 	"go.uber.org/zap"
 )
 

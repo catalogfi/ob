@@ -3,7 +3,7 @@ package ethereum_test
 import (
 	"math/big"
 
-	"github.com/catalogfi/orderbook/swapper/ethereum"
+	"github.com/catalogfi/ob/swapper/ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/crypto"
 	"go.uber.org/zap"

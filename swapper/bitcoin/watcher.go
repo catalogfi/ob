@@ -11,8 +11,8 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/catalogfi/orderbook/model"
-	"github.com/catalogfi/orderbook/swapper"
+	"github.com/catalogfi/ob/model"
+	"github.com/catalogfi/ob/swapper"
 )
 
 // Watcher implements the `swapper.Watcher` interface. It watches a particular HTLC contract address and detect state

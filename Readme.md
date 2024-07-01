@@ -1,6 +1,6 @@
-# OrderBook
+# Orderbook
 
-Orderbook is a order matching engine for [garden.finance](https://garden.finance), implemented in Go. Garden Finance is a decentralized exchange which supports atomic swaps, enabling seamless cross-chain bridging. Through this Orderbook API, users can create orders, track the progress of orders, and complete swaps, while market makers can accept orders and complete trades.
+Orderbook is a order matching engine for [garden.finance](https://garden.finance), implemented in Go. Garden Finance is a decentralized exchange which supports atomic swaps, enabling seamless cross-chain bridging. Through this orderbook API, users can create orders, track the progress of orders, and complete swaps, while market makers can accept orders and complete trades.
 
 Orderbook serves as the intermediary between users and counter parties during swaps. It facilitates transactions by supporting different order types: market orders for immediate execution, limit orders for specific prices(wip), and Dutch auction orders for dynamic price discovery(wip).
 
@@ -93,10 +93,10 @@ Each network configuration under `CONFIG.Network` includes data about a blockcha
 
 1. Clone the repository
    ```shell
-   $ git clone https://github.com/catalogfi/orderbook.git
+   $ git clone https://github.com/catalogfi/ob.git
    ```
    ```shell
-   $ cd orderbook
+   $ cd ob
    ```
 2. Build the project
    ```shell

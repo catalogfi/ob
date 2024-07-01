@@ -7,7 +7,7 @@ package mocks
 import (
 	reflect "reflect"
 
-	bitcoin "github.com/catalogfi/orderbook/swapper/bitcoin"
+	bitcoin "github.com/catalogfi/ob/swapper/bitcoin"
 	gomock "go.uber.org/mock/gomock"
 )
 

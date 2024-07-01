@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/catalogfi/orderbook/model"
+	"github.com/catalogfi/ob/model"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"

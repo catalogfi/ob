@@ -1,4 +1,4 @@
-module github.com/catalogfi/orderbook
+module github.com/catalogfi/ob
 
 go 1.21
 

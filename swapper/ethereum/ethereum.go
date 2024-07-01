@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/catalogfi/orderbook/swapper"
+	"github.com/catalogfi/ob/swapper"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )

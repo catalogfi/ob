@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/catalogfi/orderbook/model"
+	"github.com/catalogfi/ob/model"
 )
 
 var (

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/catalogfi/orderbook/model"
+	"github.com/catalogfi/ob/model"
 	"gorm.io/gorm"
 )
 

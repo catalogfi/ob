@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/catalogfi/orderbook/mocks"
-	"github.com/catalogfi/orderbook/model"
-	"github.com/catalogfi/orderbook/rest"
+	"github.com/catalogfi/ob/mocks"
+	"github.com/catalogfi/ob/model"
+	"github.com/catalogfi/ob/rest"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"

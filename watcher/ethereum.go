@@ -10,9 +10,9 @@ import (
 	"time"
 
 	GardenHTLC "github.com/catalogfi/blockchain/evm/bindings/contracts/htlc/gardenhtlc"
-	"github.com/catalogfi/orderbook/model"
-	"github.com/catalogfi/orderbook/screener"
-	"github.com/catalogfi/orderbook/swapper/ethereum"
+	"github.com/catalogfi/ob/model"
+	"github.com/catalogfi/ob/screener"
+	"github.com/catalogfi/ob/swapper/ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
